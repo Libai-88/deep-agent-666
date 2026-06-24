@@ -10,6 +10,8 @@ Files changed:
 - `.env.example`
 - `.gitignore`
 - `tests/smoke/test_repo_layout.py`
+- `agent/.gitkeep`
+- `web/.gitkeep`
 
 Directories created:
 
@@ -40,6 +42,46 @@ Added the minimal scaffolding required by the brief:
 - root `.env.example` with the exact required environment keys and values
 - appended the required root ignore entries to `.gitignore`
 - created empty `agent/` and `web/` directories to satisfy the required smoke test behavior
+
+Re-ran:
+
+```bash
+python -m pytest tests/smoke/test_repo_layout.py -v
+```
+
+Result:
+
+- `1 passed`
+
+## Follow-up Durability Fix
+
+### Red
+
+Identified that the original Task 1 result was not durable across fresh checkouts because Git does not track empty directories.
+
+Updated the focused smoke test to require tracked placeholders:
+
+- `agent/.gitkeep`
+- `web/.gitkeep`
+
+Then ran:
+
+```bash
+python -m pytest tests/smoke/test_repo_layout.py -v
+```
+
+Observed the expected failure:
+
+- `missing repository paths: ['agent\\.gitkeep', 'web\\.gitkeep']`
+
+This confirmed the durability gap with the original empty-directory-only approach.
+
+### Green
+
+Added the smallest tracked placeholders needed to make the repository layout durable in Git:
+
+- `agent/.gitkeep`
+- `web/.gitkeep`
 
 Re-ran:
 
@@ -84,5 +126,4 @@ Result:
 
 ## Notes / Concerns
 
-- `agent/` and `web/` were created as empty directories to satisfy the task’s explicit ambiguity resolution.
-- Empty directories are not tracked by Git by default, so the commit records the root foundation files and test, while the directories remain present in the worktree filesystem.
+- `agent/` and `web/` now contain tracked `.gitkeep` placeholders so the Task 1 repository layout survives fresh checkouts.
