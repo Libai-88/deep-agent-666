@@ -213,3 +213,75 @@ Relevant output:
   - `test:web`
   - `test:agent`
 - each of those required Task 1 entrypoints now resolves to a `powershell -NoProfile -Command ...` script
+
+## Second Follow-up Fix: Remaining PowerShell Entry Points
+
+### Red
+
+The remaining Task 1 gap was that `typecheck:web` and `lint:web` were still root developer entrypoints that bypassed the explicit PowerShell wrapper.
+
+Ran the expanded focused check before editing `package.json`:
+
+```bash
+@'
+const pkg = require('./package.json');
+const required = ['dev:web','dev:agent','dev','test:web','test:agent','test','typecheck:web','lint:web'];
+const missing = required.filter((name) => !pkg.scripts[name].startsWith('powershell -NoProfile -Command '));
+if (missing.length) {
+  console.error(`scripts missing explicit PowerShell wrapper: ${missing.join(', ')}`);
+  process.exit(1);
+}
+console.log('all required scripts use explicit PowerShell wrappers');
+'@ | node -
+```
+
+Observed expected failure:
+
+- `scripts missing explicit PowerShell wrapper: typecheck:web, lint:web`
+
+### Green
+
+Made the smallest Task 1 fix in `package.json`:
+
+- wrapped `typecheck:web` in `powershell -NoProfile -Command`
+- wrapped `lint:web` in `powershell -NoProfile -Command`
+
+Re-ran the required focused smoke test:
+
+```bash
+python -m pytest tests/smoke/test_repo_layout.py -v
+```
+
+Result:
+
+- `1 passed`
+
+Re-ran the expanded eight-script wrapper verification:
+
+```bash
+@'
+const pkg = require('./package.json');
+const required = ['dev:web','dev:agent','dev','test:web','test:agent','test','typecheck:web','lint:web'];
+const missing = required.filter((name) => !pkg.scripts[name].startsWith('powershell -NoProfile -Command '));
+if (missing.length) {
+  console.error(`scripts missing explicit PowerShell wrapper: ${missing.join(', ')}`);
+  process.exit(1);
+}
+console.log('all required scripts use explicit PowerShell wrappers');
+'@ | node -
+```
+
+Result:
+
+- `all required scripts use explicit PowerShell wrappers`
+
+Confirmed the root script surface still resolves:
+
+```bash
+npm run
+```
+
+Relevant output:
+
+- `typecheck:web` resolves to `powershell -NoProfile -Command "npm --prefix web run typecheck"`
+- `lint:web` resolves to `powershell -NoProfile -Command "npm --prefix web run lint"`

@@ -8,8 +8,8 @@
     "test:web": "powershell -NoProfile -Command \"npm --prefix web run test\"",
     "test:agent": "powershell -NoProfile -Command \"uv run --project agent pytest\"",
     "test": "powershell -NoProfile -Command \"python -m pytest tests/smoke/test_repo_layout.py -v; if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }; npm run test:agent; if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }; npm run test:web; exit $LASTEXITCODE\"",
-    "typecheck:web": "npm --prefix web run typecheck",
-    "lint:web": "npm --prefix web run lint"
+    "typecheck:web": "powershell -NoProfile -Command \"npm --prefix web run typecheck\"",
+    "lint:web": "powershell -NoProfile -Command \"npm --prefix web run lint\""
   },
   "devDependencies": {
     "concurrently": "^10.0.3"
