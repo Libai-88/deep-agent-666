@@ -111,3 +111,68 @@ With the installed `next@16.2.9`, that command does not run successfully in this
 - `Invalid project directory provided, no such directory: ...\\web\\lint`
 
 I left the script as specified by the task brief rather than silently changing the required verbatim value. Tests, typecheck, and production build all pass.
+
+## Task 4 Lint Fix
+
+Follow-up scope was intentionally limited to the official Next 16 lint migration:
+
+- replaced `web/package.json` script from `next lint` to `eslint .`
+- added `eslint` and `eslint-config-next` to `web/package.json` dev dependencies
+- added `web/eslint.config.mjs` using the official flat-config style for Next.js + TypeScript:
+  - `eslint-config-next/core-web-vitals`
+  - `eslint-config-next/typescript`
+  - `globalIgnores(...)` for build artifacts
+
+### Lint Fix TDD Evidence
+
+#### Red
+
+Added a narrow failing test in:
+
+- `web/src/lib/__tests__/copilot-runtime.test.ts`
+
+Focused red command:
+
+```powershell
+npm run test -- --run src/lib/__tests__/copilot-runtime.test.ts
+```
+
+Observed failure:
+
+- expected lint script `eslint .`
+- received `next lint`
+
+#### Green
+
+Applied the minimal official Next 16 ESLint CLI setup and reran the focused test:
+
+```powershell
+npm run test -- --run src/lib/__tests__/copilot-runtime.test.ts
+```
+
+Observed result:
+
+- `1` file passed
+- `3` tests passed
+
+### Lint Fix Verification
+
+Fresh successful commands after the fix:
+
+```powershell
+npm run lint
+npm run test
+npm run typecheck
+npm run build
+```
+
+Observed results:
+
+- `npm run lint`: passed with `eslint .`
+- `npm run test`: passed, `2` files / `6` tests green
+- `npm run typecheck`: passed
+- `npm run build`: passed
+
+### Updated Concern
+
+The original Task 4 lint concern is resolved. The `web` project now uses the official Next 16 ESLint CLI setup and `npm run lint` succeeds.
