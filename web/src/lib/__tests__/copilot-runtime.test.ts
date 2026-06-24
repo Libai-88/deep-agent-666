@@ -124,6 +124,7 @@ describe("createRuntimeFromCatalog", () => {
     expect(Object.keys(runtimeOptions.agents)).toEqual([
       "openai-balanced",
       "google-full-access",
+      "default",
     ]);
     expect(runtimeOptions.agents["openai-balanced"]?.options).toEqual({
       url: "http://127.0.0.1:8123/openai-balanced",

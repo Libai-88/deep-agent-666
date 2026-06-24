@@ -25,14 +25,22 @@ export function createRemoteAgents(
   baseUrl: string,
   catalog: AgentPresetCatalog,
 ): Record<string, LangGraphHttpAgent> {
-  return Object.fromEntries(
-    catalog.presets.map((preset) => [
-      preset.id,
-      new LangGraphHttpAgent({
-        url: buildRemoteAgentUrl(baseUrl, preset.id),
-      }),
-    ]),
-  );
+  const agents: Record<string, LangGraphHttpAgent> = {};
+  const defaultPresetId = catalog.defaultPresetId ?? catalog.presets[0]?.id;
+
+  for (const preset of catalog.presets) {
+    agents[preset.id] = new LangGraphHttpAgent({
+      url: buildRemoteAgentUrl(baseUrl, preset.id),
+    });
+  }
+
+  // CopilotKit uses "default" as the internal agent ID when none is specified.
+  // Alias it to the catalog's default preset so the provider sync succeeds.
+  if (defaultPresetId && !agents["default"]) {
+    agents["default"] = agents[defaultPresetId];
+  }
+
+  return agents;
 }
 
 export function createRuntimeFromCatalog(
