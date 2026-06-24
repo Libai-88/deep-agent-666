@@ -24,6 +24,7 @@ uv sync --project agent --extra dev
 ```powershell
 cd web
 npm install
+npx playwright install chromium
 cd ..
 ```
 
