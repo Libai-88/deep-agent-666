@@ -1,17 +1,12 @@
 from __future__ import annotations
 
-from typing import Any
 from pathlib import Path
 
 from copilotkit import LangGraphAGUIAgent
 from deepagents import create_deep_agent
 from langchain.chat_models import init_chat_model
 from langchain.tools import tool
-from langchain_core.callbacks import CallbackManagerForLLMRun
-from langchain_core.language_models import BaseChatModel, SimpleChatModel
-from langchain_core.messages import BaseMessage
 from langgraph.checkpoint.memory import InMemorySaver
-from pydantic import PrivateAttr
 
 from app.config import AgentSettings
 from app.permissions import PermissionMode, interrupt_config_for_mode, mutable_tool_names
@@ -33,33 +28,19 @@ When a tool call is interrupted for approval, wait for the human decision and co
 Prefer concise, execution-focused responses."""
 
 
-class LazyPresetChatModel(SimpleChatModel):
-    model_name: str
-    _resolved_model: BaseChatModel | None = PrivateAttr(default=None)
+def _build_model(preset: AgentPreset, settings: AgentSettings):
+    provider, model_name = preset.model.split(":", maxsplit=1)
+    model_provider = "google_genai" if provider == "google" else provider
 
-    @property
-    def _llm_type(self) -> str:
-        return "lazy-preset-chat-model"
+    kwargs: dict[str, str] = {}
+    if provider == "openai" and settings.openai_api_key:
+        kwargs["api_key"] = settings.openai_api_key
+    elif provider == "anthropic" and settings.anthropic_api_key:
+        kwargs["api_key"] = settings.anthropic_api_key
+    elif provider == "google" and settings.google_api_key:
+        kwargs["google_api_key"] = settings.google_api_key
 
-    def _get_resolved_model(self) -> BaseChatModel:
-        if self._resolved_model is None:
-            self._resolved_model = init_chat_model(self.model_name)
-        return self._resolved_model
-
-    def _call(
-        self,
-        messages: list[BaseMessage],
-        stop: list[str] | None = None,
-        run_manager: CallbackManagerForLLMRun | None = None,
-        **kwargs: Any,
-    ) -> str:
-        response = self._get_resolved_model().invoke(messages, stop=stop, **kwargs)
-        if isinstance(response.content, str):
-            return response.content
-        return str(response.content)
-
-    def bind_tools(self, tools, *, tool_choice: str | None = None, **kwargs: Any):
-        return self._get_resolved_model().bind_tools(tools, tool_choice=tool_choice, **kwargs)
+    return init_chat_model(model=model_name, model_provider=model_provider, **kwargs)
 
 
 def _toolset_for_preset(workspace_root: Path, permission_mode: PermissionMode) -> list[object]:
@@ -119,7 +100,7 @@ def _toolset_for_preset(workspace_root: Path, permission_mode: PermissionMode) -
 
 def build_graph(preset: AgentPreset, settings: AgentSettings) -> object:
     return create_deep_agent(
-        model=LazyPresetChatModel(model_name=preset.model),
+        model=_build_model(preset, settings),
         tools=_toolset_for_preset(settings.workspace_root, preset.permission_mode),
         system_prompt=SYSTEM_PROMPT,
         interrupt_on=interrupt_config_for_mode(preset.permission_mode),

@@ -112,3 +112,87 @@ Planned commit message from the task brief:
 ```text
 feat: add deep agents backend service
 ```
+
+## Task 3 Follow-Up Fix: Provider Integrations
+
+### Validated finding
+
+The reviewer finding was correct for this codebase:
+
+- The backend advertised OpenAI, Anthropic, and Google presets.
+- `agent/pyproject.toml` did not explicitly declare the matching LangChain provider integrations.
+- The lazy model wrapper in `agent/app/agent_factory.py` allowed startup and tests to pass while deferring provider failures to first real preset use.
+
+### Red
+
+Added a regression test in `agent/tests/test_agent_factory.py`:
+
+- `test_provider_integrations_exist_for_advertised_presets`
+
+Ran:
+
+```powershell
+uv run --project D:\AgentBuild\.worktrees\deepagents-foundation\agent pytest D:\AgentBuild\.worktrees\deepagents-foundation\agent\tests\test_agent_factory.py::test_provider_integrations_exist_for_advertised_presets -v
+```
+
+Observed expected failure:
+
+- `AssertionError: assert None is not None`
+- Missing module: `langchain_openai`
+
+### Fix applied
+
+- Added explicit provider dependencies to `agent/pyproject.toml`:
+  - `langchain-openai>=1.0.0,<2.0.0`
+  - `langchain-anthropic>=1.0.0,<2.0.0`
+  - `langchain-google-genai>=4.0.0,<5.0.0`
+- Removed the lazy preset model wrapper from `agent/app/agent_factory.py`.
+- Replaced it with eager provider-backed model construction using `init_chat_model(...)`.
+- Mapped the preset `google:` prefix to LangChain's `google_genai` provider name.
+- Passed provider API keys from `AgentSettings` into model construction so the eager graph build path is valid for all advertised providers.
+- Tightened `test_build_graph_map_covers_every_preset` to supply OpenAI, Anthropic, and Google API keys.
+
+### Verification
+
+#### Focused Task 3 tests
+
+```powershell
+uv run --project D:\AgentBuild\.worktrees\deepagents-foundation\agent pytest D:\AgentBuild\.worktrees\deepagents-foundation\agent\tests\test_workspace_tools.py D:\AgentBuild\.worktrees\deepagents-foundation\agent\tests\test_documents.py D:\AgentBuild\.worktrees\deepagents-foundation\agent\tests\test_agent_factory.py -v
+```
+
+Result:
+
+- `6 passed in 9.68s`
+
+#### Broader backend verification
+
+```powershell
+uv run --project D:\AgentBuild\.worktrees\deepagents-foundation\agent pytest D:\AgentBuild\.worktrees\deepagents-foundation\agent\tests -v
+```
+
+Result:
+
+- `14 passed in 6.81s`
+
+#### Multi-provider service import sanity check
+
+Ran from `D:\AgentBuild\.worktrees\deepagents-foundation\agent` with:
+
+```powershell
+$env:AGENT_WORKSPACE_ROOT='D:\AgentBuild\.worktrees\deepagents-foundation'
+$env:OPENAI_API_KEY='test-key'
+$env:ANTHROPIC_API_KEY='test-key'
+$env:GOOGLE_API_KEY='test-key'
+uv run python -c "from app.main import app, agents; print(app.title); print(len(agents)); print(sorted(route.path for route in app.routes if route.path in ['/health', '/presets', '/openai-balanced', '/anthropic-balanced', '/google-balanced']))"
+```
+
+Result:
+
+- App title: `deep-agent-666-agent`
+- Preset agent count: `9`
+- Verified multi-provider routes:
+  - `'/anthropic-balanced'`
+  - `'/google-balanced'`
+  - `'/health'`
+  - `'/openai-balanced'`
+  - `'/presets'`
