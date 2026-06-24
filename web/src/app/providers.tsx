@@ -9,10 +9,9 @@ export function Providers({ children }: { children: ReactNode }) {
   return (
     <CopilotKit
       runtimeUrl="/api/copilotkit"
-      useSingleEndpoint={false}
-      showDevConsole
-      onError={({ type, error, context }) => {
-        console.error("[copilotkit]", type, error, context);
+      credentials="include"
+      onError={({ code, error, context }) => {
+        console.error("[copilotkit]", code, error, context);
       }}
     >
       {children}
