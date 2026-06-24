@@ -20,14 +20,10 @@ function getHandler() {
   return handler;
 }
 
-export async function GET(request: Request) {
+async function handleRequest(request: Request) {
   return getHandler()(request);
 }
 
-export async function POST(request: Request) {
-  return getHandler()(request);
-}
-
-export async function OPTIONS(request: Request) {
-  return getHandler()(request);
-}
+export const GET = handleRequest;
+export const POST = handleRequest;
+export const OPTIONS = handleRequest;

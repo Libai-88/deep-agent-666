@@ -176,3 +176,66 @@ Observed results:
 ### Updated Concern
 
 The original Task 4 lint concern is resolved. The `web` project now uses the official Next 16 ESLint CLI setup and `npm run lint` succeeds.
+
+## Task 4 Review Fix
+
+Validated review issue addressed without broadening into Task 5:
+
+- strengthened `web/src/lib/__tests__/copilot-runtime.test.ts`
+  - added focused `createRuntime()` contract coverage
+  - added focused API route export/handler coverage
+- made a minimal route refactor in `web/src/app/api/copilotkit/[...slug]/route.ts`
+  - `GET`, `POST`, and `OPTIONS` now share one exported request function
+  - runtime behavior is unchanged: still lazy, still fetch-native, still uses `createCopilotRuntimeHandler`
+
+No explicit `threadId` wiring, local thread registry, or single-primary-agent behavior was added here. Those remain Task 5 responsibilities.
+
+### Review Fix TDD Evidence
+
+#### Red
+
+Added the missing runtime-bridge assertions first and ran the focused test file:
+
+```powershell
+npm run test -- --run src/lib/__tests__/copilot-runtime.test.ts
+```
+
+Observed failure:
+
+- route export contract failed because `GET` and `POST` were different wrapper functions
+
+Failure excerpt:
+
+- expected `GET` to be `POST`
+- received separate async functions
+
+#### Green
+
+Applied the minimal route refactor and reran the focused test file:
+
+```powershell
+npm run test -- --run src/lib/__tests__/copilot-runtime.test.ts
+```
+
+Observed result:
+
+- `1` file passed
+- `5` tests passed
+
+### Review Fix Verification
+
+Fresh successful commands after the fix:
+
+```powershell
+npm run lint
+npm run test
+npm run typecheck
+npm run build
+```
+
+Observed results:
+
+- `npm run lint`: passed
+- `npm run test`: passed, `2` files / `8` tests green
+- `npm run typecheck`: passed
+- `npm run build`: passed
