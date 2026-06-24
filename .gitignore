@@ -1,0 +1,7 @@
+/.agents/
+/.tmp-copilotkit-cli/
+/.workbuddy/
+/maxmzr/
+/copilotkit-*.tgz
+/nul
+/skills-lock.json
