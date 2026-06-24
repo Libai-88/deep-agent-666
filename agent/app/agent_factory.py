@@ -28,17 +28,42 @@ When a tool call is interrupted for approval, wait for the human decision and co
 Prefer concise, execution-focused responses."""
 
 
+def _preset_provider(preset: AgentPreset) -> str:
+    return preset.model.split(":", maxsplit=1)[0]
+
+
+def _provider_api_key(settings: AgentSettings, provider: str) -> str | None:
+    if provider == "openai":
+        return settings.openai_api_key
+    if provider == "anthropic":
+        return settings.anthropic_api_key
+    if provider == "google":
+        return settings.google_api_key
+    return None
+
+
+def available_presets(settings: AgentSettings) -> dict[str, AgentPreset]:
+    return {
+        preset_id: preset
+        for preset_id, preset in ALL_PRESETS.items()
+        if _provider_api_key(settings, _preset_provider(preset))
+    }
+
+
 def _build_model(preset: AgentPreset, settings: AgentSettings):
-    provider, model_name = preset.model.split(":", maxsplit=1)
+    provider = _preset_provider(preset)
+    model_name = preset.model.split(":", maxsplit=1)[1]
     model_provider = "google_genai" if provider == "google" else provider
 
-    kwargs: dict[str, str] = {}
-    if provider == "openai" and settings.openai_api_key:
-        kwargs["api_key"] = settings.openai_api_key
-    elif provider == "anthropic" and settings.anthropic_api_key:
-        kwargs["api_key"] = settings.anthropic_api_key
-    elif provider == "google" and settings.google_api_key:
-        kwargs["google_api_key"] = settings.google_api_key
+    api_key = _provider_api_key(settings, provider)
+    if api_key is None:
+        raise ValueError(f"provider is not configured: {provider}")
+
+    kwargs: dict[str, str]
+    if provider == "google":
+        kwargs = {"google_api_key": api_key}
+    else:
+        kwargs = {"api_key": api_key}
 
     return init_chat_model(model=model_name, model_provider=model_provider, **kwargs)
 
@@ -110,15 +135,19 @@ def build_graph(preset: AgentPreset, settings: AgentSettings) -> object:
 
 
 def build_graph_map(settings: AgentSettings) -> dict[str, object]:
-    return {preset_id: build_graph(preset, settings) for preset_id, preset in ALL_PRESETS.items()}
+    return {
+        preset_id: build_graph(preset, settings)
+        for preset_id, preset in available_presets(settings).items()
+    }
 
 
 def build_langgraph_agents(settings: AgentSettings) -> dict[str, LangGraphAGUIAgent]:
     graph_map = build_graph_map(settings)
+    configured_presets = available_presets(settings)
     return {
         preset_id: LangGraphAGUIAgent(
             name=preset_id,
-            description=ALL_PRESETS[preset_id].label,
+            description=configured_presets[preset_id].label,
             graph=graph,
         )
         for preset_id, graph in graph_map.items()

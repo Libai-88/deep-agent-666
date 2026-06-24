@@ -2,12 +2,13 @@ from fastapi import FastAPI
 from fastapi.responses import JSONResponse
 from ag_ui_langgraph import add_langgraph_fastapi_endpoint
 
-from app.agent_factory import build_langgraph_agents
+from app.agent_factory import available_presets, build_langgraph_agents
 from app.config import load_settings
-from app.presets import ALL_PRESETS, DEFAULT_PRESET_ID
+from app.presets import DEFAULT_PRESET_ID
 
 
 settings = load_settings()
+presets_by_id = available_presets(settings)
 agents = build_langgraph_agents(settings)
 app = FastAPI(title="deep-agent-666-agent")
 
@@ -19,10 +20,11 @@ async def health() -> JSONResponse:
 
 @app.get("/presets")
 async def presets() -> JSONResponse:
+    default_preset_id = DEFAULT_PRESET_ID if DEFAULT_PRESET_ID in presets_by_id else next(iter(presets_by_id), None)
     return JSONResponse(
         {
-            "defaultPresetId": DEFAULT_PRESET_ID,
-            "presets": [preset.model_dump() for preset in ALL_PRESETS.values()],
+            "defaultPresetId": default_preset_id,
+            "presets": [preset.model_dump() for preset in presets_by_id.values()],
         }
     )
 

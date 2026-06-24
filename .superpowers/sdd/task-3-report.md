@@ -196,3 +196,89 @@ Result:
   - `'/health'`
   - `'/openai-balanced'`
   - `'/presets'`
+
+## Task 3 Follow-Up Fix: Partial Provider Startup
+
+### Validated finding
+
+The remaining reviewer finding was correct:
+
+- The service eagerly constructed graphs for every advertised preset at import/startup time.
+- After the provider integration fix, startup still failed if only a subset of provider API keys was configured.
+- This made `app.main` unusable for partial-provider environments even though the product-level preset catalog can legitimately contain more providers than are locally configured.
+
+### Red
+
+Added a startup-focused regression test in `agent/tests/test_agent_factory.py`:
+
+- `test_main_starts_with_only_openai_configured`
+
+Ran:
+
+```powershell
+uv run --project D:\AgentBuild\.worktrees\deepagents-foundation\agent pytest D:\AgentBuild\.worktrees\deepagents-foundation\agent\tests\test_agent_factory.py::test_main_starts_with_only_openai_configured -v
+```
+
+Observed expected failure:
+
+- Importing `app.main` with only `OPENAI_API_KEY` set failed during eager Google graph construction.
+- The concrete exception was the Gemini API key validation failure from `ChatGoogleGenerativeAI`.
+
+### Fix applied
+
+- Added `available_presets(settings)` in `agent/app/agent_factory.py` to filter the full preset catalog down to providers that currently have credentials configured.
+- Updated `build_graph_map(settings)` and `build_langgraph_agents(settings)` to construct runtime graphs and agents only for the configured provider subset.
+- Kept `ALL_PRESETS` unchanged as the product-level full catalog definition.
+- Updated `agent/app/main.py` to expose `/presets` metadata only for the configured provider subset.
+- Kept `defaultPresetId` stable when the configured subset still includes `openai-balanced`; otherwise it falls back to the first available configured preset or `null` if none are configured.
+
+### Verification
+
+#### Focused partial-provider regression
+
+```powershell
+uv run --project D:\AgentBuild\.worktrees\deepagents-foundation\agent pytest D:\AgentBuild\.worktrees\deepagents-foundation\agent\tests\test_agent_factory.py::test_main_starts_with_only_openai_configured -v
+```
+
+Result:
+
+- `1 passed in 4.27s`
+
+#### Focused Task 3 tests
+
+```powershell
+uv run --project D:\AgentBuild\.worktrees\deepagents-foundation\agent pytest D:\AgentBuild\.worktrees\deepagents-foundation\agent\tests\test_workspace_tools.py D:\AgentBuild\.worktrees\deepagents-foundation\agent\tests\test_documents.py D:\AgentBuild\.worktrees\deepagents-foundation\agent\tests\test_agent_factory.py -v
+```
+
+Result:
+
+- `7 passed in 8.47s`
+
+#### Broader backend verification
+
+```powershell
+uv run --project D:\AgentBuild\.worktrees\deepagents-foundation\agent pytest D:\AgentBuild\.worktrees\deepagents-foundation\agent\tests -v
+```
+
+Result:
+
+- `15 passed in 8.72s`
+
+#### One-provider startup sanity check
+
+Ran from `D:\AgentBuild\.worktrees\deepagents-foundation\agent` with:
+
+```powershell
+$env:AGENT_WORKSPACE_ROOT='D:\AgentBuild\.worktrees\deepagents-foundation'
+$env:OPENAI_API_KEY='test-key'
+Remove-Item Env:ANTHROPIC_API_KEY -ErrorAction SilentlyContinue
+Remove-Item Env:GOOGLE_API_KEY -ErrorAction SilentlyContinue
+uv run python -c "from app.main import app, agents, presets_by_id; print(app.title); print(sorted(agents)); print(sorted(presets_by_id)); print(sorted(route.path for route in app.routes if route.path in ['/health', '/presets', '/openai-balanced', '/anthropic-balanced', '/google-balanced']))"
+```
+
+Result:
+
+- App title: `deep-agent-666-agent`
+- Runtime agents: `['openai-balanced', 'openai-full-access', 'openai-read-only']`
+- Exposed preset metadata: `['openai-balanced', 'openai-full-access', 'openai-read-only']`
+- Verified routes: `['/health', '/openai-balanced', '/presets']`
