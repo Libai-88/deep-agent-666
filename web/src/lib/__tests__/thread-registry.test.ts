@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import {
   createLocalThread,
   loadThreads,
+  sanitizeThreads,
   saveThreads,
 } from "../thread-registry";
 
@@ -53,6 +54,42 @@ describe("thread registry", () => {
         title: "Safe thread",
         presetId: "openai-balanced",
         updatedAt: 123,
+      },
+    ]);
+  });
+
+  it("drops persisted threads whose presets are not currently available", () => {
+    expect(
+      sanitizeThreads(
+        [
+          {
+            id: "thread-openai",
+            title: "OpenAI thread",
+            presetId: "openai-balanced",
+            updatedAt: 1,
+          },
+          {
+            id: "thread-google",
+            title: "Google thread",
+            presetId: "google-balanced",
+            updatedAt: 2,
+          },
+        ],
+        [
+          {
+            id: "google-balanced",
+            label: "Google / Balanced",
+            provider: "google",
+            permissionMode: "balanced",
+          },
+        ],
+      ),
+    ).toEqual([
+      {
+        id: "thread-google",
+        title: "Google thread",
+        presetId: "google-balanced",
+        updatedAt: 2,
       },
     ]);
   });

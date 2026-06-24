@@ -3,6 +3,8 @@ import { describe, expect, it } from "vitest";
 import {
   ALL_AGENT_PRESETS,
   DEFAULT_AGENT_PRESET_ID,
+  parsePresetId,
+  resolveDefaultPresetId,
   resolvePresetId,
 } from "../agent-presets";
 
@@ -30,5 +32,28 @@ describe("agent presets", () => {
 
   it("uses the backend-aligned default preset id", () => {
     expect(DEFAULT_AGENT_PRESET_ID).toBe("openai-balanced");
+  });
+
+  it("parses preset ids into provider and permission mode pairs", () => {
+    expect(parsePresetId("google-full-access")).toEqual({
+      provider: "google",
+      permissionMode: "full-access",
+    });
+  });
+
+  it("falls back to the first available preset when the default is unavailable", () => {
+    expect(
+      resolveDefaultPresetId({
+        defaultPresetId: "openai-balanced",
+        presets: [
+          {
+            id: "google-balanced",
+            label: "Google / Balanced",
+            provider: "google",
+            permissionMode: "balanced",
+          },
+        ],
+      }),
+    ).toBe("google-balanced");
   });
 });

@@ -1,6 +1,10 @@
 import { randomUUID } from "@copilotkit/shared";
 
-import { ALL_AGENT_PRESETS, type AgentPresetId } from "./agent-presets";
+import {
+  ALL_AGENT_PRESETS,
+  type AgentPresetDefinition,
+  type AgentPresetId,
+} from "./agent-presets";
 
 export type LocalThread = {
   id: string;
@@ -53,6 +57,15 @@ export function saveThreads(
   storage: Storage = window.localStorage,
 ): void {
   storage.setItem(STORAGE_KEY, JSON.stringify(threads));
+}
+
+export function sanitizeThreads(
+  threads: LocalThread[],
+  presets: readonly AgentPresetDefinition[],
+): LocalThread[] {
+  const availablePresetIds = new Set(presets.map((preset) => preset.id));
+
+  return threads.filter((thread) => availablePresetIds.has(thread.presetId));
 }
 
 export function createLocalThread(presetId: AgentPresetId): LocalThread {

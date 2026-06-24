@@ -45,6 +45,11 @@ npm run dev
 
 Open `http://127.0.0.1:3000`.
 
+## Current limits
+
+- The frontend stores local thread metadata, but in-flight backend graph state does not survive a FastAPI restart yet.
+- `npm run e2e` currently validates the local shell and preset/thread boot flow. It is not a full frontend-to-backend chat round-trip test.
+
 ## Test
 
 ### Python

@@ -1,27 +1,10 @@
-import { createCopilotRuntimeHandler } from "@copilotkit/runtime/v2";
-
-import { createRuntime } from "@/lib/copilot-runtime";
+import { getRuntimeState } from "@/lib/runtime-state";
 
 export const runtime = "nodejs";
 
-let handler:
-  | ReturnType<typeof createCopilotRuntimeHandler>
-  | undefined;
-
-function getHandler() {
-  if (!handler) {
-    handler = createCopilotRuntimeHandler({
-      runtime: createRuntime(),
-      basePath: "/api/copilotkit",
-      cors: true,
-    });
-  }
-
-  return handler;
-}
-
 async function handleRequest(request: Request) {
-  return getHandler()(request);
+  const state = await getRuntimeState();
+  return state.handler(request);
 }
 
 export const GET = handleRequest;
