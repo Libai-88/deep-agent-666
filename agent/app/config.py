@@ -14,6 +14,4 @@ class AgentSettings(BaseSettings):
 
 
 def load_settings() -> AgentSettings:
-    settings = AgentSettings()
-    settings.workspace_root.mkdir(parents=True, exist_ok=True)
-    return settings
+    return AgentSettings()
