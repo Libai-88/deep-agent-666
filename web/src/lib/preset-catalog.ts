@@ -30,10 +30,12 @@ function isPresetRecord(value: unknown): value is {
 
   const candidate = value as Record<string, unknown>;
 
+  // Accept both snake_case (raw backend) and camelCase (already-normalized) formats
   return (
     typeof candidate.id === "string" &&
     typeof candidate.label === "string" &&
-    typeof candidate.permission_mode === "string"
+    (typeof candidate.permission_mode === "string" ||
+     typeof candidate.permissionMode === "string")
   );
 }
 

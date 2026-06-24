@@ -35,9 +35,11 @@ function isLocalThread(value: unknown): value is LocalThread {
 }
 
 export function loadThreads(
-  storage: Storage = window.localStorage,
+  storage?: Storage,
 ): LocalThread[] {
-  const rawThreads = storage.getItem(STORAGE_KEY);
+  if (typeof window === "undefined") return [];
+  const s = storage ?? window.localStorage;
+  const rawThreads = s.getItem(STORAGE_KEY);
 
   if (!rawThreads) {
     return [];
