@@ -1,6 +1,6 @@
 import { randomUUID } from "@copilotkit/shared";
 
-import type { AgentPresetId } from "./agent-presets";
+import { ALL_AGENT_PRESETS, type AgentPresetId } from "./agent-presets";
 
 export type LocalThread = {
   id: string;
@@ -10,13 +10,42 @@ export type LocalThread = {
 };
 
 const STORAGE_KEY = "deep-agent-666.threads";
+const VALID_PRESET_IDS = new Set(
+  ALL_AGENT_PRESETS.map((preset) => preset.id),
+);
+
+function isLocalThread(value: unknown): value is LocalThread {
+  if (!value || typeof value !== "object") {
+    return false;
+  }
+
+  const candidate = value as Record<string, unknown>;
+
+  return (
+    typeof candidate.id === "string" &&
+    typeof candidate.title === "string" &&
+    typeof candidate.updatedAt === "number" &&
+    typeof candidate.presetId === "string" &&
+    VALID_PRESET_IDS.has(candidate.presetId as AgentPresetId)
+  );
+}
 
 export function loadThreads(
   storage: Storage = window.localStorage,
 ): LocalThread[] {
   const rawThreads = storage.getItem(STORAGE_KEY);
 
-  return rawThreads ? (JSON.parse(rawThreads) as LocalThread[]) : [];
+  if (!rawThreads) {
+    return [];
+  }
+
+  try {
+    const parsed = JSON.parse(rawThreads) as unknown;
+
+    return Array.isArray(parsed) ? parsed.filter(isLocalThread) : [];
+  } catch {
+    return [];
+  }
 }
 
 export function saveThreads(

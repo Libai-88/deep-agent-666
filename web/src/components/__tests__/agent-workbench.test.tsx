@@ -115,4 +115,45 @@ describe("AgentWorkbench", () => {
       root.unmount();
     });
   });
+
+  it("uses DEFAULT_AGENT_PRESET_ID when there are no persisted threads", async () => {
+    vi.resetModules();
+    vi.doMock("@/lib/agent-presets", async () => {
+      const actual = await vi.importActual<typeof import("@/lib/agent-presets")>(
+        "@/lib/agent-presets",
+      );
+
+      return {
+        ...actual,
+        DEFAULT_AGENT_PRESET_ID: "google-read-only",
+      };
+    });
+
+    const container = document.createElement("div");
+    document.body.appendChild(container);
+
+    const root = ReactDOMClient.createRoot(container);
+
+    await act(async () => {
+      const { AgentWorkbench: MockedAgentWorkbench } = await import(
+        "../agent-workbench"
+      );
+
+      root.render(<MockedAgentWorkbench />);
+    });
+
+    expect(copilotChatSpy).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        agentId: "google-read-only",
+        threadId: expect.any(String),
+      }),
+    );
+
+    act(() => {
+      root.unmount();
+    });
+
+    vi.doUnmock("@/lib/agent-presets");
+    vi.resetModules();
+  });
 });

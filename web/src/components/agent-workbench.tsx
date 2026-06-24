@@ -3,8 +3,12 @@
 import { CopilotChat } from "@copilotkit/react-core/v2";
 import { useEffect, useMemo, useState } from "react";
 
-import type { PermissionMode, ProviderKey } from "@/lib/agent-presets";
-import { resolvePresetId } from "@/lib/agent-presets";
+import {
+  DEFAULT_AGENT_PRESET_ID,
+  type PermissionMode,
+  type ProviderKey,
+  resolvePresetId,
+} from "@/lib/agent-presets";
 import {
   createLocalThread,
   loadThreads,
@@ -29,13 +33,12 @@ function parsePresetId(presetId: string): {
 
 export function AgentWorkbench() {
   const [initialState] = useState(() => {
-    const defaultPresetId = resolvePresetId("openai", "balanced");
     const storedThreads =
       typeof window === "undefined" ? [] : loadThreads(window.localStorage);
     const threads =
       storedThreads.length > 0
         ? storedThreads
-        : [createLocalThread(defaultPresetId)];
+        : [createLocalThread(DEFAULT_AGENT_PRESET_ID)];
     const activeThread = threads[0];
     const { provider, permissionMode } = parsePresetId(activeThread.presetId);
 
