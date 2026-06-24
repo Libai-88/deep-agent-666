@@ -83,9 +83,13 @@ export function TasksFilesSidebar({
       )}
 
       {todos.length === 0 && files.length === 0 && (
-        <p className="py-8 text-center text-sm text-muted-foreground">
-          No tasks or files yet.
-        </p>
+        <div className="flex flex-col items-center justify-center py-16 px-4 text-center">
+          <ListTodo className="mb-4 h-12 w-12 text-muted-foreground/30" />
+          <p className="text-sm font-medium text-foreground">No tasks or files yet</p>
+          <p className="mt-1 text-xs text-muted-foreground/60 max-w-[200px]">
+            Ask the agent to create todos or write files — they'll appear here automatically
+          </p>
+        </div>
       )}
 
       <FileViewDialog

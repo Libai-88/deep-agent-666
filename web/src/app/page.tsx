@@ -37,6 +37,7 @@ import {
   type FileItem,
 } from "@/components/TasksFilesSidebar";
 import { ToolCallCard } from "@/components/ToolCallCard";
+import { ThemeToggle } from "@/components/ThemeToggle";
 
 function seedThreads(): LocalThread[] {
   const stored = loadThreads();
@@ -209,6 +210,7 @@ function HomePageContent() {
           )}
         </div>
         <div className="flex items-center gap-2">
+          <ThemeToggle />
           <span className="text-xs text-muted-foreground">
             {currentPreset.label}
           </span>
@@ -285,8 +287,9 @@ function HomePageContent() {
                   agentId={activeThread.presetId}
                   threadId={activeThread.id}
                   labels={{
-                    welcomeMessageText: "Hi! How can I help you today?",
-                    chatInputPlaceholder: "Type a message...",
+                    welcomeMessageText: "Hi! I'm your local AI agent. I can help you with code, files, and tasks.",
+                    chatInputPlaceholder: "Ask me to research, write files, or manage tasks...",
+                    chatDisclaimerText: "AI responses may be inaccurate. Verify important information.",
                   }}
                 />
               </div>

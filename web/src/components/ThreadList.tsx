@@ -43,6 +43,7 @@ export function ThreadList({
   onClose,
 }: ThreadListProps) {
   const [filter, setFilter] = useState<string>("all");
+  const [loading] = useState(false);
 
   const filtered = useMemo(() => {
     return filter === "all"
@@ -61,7 +62,7 @@ export function ThreadList({
   }, [filtered]);
 
   return (
-    <div className="flex h-full flex-col">
+    <div className="flex h-full flex-col panel-enter">
       <div className="flex items-center justify-between border-b border-border px-4 py-3">
         <h2 className="text-sm font-semibold text-foreground">Threads</h2>
         <Button variant="ghost" size="sm" onClick={onClose}>
@@ -89,7 +90,13 @@ export function ThreadList({
 
       <ScrollArea className="flex-1">
         <div className="px-2 py-2">
-          {filtered.length === 0 ? (
+          {loading ? (
+            <div className="flex flex-col gap-3 p-2">
+              {[1,2,3,4,5].map(i => (
+                <div key={i} className="skeleton h-16 w-full rounded-lg" />
+              ))}
+            </div>
+          ) : filtered.length === 0 ? (
             <p className="px-2 py-8 text-center text-sm text-muted-foreground">
               No threads
             </p>

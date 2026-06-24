@@ -18,58 +18,80 @@
   --color-border: hsl(var(--border));
   --color-input: hsl(var(--input));
   --color-ring: hsl(var(--ring));
-  --radius: 0.625rem;
+  --radius: 0.75rem;
 }
 
 @layer base {
   :root {
-    /* shadcn/ui design tokens */
-    --background: 0 0% 100%;
-    --foreground: 240 10% 3.9%;
-    --card: 0 0% 100%;
-    --card-foreground: 240 10% 3.9%;
-    --primary: 346 100% 58%;
-    --primary-foreground: 0 0% 100%;
-    --secondary: 240 4.8% 95.9%;
-    --secondary-foreground: 240 5.9% 10%;
-    --muted: 240 4.8% 95.9%;
-    --muted-foreground: 240 3.8% 46.1%;
-    --accent: 240 4.8% 95.9%;
-    --accent-foreground: 240 5.9% 10%;
-    --destructive: 0 84.2% 60.2%;
-    --destructive-foreground: 0 0% 98%;
-    --border: 240 5.9% 90%;
-    --input: 240 5.9% 90%;
-    --ring: 346 100% 58%;
-    --radius: 0.625rem;
+    /* === Maxma 品牌色 — 紫色系，基于 Maxma 品牌规范 === */
+    --background: oklch(0.98 0.005 280);
+    --foreground: oklch(0.15 0.01 280);
+    --card: oklch(1 0 0);
+    --card-foreground: oklch(0.15 0.01 280);
+    --primary: oklch(0.72 0.12 280);
+    --primary-foreground: oklch(0.99 0 0);
+    --secondary: oklch(0.96 0.005 280);
+    --secondary-foreground: oklch(0.20 0.02 280);
+    --muted: oklch(0.96 0.005 280);
+    --muted-foreground: oklch(0.55 0.01 280);
+    --accent: oklch(0.90 0.04 280);
+    --accent-foreground: oklch(0.20 0.02 280);
+    --destructive: oklch(0.60 0.20 25);
+    --destructive-foreground: oklch(0.99 0 0);
+    --border: oklch(0.92 0.008 280);
+    --input: oklch(0.92 0.008 280);
+    --ring: oklch(0.72 0.12 280);
+    --radius: 0.75rem;
 
-    /* App-specific colors */
-    --color-user-message: #076699;
-    --color-user-message-bg: #e8f4f8;
-    --color-avatar-bg: #e8ebeb;
-    --color-success: #10b981;
-    --color-warning: #f59e0b;
-    --color-error: #ef4444;
+    /* 应用特定色 */
+    --color-user-message: oklch(0.60 0.15 280);
+    --color-user-message-bg: oklch(0.95 0.04 280);
+
+    /* === 全息渐变（品牌性装饰）=== */
+    --holo-gradient: linear-gradient(135deg, #c4b5fd, #93c5fd, #67e8f9);
+    --holo-gradient-hover: linear-gradient(135deg, #a78bfa, #60a5fa, #22d3ee);
+
+    /* === 4pt 基准间距体系（impeccable → spatial-design）=== */
+    --space-xs: 0.25rem;
+    --space-sm: 0.5rem;
+    --space-md: 0.75rem;
+    --space-lg: 1rem;
+    --space-xl: 1.5rem;
+    --space-2xl: 2rem;
+    --space-3xl: 3rem;
+    --space-4xl: 4rem;
+
+    /* === 动效 token（impeccable → motion-design: 100/300/500 规则）=== */
+    --duration-instant: 100ms;
+    --duration-state: 250ms;
+    --duration-layout: 400ms;
+    --duration-entrance: 600ms;
+    --ease-out-quart: cubic-bezier(0.25, 1, 0.5, 1);
+    --ease-out-expo: cubic-bezier(0.16, 1, 0.3, 1);
+    --ease-in-out: cubic-bezier(0.65, 0, 0.35, 1);
   }
 
   .dark {
-    --background: 240 10% 3.9%;
-    --foreground: 0 0% 98%;
-    --card: 240 10% 3.9%;
-    --card-foreground: 0 0% 98%;
-    --primary: 346 100% 58%;
-    --primary-foreground: 0 0% 100%;
-    --secondary: 240 3.7% 15.9%;
-    --secondary-foreground: 0 0% 98%;
-    --muted: 240 3.7% 15.9%;
-    --muted-foreground: 240 5% 64.9%;
-    --accent: 240 3.7% 15.9%;
-    --accent-foreground: 0 0% 98%;
-    --destructive: 0 62.8% 30.6%;
-    --destructive-foreground: 0 0% 98%;
-    --border: 240 3.7% 15.9%;
-    --input: 240 3.7% 15.9%;
-    --ring: 346 100% 58%;
+    --background: oklch(0.11 0.015 280);
+    --foreground: oklch(0.93 0.01 280);
+    --card: oklch(0.14 0.015 280);
+    --card-foreground: oklch(0.93 0.01 280);
+    --primary: oklch(0.78 0.10 280);
+    --primary-foreground: oklch(0.11 0.015 280);
+    --secondary: oklch(0.18 0.015 280);
+    --secondary-foreground: oklch(0.93 0.01 280);
+    --muted: oklch(0.18 0.015 280);
+    --muted-foreground: oklch(0.65 0.01 280);
+    --accent: oklch(0.22 0.03 280);
+    --accent-foreground: oklch(0.93 0.01 280);
+    --destructive: oklch(0.60 0.20 25);
+    --destructive-foreground: oklch(0.99 0 0);
+    --border: oklch(0.22 0.02 280);
+    --input: oklch(0.22 0.02 280);
+    --ring: oklch(0.78 0.10 280);
+
+    --color-user-message: oklch(0.78 0.10 280);
+    --color-user-message-bg: oklch(0.18 0.04 280);
   }
 
   * {
@@ -78,12 +100,16 @@
   }
 
   body {
-    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
-      "Helvetica Neue", Arial, sans-serif;
+    font-family: "Space Grotesk", -apple-system, BlinkMacSystemFont,
+      "Segoe UI", "Noto Sans SC", "PingFang SC", sans-serif;
     background: hsl(var(--background));
     color: hsl(var(--foreground));
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
+  }
+
+  code, pre, .font-mono {
+    font-family: "Spline Sans Mono", "SF Mono", Monaco, "Cascadia Code", monospace;
   }
 
   input:focus,
@@ -93,15 +119,15 @@
   }
 }
 
-/* CopilotKit v2 shadcn token overrides */
+/* === CopilotKit v2 shadcn token overrides（对齐 Maxma 品牌）=== */
 [data-copilotkit] {
-  --primary: oklch(0.55 0.22 264);
+  --primary: oklch(0.72 0.12 280);
   --primary-foreground: oklch(0.99 0 0);
   --background: oklch(1 0 0);
   --foreground: oklch(0.145 0 0);
-  --muted: oklch(0.97 0 0);
-  --border: oklch(0.922 0 0);
-  --radius: 0.625rem;
+  --muted: oklch(0.96 0.005 280);
+  --border: oklch(0.92 0.008 280);
+  --radius: 0.75rem;
 }
 
 .dark [data-copilotkit] {
@@ -110,57 +136,53 @@
   --border: oklch(0.269 0 0);
 }
 
-/* Scrollbar styling */
-.scrollbar-pretty::-webkit-scrollbar {
-  width: 6px;
+/* === 全息渐变按钮 === */
+.holo-button {
+  background: var(--holo-gradient);
+  color: white;
+  border: none;
+  transition: opacity var(--duration-state) var(--ease-out-quart);
+}
+.holo-button:hover {
+  background: var(--holo-gradient-hover);
+  opacity: 0.9;
 }
 
-.scrollbar-pretty::-webkit-scrollbar-track {
-  background: transparent;
+/* === 面板动画 === */
+@keyframes panelEnter {
+  from { transform: translateX(-8px); opacity: 0; }
+  to { transform: translateX(0); opacity: 1; }
 }
 
-.scrollbar-pretty::-webkit-scrollbar-thumb {
-  background: hsl(var(--muted-foreground) / 0.3);
-  border-radius: 3px;
-}
-
-.scrollbar-pretty::-webkit-scrollbar-thumb:hover {
-  background: hsl(var(--muted-foreground) / 0.5);
-}
-
-/* Utility classes */
-.sr-only {
-  position: absolute;
-  width: 1px;
-  height: 1px;
-  padding: 0;
-  margin: -1px;
-  overflow: hidden;
-  clip: rect(0, 0, 0, 0);
-  white-space: nowrap;
-  border-width: 0;
-}
-
-/* Animations */
-@keyframes fadeIn {
-  from { opacity: 0; }
-  to { opacity: 1; }
-}
-
-@keyframes slideIn {
+@keyframes fadeSlideUp {
   from { transform: translateY(4px); opacity: 0; }
   to { transform: translateY(0); opacity: 1; }
 }
 
-.fade-in {
-  animation: fadeIn 0.2s ease-out;
+.panel-enter {
+  animation: panelEnter var(--duration-layout) var(--ease-out-quart);
 }
 
-.slide-in {
-  animation: slideIn 0.2s ease-out;
+.fade-slide-up {
+  animation: fadeSlideUp var(--duration-state) var(--ease-out-quart);
 }
 
-/* Skeleton loading */
+/* === Scrollbar styling === */
+.scrollbar-pretty::-webkit-scrollbar {
+  width: 6px;
+}
+.scrollbar-pretty::-webkit-scrollbar-track {
+  background: transparent;
+}
+.scrollbar-pretty::-webkit-scrollbar-thumb {
+  background: hsl(var(--muted-foreground) / 0.3);
+  border-radius: 3px;
+}
+.scrollbar-pretty::-webkit-scrollbar-thumb:hover {
+  background: hsl(var(--muted-foreground) / 0.5);
+}
+
+/* === Skeleton loading === */
 @keyframes skeleton-pulse {
   0%, 100% { opacity: 0.4; }
   50% { opacity: 0.8; }
@@ -169,5 +191,12 @@
 .skeleton {
   background: hsl(var(--muted));
   border-radius: var(--radius);
-  animation: skeleton-pulse 1.5s ease-in-out infinite;
+  animation: skeleton-pulse 1.5s var(--ease-in-out) infinite;
+}
+
+/* === Utility === */
+.sr-only {
+  position: absolute; width: 1px; height: 1px;
+  padding: 0; margin: -1px; overflow: hidden;
+  clip: rect(0,0,0,0); white-space: nowrap; border-width: 0;
 }
