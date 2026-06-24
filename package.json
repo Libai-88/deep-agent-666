@@ -1,0 +1,17 @@
+{
+  "name": "deep-agent-666",
+  "private": true,
+  "scripts": {
+    "dev:web": "npm --prefix web run dev",
+    "dev:agent": "uv run --project agent uvicorn app.main:app --host 127.0.0.1 --port 8123 --reload",
+    "dev": "concurrently -n web,agent -c cyan,green \"npm run dev:web\" \"npm run dev:agent\"",
+    "test:web": "npm --prefix web run test",
+    "test:agent": "uv run --project agent pytest",
+    "test": "python -m pytest tests/smoke/test_repo_layout.py -v && npm run test:agent && npm run test:web",
+    "typecheck:web": "npm --prefix web run typecheck",
+    "lint:web": "npm --prefix web run lint"
+  },
+  "devDependencies": {
+    "concurrently": "^10.0.3"
+  }
+}
