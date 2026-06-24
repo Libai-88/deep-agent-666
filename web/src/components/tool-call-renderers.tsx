@@ -17,14 +17,12 @@ export function ToolCallRenderers() {
         cwd: z.string().optional(),
       }),
       render: ({ status, parameters, result }) => (
-        <div
-          style={{ border: "1px solid var(--line)", borderRadius: 12, padding: 12 }}
-        >
-          <strong>PowerShell</strong>
-          <div>{parameters.command}</div>
-          <div style={{ color: "var(--muted)", fontSize: 12 }}>{status}</div>
+        <div className="wb-tool">
+          <div className="wb-tool__name">PowerShell</div>
+          <div className="wb-tool__detail">{parameters.command}</div>
+          <div className="wb-tool__status">{status}</div>
           {status === "complete" ? (
-            <pre>{JSON.stringify(result, null, 2)}</pre>
+            <pre className="wb-tool__result">{JSON.stringify(result, null, 2)}</pre>
           ) : null}
         </div>
       ),
@@ -37,12 +35,10 @@ export function ToolCallRenderers() {
       name: "read_document_tool",
       parameters: z.object({ path: z.string() }),
       render: ({ status, parameters }) => (
-        <div
-          style={{ border: "1px solid var(--line)", borderRadius: 12, padding: 12 }}
-        >
-          <strong>Document</strong>
-          <div>{parameters.path}</div>
-          <div style={{ color: "var(--muted)", fontSize: 12 }}>{status}</div>
+        <div className="wb-tool">
+          <div className="wb-tool__name">Document</div>
+          <div className="wb-tool__detail">{parameters.path}</div>
+          <div className="wb-tool__status">{status}</div>
         </div>
       ),
     },

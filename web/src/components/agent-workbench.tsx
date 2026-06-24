@@ -138,9 +138,11 @@ export function AgentWorkbench({
 
   if (!activeThread || !currentPreset) {
     return (
-      <main style={{ padding: 24 }}>
-        <h1 style={{ marginTop: 0 }}>Assistant</h1>
-        <p>No configured agent presets are available. Add at least one provider key.</p>
+      <main className="wb">
+        <section className="wb-main">
+          <h1 className="wb-main__title">Assistant</h1>
+          <p>No configured agent presets are available. Add at least one provider key.</p>
+        </section>
       </main>
     );
   }
@@ -163,13 +165,7 @@ export function AgentWorkbench({
   }
 
   return (
-    <main
-      style={{
-        display: "grid",
-        gridTemplateColumns: "260px 1fr",
-        minHeight: "100vh",
-      }}
-    >
+    <main className="wb">
       <ThreadSidebar
         threads={threads}
         activeThreadId={activeThread.id}
@@ -178,8 +174,13 @@ export function AgentWorkbench({
           appendThread(currentPreset.id);
         }}
       />
-      <section style={{ padding: 24 }}>
-        <h1 style={{ marginTop: 0 }}>Assistant</h1>
+      <section className="wb-main">
+        <div className="wb-main__header">
+          <h1 className="wb-main__title">Assistant</h1>
+          <span className="wb-main__status">
+            {catalogSource === "live" ? "Connected" : "Offline"}
+          </span>
+        </div>
         <SettingsPanel
           provider={provider}
           permissionMode={permissionMode}
@@ -213,19 +214,16 @@ export function AgentWorkbench({
         />
         <ToolCallRenderers />
         <InterruptApproval />
-        <div
-          style={{
-            height: "calc(100vh - 180px)",
-            border: "1px solid var(--line)",
-            borderRadius: 20,
-            overflow: "hidden",
-          }}
-        >
+        <div className="wb-chat">
           {catalogSource === "live" ? (
             <CopilotChat agentId={activeThread.presetId} threadId={activeThread.id} />
           ) : (
-            <div style={{ padding: 24 }}>
-              Backend is offline. Start the local agent service to enable chat.
+            <div className="wb-offline">
+              <span className="wb-offline__icon">&#9889;</span>
+              <span>Backend is offline</span>
+              <span style={{ fontSize: "0.82rem", opacity: 0.7 }}>
+                Start the local agent service to enable chat
+              </span>
             </div>
           )}
         </div>

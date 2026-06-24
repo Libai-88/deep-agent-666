@@ -25,7 +25,7 @@ def test_all_model_permission_pairs_exist() -> None:
 
 def test_get_preset_returns_metadata() -> None:
     preset = get_preset("openai-balanced")
-    assert preset.model == "openai:gpt-5-mini"
+    assert preset.model == "openai:openrouter/free"
     assert preset.permission_mode == "balanced"
 
 
@@ -48,13 +48,15 @@ def test_load_settings_is_read_only_and_does_not_create_workspace(monkeypatch, t
     workspace_root = tmp_path / "workspace"
     monkeypatch.setenv("AGENT_WORKSPACE_ROOT", str(workspace_root))
     monkeypatch.delenv("OPENAI_API_KEY", raising=False)
+    monkeypatch.delenv("OPENAI_BASE_URL", raising=False)
     monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
     monkeypatch.delenv("GOOGLE_API_KEY", raising=False)
 
-    settings = load_settings()
+    settings = AgentSettings(_env_file="")
 
     assert settings.workspace_root == workspace_root
     assert settings.openai_api_key is None
+    assert settings.openai_base_url is None
     assert settings.anthropic_api_key is None
     assert settings.google_api_key is None
     assert not workspace_root.exists()

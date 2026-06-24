@@ -31,9 +31,7 @@ export function SettingsPanel({
   );
 
   return (
-    <div
-      style={{ display: "flex", gap: 12, alignItems: "center", marginBottom: 12 }}
-    >
+    <div className="wb-settings">
       <label>
         Model
         <select

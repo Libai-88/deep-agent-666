@@ -9,6 +9,7 @@ class AgentSettings(BaseSettings):
 
     workspace_root: Path = Field(alias="AGENT_WORKSPACE_ROOT")
     openai_api_key: str | None = Field(default=None, alias="OPENAI_API_KEY")
+    openai_base_url: str | None = Field(default=None, alias="OPENAI_BASE_URL")
     anthropic_api_key: str | None = Field(default=None, alias="ANTHROPIC_API_KEY")
     google_api_key: str | None = Field(default=None, alias="GOOGLE_API_KEY")
 

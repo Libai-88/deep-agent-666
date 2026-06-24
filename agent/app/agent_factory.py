@@ -6,7 +6,7 @@ from copilotkit import LangGraphAGUIAgent
 from deepagents import create_deep_agent
 from langchain.chat_models import init_chat_model
 from langchain.tools import tool
-from langgraph.checkpoint.memory import InMemorySaver
+from langgraph.checkpoint.memory import MemorySaver
 
 from app.config import AgentSettings
 from app.permissions import PermissionMode, interrupt_config_for_mode, mutable_tool_names
@@ -59,11 +59,14 @@ def _build_model(preset: AgentPreset, settings: AgentSettings):
     if api_key is None:
         raise ValueError(f"provider is not configured: {provider}")
 
-    kwargs: dict[str, str]
+    kwargs: dict[str, str] = {}
     if provider == "google":
-        kwargs = {"google_api_key": api_key}
+        kwargs["google_api_key"] = api_key
     else:
-        kwargs = {"api_key": api_key}
+        kwargs["api_key"] = api_key
+
+    if provider == "openai" and settings.openai_base_url:
+        kwargs["base_url"] = settings.openai_base_url
 
     return init_chat_model(model=model_name, model_provider=model_provider, **kwargs)
 
@@ -129,7 +132,7 @@ def build_graph(preset: AgentPreset, settings: AgentSettings) -> object:
         tools=_toolset_for_preset(settings.workspace_root, preset.permission_mode),
         system_prompt=SYSTEM_PROMPT,
         interrupt_on=interrupt_config_for_mode(preset.permission_mode),
-        checkpointer=InMemorySaver(),
+        checkpointer=MemorySaver(),
         name=preset.id,
     )
 

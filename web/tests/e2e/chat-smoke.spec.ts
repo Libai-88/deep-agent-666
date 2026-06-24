@@ -30,7 +30,7 @@ if (isVitest) {
     await expect(page.getByText("Assistant")).toBeVisible();
     await expect(page.getByText("Threads")).toBeVisible();
     await expect(
-      page.getByRole("button", { name: "New", exact: true }),
+      page.getByRole("button", { name: "+ New", exact: true }),
     ).toBeVisible();
   });
 }
