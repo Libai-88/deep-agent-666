@@ -2,12 +2,12 @@
   "name": "deep-agent-666",
   "private": true,
   "scripts": {
-    "dev:web": "npm --prefix web run dev",
-    "dev:agent": "uv run --project agent uvicorn app.main:app --host 127.0.0.1 --port 8123 --reload",
-    "dev": "concurrently -n web,agent -c cyan,green \"npm run dev:web\" \"npm run dev:agent\"",
-    "test:web": "npm --prefix web run test",
-    "test:agent": "uv run --project agent pytest",
-    "test": "python -m pytest tests/smoke/test_repo_layout.py -v && npm run test:agent && npm run test:web",
+    "dev:web": "powershell -NoProfile -Command \"npm --prefix web run dev\"",
+    "dev:agent": "powershell -NoProfile -Command \"uv run --project agent uvicorn app.main:app --host 127.0.0.1 --port 8123 --reload\"",
+    "dev": "powershell -NoProfile -Command \"concurrently -n web,agent -c cyan,green 'npm run dev:web' 'npm run dev:agent'\"",
+    "test:web": "powershell -NoProfile -Command \"npm --prefix web run test\"",
+    "test:agent": "powershell -NoProfile -Command \"uv run --project agent pytest\"",
+    "test": "powershell -NoProfile -Command \"python -m pytest tests/smoke/test_repo_layout.py -v; if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }; npm run test:agent; if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }; npm run test:web; exit $LASTEXITCODE\"",
     "typecheck:web": "npm --prefix web run typecheck",
     "lint:web": "npm --prefix web run lint"
   },

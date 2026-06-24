@@ -6,8 +6,6 @@ REQUIRED_PATHS = [
     Path(".env.example"),
     Path("agent"),
     Path("web"),
-    Path("agent/.gitkeep"),
-    Path("web/.gitkeep"),
 ]
 
 
