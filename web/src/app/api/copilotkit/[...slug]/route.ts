@@ -72,20 +72,28 @@ async function handler(request: Request): Promise<Response> {
   }
 
   // Info/discovery: augment with "default" agent alias
+  // CopilotKit provider expects agents as object {name: {...}}, not array
   if (request.method === "GET") {
     const backendInfo = await fetch(`${BACKEND_URL}/copilotkit/`, {
       headers: { Accept: "application/json" },
     });
     if (backendInfo.ok) {
       const backendData = await backendInfo.json();
-      const agents = backendData.agents ?? [];
-      const defaultAgent = agents.find((a: any) => a.name === "openai-balanced");
+      const agentArray: Array<{ name: string } & Record<string, unknown>> = backendData.agents ?? [];
+      // Convert array → object and inject "default"
+      const agentObject: Record<string, unknown> = {};
+      for (const a of agentArray) {
+        agentObject[a.name] = a;
+      }
+      // Inject default alias pointing to openai-balanced
+      if (!agentObject.default && agentObject["openai-balanced"]) {
+        agentObject.default = { ...agentObject["openai-balanced"], name: "default", description: "Default agent" };
+      }
       return Response.json({
-        ...backendData,
-        agents: [
-          { ...(defaultAgent ?? {}), name: "default", description: "Default agent" },
-          ...agents,
-        ],
+        actions: backendData.actions ?? [],
+        agents: agentObject,
+        sdkVersion: backendData.sdkVersion ?? "0.1.94",
+        mode: "sse",
       });
     }
   }

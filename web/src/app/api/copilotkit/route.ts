@@ -19,9 +19,8 @@ const runtimeHandler = createCopilotRuntimeHandler({
 });
 
 /** The CopilotKit browser provider sends GET /api/copilotkit for discovery.
- *  The backend CopilotKitRemoteEndpoint responds to /copilotkit/ (with slash)
- *  with agents as an array. We inject a "default" alias pointing to openai-balanced
- *  so the browser CopilotKit provider doesn't throw "Agent 'default' not found". */
+ *  The backend CopilotKitRemoteEndpoint returns agents as an array, but the
+ *  CopilotKit provider expects agents as an object {name: {...}} with "default" key. */
 async function handler(request: Request): Promise<Response> {
   const url = new URL(request.url);
   if (request.method === "GET" && !url.pathname.includes("/info")) {
@@ -29,17 +28,20 @@ async function handler(request: Request): Promise<Response> {
       headers: { Accept: "application/json" },
     });
     const backendData = await backendInfo.json();
-    // Inject default agent alias
-    const agents = backendData.agents ?? [];
-    const defaultAgent = agents.find((a: any) => a.name === "openai-balanced");
-    const augmented = {
-      ...backendData,
-      agents: [
-        { ...(defaultAgent ?? {}), name: "default", description: "Default agent" },
-        ...agents,
-      ],
-    };
-    return Response.json(augmented);
+    const agentArray = backendData.agents ?? [];
+    const agentObject: Record<string, unknown> = {};
+    for (const a of agentArray) {
+      agentObject[a.name] = a;
+    }
+    if (!agentObject.default && agentObject["openai-balanced"]) {
+      agentObject.default = { ...agentObject["openai-balanced"], name: "default", description: "Default agent" };
+    }
+    return Response.json({
+      actions: backendData.actions ?? [],
+      agents: agentObject,
+      sdkVersion: backendData.sdkVersion ?? "0.1.94",
+      mode: "sse",
+    });
   }
   return runtimeHandler(request);
 }
