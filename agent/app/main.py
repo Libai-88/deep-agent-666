@@ -32,6 +32,9 @@ def _reload_agents() -> None:
     global presets_by_id, agents
     presets_by_id = available_presets(settings)
     agents = build_langgraph_agents(settings)
+    # Coordinators are rebuilt once at module level below (and on configure via app.state)
+
+app.state.coordinator_agents = {}
 
 
 @app.get("/health")
@@ -92,32 +95,47 @@ async def configure(body: ConfigureRequest) -> JSONResponse:
 for preset_id, agent in agents.items():
     add_langgraph_fastapi_endpoint(app=app, agent=agent, path=f"/{preset_id}")
 
-# Register V2 coordinator AG-UI endpoints for presets with write-capable permission modes.
-# The coordinator wraps Plan->Do->Review subagents for multi-step task execution.
-for preset_id, preset in presets_by_id.items():
-    if preset.permission_mode not in (PermissionMode.BALANCED, PermissionMode.FULL_ACCESS):
-        continue
+# Register V2 coordinator AG-UI endpoints
+# Wrapped in a callable so _reload_agents can re-run on configure
+_COORDINATOR_PATHS: set[str] = set()
 
-    # Convert model format from "provider:model_name" to "provider/model_name"
-    # as expected by build_v2_coordinator.
-    v2_model = preset.model.replace(":", "/", 1)
 
-    coordinator_graph = build_v2_coordinator(
-        model=v2_model,
-        permission_mode=preset.permission_mode.value,
-    )
+def _register_coordinators() -> None:
+    """Register or re-register coordinator endpoints for available presets.
 
-    coordinator_agent = LangGraphAGUIAgent(
-        name=f"coordinator-{preset_id}",
-        description=f"Coordinator ({preset.label})",
-        graph=coordinator_graph,
-    )
+    Note: FastAPI does not support removing routes at runtime, so old coordinator
+    endpoints from a previous registration remain. They will 404 for removed presets.
+    A server restart is the cleanest way to fully reset after /configure changes.
+    """
+    for preset_id, preset in presets_by_id.items():
+        if preset.permission_mode not in (PermissionMode.BALANCED, PermissionMode.FULL_ACCESS):
+            continue
 
-    add_langgraph_fastapi_endpoint(
-        app=app,
-        agent=coordinator_agent,
-        path=f"/coordinator-{preset_id}",
-    )
+        coord_path = f"/coordinator-{preset_id}"
+        if coord_path in _COORDINATOR_PATHS:
+            continue  # Already registered
+
+        v2_model = preset.model.replace(":", "/", 1)
+        coordinator_graph = build_v2_coordinator(
+            model=v2_model,
+            permission_mode=preset.permission_mode.value,
+        )
+
+        coordinator_agent = LangGraphAGUIAgent(
+            name=f"coordinator-{preset_id}",
+            description=f"Coordinator ({preset.label})",
+            graph=coordinator_graph,
+        )
+
+        add_langgraph_fastapi_endpoint(
+            app=app,
+            agent=coordinator_agent,
+            path=coord_path,
+        )
+        _COORDINATOR_PATHS.add(coord_path)
+
+
+_register_coordinators()
 
 
 # ──────────────────────────────────────────────

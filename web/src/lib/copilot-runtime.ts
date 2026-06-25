@@ -32,6 +32,10 @@ export function createRemoteAgents(
     agents[preset.id] = new LangGraphHttpAgent({
       url: buildRemoteAgentUrl(baseUrl, preset.id),
     });
+    // Add coordinator endpoint for this preset
+    agents[`coordinator-${preset.id}`] = new LangGraphHttpAgent({
+      url: `${baseUrl.replace(/\/$/, "")}/coordinator-${preset.id}`,
+    });
   }
 
   // CopilotKit uses "default" as the internal agent ID when none is specified.
