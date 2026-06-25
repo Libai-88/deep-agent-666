@@ -9,6 +9,7 @@ from langchain.tools import tool
 from langgraph.checkpoint.memory import MemorySaver
 
 from app.config import AgentSettings, load_settings
+from app.middleware.genui import GenUIMiddleware
 from app.permissions import PermissionMode, interrupt_config_for_mode, mutable_tool_names
 from app.presets import ALL_PRESETS, AgentPreset
 from app.tools.documents import read_document
@@ -214,6 +215,7 @@ def build_v2_coordinator(
     coordinator = create_deep_agent(
         model=llm,
         tools=toolset,
+        middleware=[GenUIMiddleware()],
         subagents=[
             {
                 "name": "planner",
