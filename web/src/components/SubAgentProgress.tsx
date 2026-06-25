@@ -32,7 +32,13 @@ const phaseConfig: Record<string, {
 };
 
 export function SubAgentProgress({ agentId, className }: { agentId?: string; className?: string }) {
-  const { agent } = useAgent({ agentId: agentId ?? "coordinator" });
+  let agentHook: { agent?: { state: unknown; subscribe: (opts: { onStateChanged: () => void }) => { unsubscribe: () => void } } } = {};
+  try {
+    agentHook = useAgent({ agentId: agentId ?? "coordinator" });
+  } catch {
+    return null;
+  }
+  const { agent } = agentHook;
   const [state, setState] = useState<V2State | null>(null);
   const [expanded, setExpanded] = useState(false);
 

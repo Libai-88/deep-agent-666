@@ -21,6 +21,8 @@ const agents = {
   "openai-read-only": new HttpAgent({ url: `${AGENT_BASE_URL}/openai-read-only` }),
   "openai-balanced": new HttpAgent({ url: `${AGENT_BASE_URL}/openai-balanced` }),
   "openai-full-access": new HttpAgent({ url: `${AGENT_BASE_URL}/openai-full-access` }),
+  "coordinator-openai-balanced": new HttpAgent({ url: `${AGENT_BASE_URL}/coordinator-openai-balanced` }),
+  "coordinator-openai-full-access": new HttpAgent({ url: `${AGENT_BASE_URL}/coordinator-openai-full-access` }),
 };
 
 export function Providers({ children }: { children: ReactNode }) {
