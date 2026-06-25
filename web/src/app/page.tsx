@@ -1,7 +1,12 @@
 "use client";
 
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { CopilotChat, useRenderTool } from "@copilotkit/react-core/v2";
+import {
+  CopilotChat,
+  useRenderTool,
+  useInterrupt,
+  useConfigureSuggestions,
+} from "@copilotkit/react-core/v2";
 import { useQueryState } from "nuqs";
 import {
   ResizableHandle,
@@ -109,6 +114,60 @@ function HomePageContent() {
 
       return <ToolCallCard name={name} status={status} args={args} result={result} />;
     },
+  });
+
+  // HITL: Agent interrupt handler for approval flows
+  useInterrupt({
+    render: ({ event, resolve }) => {
+      const question =
+        (event.value as { question?: string })?.question ??
+        event.value?.toString() ??
+        "Approve this action?";
+      return (
+        <div className="mx-4 my-2 rounded-lg border border-border bg-card p-4 shadow-sm">
+          <p className="mb-3 text-sm font-medium text-card-foreground">
+            {question}
+          </p>
+          <div className="flex gap-2">
+            <button
+              onClick={() => resolve({ approved: true })}
+              className="rounded-md bg-primary px-3 py-1.5 text-xs font-medium text-primary-foreground hover:bg-primary/90 transition-colors"
+            >
+              Approve
+            </button>
+            <button
+              onClick={() => resolve({ approved: false })}
+              className="rounded-md border border-border bg-background px-3 py-1.5 text-xs font-medium text-foreground hover:bg-muted transition-colors"
+            >
+              Reject
+            </button>
+          </div>
+        </div>
+      );
+    },
+  });
+
+  // Welcome suggestions for new conversations
+  useConfigureSuggestions({
+    suggestions: [
+      {
+        title: "📋 Research",
+        message: "Research the latest trends in AI agents and summarize them",
+      },
+      {
+        title: "📝 Write",
+        message: "Write a summary of my workspace files and their purposes",
+      },
+      {
+        title: "🔍 Find",
+        message: "Search for files containing TODO in my workspace",
+      },
+      {
+        title: "📊 Analyze",
+        message: "Analyze the project structure and suggest improvements",
+      },
+    ],
+    available: "before-first-message",
   });
 
   const [threads, setThreads] = useState<LocalThread[]>(seedThreads);
