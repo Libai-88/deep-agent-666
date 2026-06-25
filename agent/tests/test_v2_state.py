@@ -20,19 +20,26 @@ def test_v2_state_phase_transition():
     assert state.plan_steps[0]["step"] == "analyze"
 
 
-def test_v2_state_inherits_copilotkit_state():
+def test_v2_state_is_pydantic_model():
+    """V2AgentState uses pydantic BaseModel (not TypedDict inheritance from CopilotKitState).
+
+    CopilotKitState is a TypedDict (conflicts with BaseModel metaclass), so V2AgentState
+    is a standalone BaseModel. It maintains structural compatibility by having all
+    required fields with proper defaults.
+    """
     from copilotkit import CopilotKitState
 
-    # V2AgentState inherits from BaseModel (not TypedDict), so standard
-    # issubclass works. It carries all CopilotKitState protocol fields.
+    # V2AgentState is a pydantic BaseModel
     assert issubclass(V2AgentState, BaseModel)
     assert isinstance(V2AgentState(), BaseModel)
 
-    # Structural compatibility with CopilotKitState:
-    # V2AgentState can represent all CopilotKitState data.
+    # Verify structural compatibility: V2AgentState fields cover what CopilotKitState needs
     state = V2AgentState()
     assert hasattr(state, "phase")
     assert hasattr(state, "plan_steps")
     assert hasattr(state, "completed_steps")
     assert hasattr(state, "file_changes")
     assert hasattr(state, "review_result")
+
+    # Confirm CopilotKitState is indeed a TypedDict (not BaseModel-compatible)
+    assert not issubclass(CopilotKitState, BaseModel)
