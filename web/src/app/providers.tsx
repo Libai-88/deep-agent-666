@@ -3,32 +3,21 @@
 import type { ReactNode } from "react";
 
 import { CopilotKit } from "@copilotkit/react-core/v2";
-import { HttpAgent } from "@ag-ui/client";
 import "@copilotkit/react-core/v2/styles.css";
 
-const AGENT_BASE_URL = "http://127.0.0.1:8123";
-
 /**
- * Connect the browser's @ag-ui/client directly to the Python backend's
- * add_langgraph_fastapi_endpoint. This bypasses the CopilotKit Runtime handler
- * (which doesn't forward RUN_FINISHED correctly), avoiding INCOMPLETE_STREAM.
+ * Connect the frontend to the CopilotKit Runtime (Next.js route handler).
+ * The Runtime uses server-side HttpAgent instances to proxy requests to
+ * the Python backend at http://127.0.0.1:8123/{agentId}.
  *
- * HttpAgent sends POST {url} with RunAgentInput, expects SSE stream.
- * The backend responds with proper AG-UI events (verified: RUN_FINISHED emitted).
+ * This avoids the INCOMPLETE_STREAM bug caused by direct browser HttpAgent
+ * connections — the Runtime handles thread lifecycle (connect/run/stop)
+ * and properly forwards RUN_FINISHED events to the client.
  */
-const agents = {
-  "default": new HttpAgent({ url: `${AGENT_BASE_URL}/openai-balanced` }),
-  "openai-read-only": new HttpAgent({ url: `${AGENT_BASE_URL}/openai-read-only` }),
-  "openai-balanced": new HttpAgent({ url: `${AGENT_BASE_URL}/openai-balanced` }),
-  "openai-full-access": new HttpAgent({ url: `${AGENT_BASE_URL}/openai-full-access` }),
-  "coordinator-openai-balanced": new HttpAgent({ url: `${AGENT_BASE_URL}/coordinator-openai-balanced` }),
-  "coordinator-openai-full-access": new HttpAgent({ url: `${AGENT_BASE_URL}/coordinator-openai-full-access` }),
-};
-
 export function Providers({ children }: { children: ReactNode }) {
   return (
     <CopilotKit
-      agents__unsafe_dev_only={agents}
+      runtimeUrl="/api/copilotkit"
       useSingleEndpoint={false}
       credentials="include"
       onError={(event) => {
