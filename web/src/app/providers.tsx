@@ -29,7 +29,7 @@ const agents = {
 export function Providers({ children }: { children: ReactNode }) {
   return (
     <CopilotKit
-      agents__unsafe_dev_only={agents}
+      runtimeUrl="/api/copilotkit"
       useSingleEndpoint={false}
       credentials="include"
       onError={(event) => {
