@@ -18,6 +18,7 @@ const BACKEND_URL = "http://127.0.0.1:8123";
 
 const runtime = new CopilotRuntime({
   agents: {
+    "default": new HttpAgent({ url: `${BACKEND_URL}/openai-balanced` }),
     "openai-read-only": new HttpAgent({ url: `${BACKEND_URL}/openai-read-only` }),
     "openai-balanced": new HttpAgent({ url: `${BACKEND_URL}/openai-balanced` }),
     "openai-full-access": new HttpAgent({ url: `${BACKEND_URL}/openai-full-access` }),
@@ -70,7 +71,26 @@ async function handler(request: Request): Promise<Response> {
     }
   }
 
-  // Everything else → delegate to Runtime handler (info, etc.)
+  // Info/discovery: augment with "default" agent alias
+  if (request.method === "GET") {
+    const backendInfo = await fetch(`${BACKEND_URL}/copilotkit/`, {
+      headers: { Accept: "application/json" },
+    });
+    if (backendInfo.ok) {
+      const backendData = await backendInfo.json();
+      const agents = backendData.agents ?? [];
+      const defaultAgent = agents.find((a: any) => a.name === "openai-balanced");
+      return Response.json({
+        ...backendData,
+        agents: [
+          { ...(defaultAgent ?? {}), name: "default", description: "Default agent" },
+          ...agents,
+        ],
+      });
+    }
+  }
+
+  // Fallback: Runtime handler
   return runtimeHandler(request);
 }
 
