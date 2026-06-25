@@ -1,6 +1,7 @@
 from pathlib import Path
 from fastapi import FastAPI, HTTPException, Query
 from fastapi.responses import JSONResponse
+from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
 from ag_ui_langgraph import add_langgraph_fastapi_endpoint
@@ -18,6 +19,15 @@ settings = load_settings()
 store = ConfigStore(settings)
 presets_by_id = available_presets(settings)
 app = FastAPI(title="deep-agent-666-agent")
+
+# CORS: allow browser-side @ag-ui/client HttpAgent to connect directly
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["http://localhost:3000", "http://127.0.0.1:3000"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 
 class ConfigureRequest(BaseModel):

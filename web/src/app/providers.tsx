@@ -1,70 +1,39 @@
 "use client";
 
-import { useEffect } from "react";
 import type { ReactNode } from "react";
 
 import { CopilotKit } from "@copilotkit/react-core/v2";
+import { HttpAgent } from "@ag-ui/client";
 import "@copilotkit/react-core/v2/styles.css";
 
+const AGENT_BASE_URL = "http://127.0.0.1:8123";
+
 /**
- * Suppress the "Run ended without emitting a terminal event" error that
- * fires on mount when CopilotChat's connect-SSE stream closes without
- * a terminal event (expected for fresh threads).
+ * Connect the browser's @ag-ui/client directly to the Python backend's
+ * add_langgraph_fastapi_endpoint. This bypasses the CopilotKit Runtime handler
+ * (which doesn't forward RUN_FINISHED correctly), avoiding INCOMPLETE_STREAM.
  *
- * CopilotKit has a hardcoded console.error in its internal CopilotListeners
- * component that cannot be suppressed via the onError handler. We work
- * around it by temporarily intercepting console.error during the connect
- * phase.
+ * HttpAgent sends POST {url} with RunAgentInput, expects SSE stream.
+ * The backend responds with proper AG-UI events (verified: RUN_FINISHED emitted).
  */
-function SuppressConnectError({ children }: { children: ReactNode }) {
-  useEffect(() => {
-    const isConnectError = (msg: unknown) =>
-      typeof msg === "string" &&
-      msg.includes("Run ended without emitting a terminal event");
-
-    const originalError = console.error;
-    // Temporarily intercept console.error during the connect phase
-    const patched = (...args: unknown[]) => {
-      if (args.some(isConnectError)) return; // swallow
-      originalError.apply(console, args);
-    };
-    console.error = patched;
-
-    // Restore after connect completes (sync for fresh threads)
-    const timer = setTimeout(() => {
-      console.error = originalError;
-    }, 2000);
-
-    return () => {
-      console.error = originalError;
-      clearTimeout(timer);
-    };
-  }, []);
-
-  return <>{children}</>;
-}
+const agents = {
+  "default": new HttpAgent({ url: `${AGENT_BASE_URL}/openai-balanced` }),
+  "openai-read-only": new HttpAgent({ url: `${AGENT_BASE_URL}/openai-read-only` }),
+  "openai-balanced": new HttpAgent({ url: `${AGENT_BASE_URL}/openai-balanced` }),
+  "openai-full-access": new HttpAgent({ url: `${AGENT_BASE_URL}/openai-full-access` }),
+};
 
 export function Providers({ children }: { children: ReactNode }) {
   return (
     <CopilotKit
-      runtimeUrl="/api/copilotkit"
+      agents__unsafe_dev_only={agents}
       useSingleEndpoint={false}
       credentials="include"
       onError={(event) => {
-        // Suppress the known benign connect-stream error everywhere:
-        // CopilotListeners checks error.message to decide whether to show
-        // a banner and log to console.  Clearing the message stops both.
-        const err = (event as { error?: Error }).error;
-        if (
-          err?.message?.includes("Run ended without emitting a terminal event")
-        ) {
-          err.message = "";
-          return;
-        }
         console.error("[copilotkit]", event);
       }}
     >
-      <SuppressConnectError>{children}</SuppressConnectError>
+      {children}
     </CopilotKit>
   );
 }
