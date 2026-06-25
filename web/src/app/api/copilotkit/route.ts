@@ -18,6 +18,31 @@ const runtimeHandler = createCopilotRuntimeHandler({
   basePath: "/api/copilotkit",
 });
 
-export const GET = runtimeHandler;
-export const POST = runtimeHandler;
+/** The CopilotKit browser provider sends GET /api/copilotkit for discovery.
+ *  The backend CopilotKitRemoteEndpoint responds to /copilotkit/ (with slash)
+ *  with agents as an array. We inject a "default" alias pointing to openai-balanced
+ *  so the browser CopilotKit provider doesn't throw "Agent 'default' not found". */
+async function handler(request: Request): Promise<Response> {
+  const url = new URL(request.url);
+  if (request.method === "GET" && !url.pathname.includes("/info")) {
+    const backendInfo = await fetch(`${BACKEND_URL}/copilotkit/`, {
+      headers: { Accept: "application/json" },
+    });
+    const backendData = await backendInfo.json();
+    // Inject default agent alias
+    const agents = backendData.agents ?? [];
+    const defaultAgent = agents.find((a: any) => a.name === "openai-balanced");
+    const augmented = {
+      ...backendData,
+      agents: [
+        { name: "default", description: "Default agent", ...defaultAgent },
+        ...agents,
+      ],
+    };
+    return Response.json(augmented);
+  }
+  return runtimeHandler(request);
+}
 
+export const GET = handler;
+export const POST = runtimeHandler;
