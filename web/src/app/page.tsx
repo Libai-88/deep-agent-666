@@ -6,6 +6,7 @@ import {
   useRenderTool,
   useInterrupt,
   useConfigureSuggestions,
+  useAgentContext,
 } from "@copilotkit/react-core/v2";
 import { useQueryState } from "nuqs";
 import {
@@ -193,6 +194,24 @@ function HomePageContent() {
       null
     );
   }, [activeThread]);
+
+  // Share workspace context with the agent
+  const workspaceContext = useMemo(
+    () => ({
+      workspaceRoot: process.env.NEXT_PUBLIC_AGENT_WORKSPACE_ROOT ?? "D:\\AgentBuild",
+      projectName: "deep-agent-666",
+      platform: "windows",
+      shell: "powershell",
+      currentThreadId: threadId ?? null,
+      currentPresetId: currentPreset?.id ?? null,
+    }),
+    [threadId, currentPreset],
+  );
+
+  useAgentContext({
+    description: "The user's local workspace environment — root path, platform, current thread and model preset",
+    value: workspaceContext,
+  });
 
   const handleNewThread = useCallback(() => {
     const defaultId = resolveDefaultPresetId({
