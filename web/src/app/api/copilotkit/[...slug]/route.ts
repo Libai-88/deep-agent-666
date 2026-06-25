@@ -18,3 +18,4 @@ const handler = createCopilotRuntimeHandler({
 export const GET = handler;
 export const POST = handler;
 export const OPTIONS = handler;
+
