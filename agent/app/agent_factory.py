@@ -155,13 +155,22 @@ def build_graph_map(settings: AgentSettings) -> dict[str, object]:
     }
 
 
-def build_langgraph_agents(settings: AgentSettings) -> dict[str, Any]:
-    """Build V1 agents per preset. Returns raw compiled graphs (not LangGraphAGUIAgent-wrapped).
+def build_langgraph_agents(settings: AgentSettings) -> dict[str, LangGraphAGUIAgent]:
+    """Build V1 agents per preset. Returns LangGraphAGUIAgent-wrapped agents.
 
-    Wrapping is handled by main.py's CopilotKitRemoteEndpoint pattern.
+    Wrapped agents are compatible with both add_langgraph_fastapi_endpoint
+    and CopilotKitRemoteEndpoint.
     """
     graph_map = build_graph_map(settings)
-    return dict(graph_map)
+    configured_presets = available_presets(settings)
+    return {
+        preset_id: LangGraphAGUIAgent(
+            name=preset_id,
+            description=configured_presets[preset_id].label,
+            graph=graph,
+        )
+        for preset_id, graph in graph_map.items()
+    }
 
 
 def build_v2_coordinator(

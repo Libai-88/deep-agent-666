@@ -3,6 +3,7 @@ from fastapi import FastAPI, HTTPException, Query
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 
+from ag_ui_langgraph import add_langgraph_fastapi_endpoint
 from copilotkit import CopilotKitRemoteEndpoint, LangGraphAGUIAgent
 from copilotkit.integrations.fastapi import add_fastapi_endpoint
 
@@ -28,43 +29,33 @@ class ConfigureRequest(BaseModel):
     google_base_url: str | None = None
 
 
-def _build_all_agents() -> list[LangGraphAGUIAgent]:
-    """Build V1 + V2 coordinator agents as a unified list for CopilotKitRemoteEndpoint."""
-    agent_list: list[LangGraphAGUIAgent] = []
-    v1_agents = build_langgraph_agents(settings)
+# Build V1 agents (wrapped in LangGraphAGUIAgent)
+v1_agents = build_langgraph_agents(settings)
 
-    # V1 agents
-    for preset_id, graph in v1_agents.items():
-        preset = presets_by_id.get(preset_id)
-        agent_list.append(LangGraphAGUIAgent(
-            name=preset_id,
-            description=f"Agent ({preset.label})" if preset else preset_id,
-            graph=graph,
+# Register V1 agents with direct paths for frontend LangGraphHttpAgent compatibility
+for preset_id, agent in v1_agents.items():
+    add_langgraph_fastapi_endpoint(app=app, agent=agent, path=f"/{preset_id}")
+
+# Build coordinator agents and register via CopilotKitRemoteEndpoint
+coordinator_agents: list[LangGraphAGUIAgent] = []
+for preset_id, preset in presets_by_id.items():
+    if preset.permission_mode not in (PermissionMode.BALANCED, PermissionMode.FULL_ACCESS):
+        continue
+    v2_model = preset.model.replace(":", "/", 1)
+    try:
+        coord_graph = build_v2_coordinator(
+            model=v2_model,
+            permission_mode=preset.permission_mode.value,
+        )
+        coordinator_agents.append(LangGraphAGUIAgent(
+            name=f"coordinator-{preset_id}",
+            description=f"Coordinator ({preset.label})",
+            graph=coord_graph,
         ))
+    except ValueError:
+        continue
 
-    # V2 coordinators (balanced/full-access only)
-    for preset_id, preset in presets_by_id.items():
-        if preset.permission_mode not in (PermissionMode.BALANCED, PermissionMode.FULL_ACCESS):
-            continue
-        v2_model = preset.model.replace(":", "/", 1)
-        try:
-            coord_graph = build_v2_coordinator(
-                model=v2_model,
-                permission_mode=preset.permission_mode.value,
-            )
-            agent_list.append(LangGraphAGUIAgent(
-                name=f"coordinator-{preset_id}",
-                description=f"Coordinator ({preset.label})",
-                graph=coord_graph,
-            ))
-        except ValueError:
-            continue  # Provider not configured, skip
-
-    return agent_list
-
-
-# Build and register all agents via CopilotKitRemoteEndpoint (official pattern)
-all_agents = _build_all_agents()
+all_agents = list(v1_agents.values()) + coordinator_agents
 sdk = CopilotKitRemoteEndpoint(agents=all_agents)
 add_fastapi_endpoint(app, sdk, "/copilotkit")
 
@@ -81,7 +72,7 @@ def _reload_agents() -> None:
 
 @app.get("/health")
 async def health() -> JSONResponse:
-    return JSONResponse({"status": "ok", "preset_count": len(all_agents)})
+    return JSONResponse({"status": "ok", "preset_count": len(all_agents), "agents": [a.name for a in all_agents]})
 
 
 @app.get("/presets")
