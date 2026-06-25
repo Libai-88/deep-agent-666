@@ -44,6 +44,7 @@ import {
 } from "@/components/TasksFilesSidebar";
 import { ToolCallCard } from "@/components/ToolCallCard";
 import { ThemeToggle } from "@/components/ThemeToggle";
+import { SubAgentProgress } from "@/components/SubAgentProgress";
 
 function seedThreads(): LocalThread[] {
   const stored = loadThreads();
@@ -357,6 +358,8 @@ function HomePageContent() {
                   onChange={handleSwitchPreset}
                 />
               </div>
+
+              <SubAgentProgress />
 
               {/* Chat area */}
               <div className="flex-1 min-h-0">
