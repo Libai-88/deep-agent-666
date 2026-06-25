@@ -8,7 +8,7 @@ from langchain.chat_models import init_chat_model
 from langchain.tools import tool
 from langgraph.checkpoint.memory import MemorySaver
 
-from app.config import AgentSettings
+from app.config import AgentSettings, load_settings
 from app.permissions import PermissionMode, interrupt_config_for_mode, mutable_tool_names
 from app.presets import ALL_PRESETS, AgentPreset
 from app.tools.documents import read_document
@@ -165,3 +165,75 @@ def build_langgraph_agents(settings: AgentSettings) -> dict[str, LangGraphAGUIAg
         )
         for preset_id, graph in graph_map.items()
     }
+
+
+def build_v2_coordinator(
+    model: str,
+    permission_mode: str = "balanced",
+):
+    """Build a Plan->Do->Review coordinator agent with three subagents.
+
+    The coordinator receives a user task, delegates to planner/executor/reviewer
+    subagents sequentially, and synthesizes the final result.
+    """
+    parts = model.split("/", maxsplit=1)
+    provider = parts[0]
+    model_name = parts[1]
+
+    settings = load_settings()
+
+    model_provider = "google_genai" if provider == "google" else provider
+    api_key = _provider_api_key(settings, provider)
+    if api_key is None:
+        raise ValueError(f"provider is not configured: {provider}")
+
+    kwargs: dict[str, str] = {}
+    if provider == "openai":
+        kwargs["api_key"] = api_key
+        if settings.openai_base_url:
+            kwargs["base_url"] = settings.openai_base_url
+    elif provider == "anthropic":
+        kwargs["api_key"] = api_key
+        if settings.anthropic_base_url:
+            kwargs["anthropic_api_url"] = settings.anthropic_base_url
+    elif provider == "google":
+        kwargs["google_api_key"] = api_key
+        if settings.google_base_url:
+            kwargs["transport"] = "rest"
+            kwargs["base_url"] = settings.google_base_url
+
+    llm = init_chat_model(model=model_name, model_provider=model_provider, **kwargs)
+
+    permission = PermissionMode(permission_mode)
+    toolset = _toolset_for_preset(settings.workspace_root, permission)
+    read_only_tools = [t for t in toolset if t.name in (
+        "list_workspace_tool", "search_workspace_tool",
+        "read_text_file_tool", "read_document_tool",
+    )]
+
+    coordinator = create_deep_agent(
+        model=llm,
+        tools=toolset,
+        subagents=[
+            {
+                "name": "planner",
+                "description": "Analyze task, break into steps, identify files to modify",
+                "system_prompt": "You are the planner subagent. Analyze the task, break it into clear steps, and identify files that need to be modified.",
+                "tools": read_only_tools,
+            },
+            {
+                "name": "executor",
+                "description": "Execute planned steps using file and command tools",
+                "system_prompt": "You are the executor subagent. Execute the planned steps using file and command tools to make the required changes.",
+                "tools": toolset,
+            },
+            {
+                "name": "reviewer",
+                "description": "Verify results match plan, check for errors",
+                "system_prompt": "You are the reviewer subagent. Verify the executed results match the original plan and check for any errors or issues.",
+                "tools": read_only_tools,
+            },
+        ],
+        checkpointer=MemorySaver(),
+    )
+    return coordinator
