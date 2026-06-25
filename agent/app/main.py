@@ -1,4 +1,5 @@
-from fastapi import FastAPI
+from pathlib import Path
+from fastapi import FastAPI, HTTPException, Query
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 from ag_ui_langgraph import add_langgraph_fastapi_endpoint
@@ -8,6 +9,7 @@ from app.agent_factory import available_presets, build_langgraph_agents, build_v
 from app.config import ConfigStore, load_settings
 from app.permissions import PermissionMode
 from app.presets import DEFAULT_PRESET_ID
+from app.tools.workspace import resolve_workspace_path
 
 
 settings = load_settings()
@@ -116,3 +118,50 @@ for preset_id, preset in presets_by_id.items():
         agent=coordinator_agent,
         path=f"/coordinator-{preset_id}",
     )
+
+
+# ──────────────────────────────────────────────
+# Workspace file browser endpoints (V2, Phase 3)
+# ──────────────────────────────────────────────
+
+
+@app.get("/workspace/files")
+async def list_directory(path: str = Query(default="", description="Subpath under workspace root")):
+    """List files and directories at the given subpath."""
+    try:
+        resolved = resolve_workspace_path(store.snapshot().workspace_root, path)
+    except ValueError:
+        raise HTTPException(status_code=400, detail="path is outside workspace root")
+
+    if not resolved.exists() or not resolved.is_dir():
+        raise HTTPException(status_code=404, detail="directory not found")
+
+    items = []
+    for entry in resolved.iterdir():
+        items.append({
+            "name": entry.name,
+            "is_dir": entry.is_dir(),
+            "size": entry.stat().st_size if entry.is_file() else 0,
+            "modified": entry.stat().st_mtime,
+        })
+    items.sort(key=lambda x: (not x["is_dir"], x["name"].lower()))
+    return {"path": path, "items": items}
+
+
+@app.get("/workspace/file")
+async def read_file(path: str = Query(..., description="Relative path to file under workspace root")):
+    """Read a file's content as text."""
+    try:
+        resolved = resolve_workspace_path(store.snapshot().workspace_root, path)
+    except ValueError:
+        raise HTTPException(status_code=400, detail="path is outside workspace root")
+
+    if not resolved.exists() or not resolved.is_file():
+        raise HTTPException(status_code=404, detail="file not found")
+
+    try:
+        content = resolved.read_text(encoding="utf-8", errors="replace")
+    except Exception:
+        raise HTTPException(status_code=500, detail="failed to read file")
+
+    return {"path": path, "content": content}
