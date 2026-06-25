@@ -35,7 +35,7 @@ async function handler(request: Request): Promise<Response> {
     const augmented = {
       ...backendData,
       agents: [
-        { name: "default", description: "Default agent", ...defaultAgent },
+        { ...(defaultAgent ?? {}), name: "default", description: "Default agent" },
         ...agents,
       ],
     };
