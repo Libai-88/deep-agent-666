@@ -7,6 +7,7 @@ import {
   useInterrupt,
   useConfigureSuggestions,
   useAgentContext,
+  useAgent,
 } from "@copilotkit/react-core/v2";
 import { useQueryState } from "nuqs";
 import {
@@ -45,6 +46,8 @@ import {
 import { ToolCallCard } from "@/components/ToolCallCard";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { SubAgentProgress } from "@/components/SubAgentProgress";
+import { DiffViewer } from "@/components/DiffViewer";
+import { FileBrowser } from "@/components/FileBrowser";
 
 function seedThreads(): LocalThread[] {
   const stored = loadThreads();
@@ -72,6 +75,9 @@ function HomePageContent() {
 
   const [todos, setTodos] = useState<TodoItem[]>([]);
   const [files, setFiles] = useState<FileItem[]>([]);
+  const [activeTab, setActiveTab] = useState<"tasks" | "workspace">("tasks");
+  const [previewFile, setPreviewFile] = useState<string | null>(null);
+  const [previewOpen, setPreviewOpen] = useState(false);
   const processedKeys = useRef<Set<string>>(new Set());
 
   // Monitor tool calls via useRenderTool
@@ -359,7 +365,8 @@ function HomePageContent() {
                 />
               </div>
 
-              <SubAgentProgress />
+              <SubAgentProgress agentId={`coordinator-${activeThread.presetId}`} />
+              <GenUIRenderer agentId={`coordinator-${activeThread.presetId}`} />
 
               {/* Chat area */}
               <div className="flex-1 min-h-0">
@@ -389,9 +396,28 @@ function HomePageContent() {
               >
                 <div className="flex h-full flex-col">
                   <div className="flex items-center justify-between border-b border-border px-3 py-2">
-                    <h2 className="text-xs font-semibold text-foreground">
-                      Tasks & Files
-                    </h2>
+                    <div className="flex gap-2">
+                      <button
+                        onClick={() => setActiveTab("tasks")}
+                        className={`text-xs px-2 py-1 rounded transition-colors ${
+                          activeTab === "tasks"
+                            ? "bg-primary/10 text-primary font-medium"
+                            : "text-muted-foreground hover:text-foreground"
+                        }`}
+                      >
+                        Tasks ({todos.length})
+                      </button>
+                      <button
+                        onClick={() => setActiveTab("workspace")}
+                        className={`text-xs px-2 py-1 rounded transition-colors ${
+                          activeTab === "workspace"
+                            ? "bg-primary/10 text-primary font-medium"
+                            : "text-muted-foreground hover:text-foreground"
+                        }`}
+                      >
+                        Workspace
+                      </button>
+                    </div>
                     <button
                       onClick={() => setFilesPanel(null)}
                       className="text-xs text-muted-foreground hover:text-foreground"
@@ -400,7 +426,17 @@ function HomePageContent() {
                     </button>
                   </div>
                   <div className="flex-1 overflow-y-auto scrollbar-pretty">
-                    <TasksFilesSidebar todos={todos} files={files} />
+                    {activeTab === "tasks" ? (
+                      <TasksFilesSidebar todos={todos} files={files} />
+                    ) : (
+                      <FileBrowser
+                        onOpenFile={(path) => {
+                          setPreviewFile(path);
+                          setPreviewOpen(true);
+                        }}
+                        className="py-2"
+                      />
+                    )}
                   </div>
                 </div>
               </ResizablePanel>
@@ -416,9 +452,47 @@ function HomePageContent() {
         currentPreset={currentPreset}
         onSwitchPreset={handleSwitchPreset}
       />
+      <GenUIRenderer agentId={`coordinator-${activeThread?.presetId ?? "openai-balanced"}`} />
     </div>
   );
 }
+
+// ── GenUI Renderer: subscribes to coordinator state for diffs/charts ──
+
+function GenUIRenderer({ agentId }: { agentId: string }) {
+  const { agent } = useAgent({ agentId });
+  const [diffs, setDiffs] = useState<Array<{ filePath: string; before: string; after: string }>>([]);
+
+  useEffect(() => {
+    if (!agent) return;
+    const sub = agent.subscribe({
+      onStateChanged: () => {
+        const s = agent.state as Record<string, unknown>;
+        const diff = s?.genui_diff as { file_path?: string; before?: string; after?: string } | undefined;
+        if (diff?.file_path && diff.before !== undefined && diff.after !== undefined) {
+          setDiffs((prev) => {
+            const exists = prev.some((d) => d.filePath === diff!.file_path);
+            if (exists) return prev;
+            return [...prev, { filePath: diff!.file_path!, before: diff!.before!, after: diff!.after! }];
+          });
+        }
+      },
+    });
+    return () => { try { sub.unsubscribe(); } catch {} };
+  }, [agent]);
+
+  if (diffs.length === 0) return null;
+
+  return (
+    <>
+      {diffs.map((d) => (
+        <DiffViewer key={d.filePath} filePath={d.filePath} before={d.before} after={d.after} />
+      ))}
+    </>
+  );
+}
+
+// ── Shared helpers ──
 
 function PresetSelector({
   presets,

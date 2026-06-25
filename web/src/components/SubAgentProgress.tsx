@@ -31,8 +31,8 @@ const phaseConfig: Record<string, {
   idle:      { icon: Timer,    color: "text-gray-400", bg: "bg-gray-50 dark:bg-gray-900", label: "Idle" },
 };
 
-export function SubAgentProgress({ className }: { className?: string }) {
-  const { agent } = useAgent({ agentId: "coordinator" });
+export function SubAgentProgress({ agentId, className }: { agentId?: string; className?: string }) {
+  const { agent } = useAgent({ agentId: agentId ?? "coordinator" });
   const [state, setState] = useState<V2State | null>(null);
   const [expanded, setExpanded] = useState(false);
 
