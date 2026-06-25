@@ -51,12 +51,16 @@ export function Providers({ children }: { children: ReactNode }) {
       useSingleEndpoint={false}
       credentials="include"
       onError={(event) => {
-        // Silently ignore the known benign connect-stream error
+        // Suppress the known benign connect-stream error everywhere:
+        // CopilotListeners checks error.message to decide whether to show
+        // a banner and log to console.  Clearing the message stops both.
         const err = (event as { error?: Error }).error;
         if (
           err?.message?.includes("Run ended without emitting a terminal event")
-        )
+        ) {
+          err.message = "";
           return;
+        }
         console.error("[copilotkit]", event);
       }}
     >
