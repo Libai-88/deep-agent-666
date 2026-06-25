@@ -2,9 +2,11 @@ from fastapi import FastAPI
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 from ag_ui_langgraph import add_langgraph_fastapi_endpoint
+from copilotkit import LangGraphAGUIAgent
 
-from app.agent_factory import available_presets, build_langgraph_agents
+from app.agent_factory import available_presets, build_langgraph_agents, build_v2_coordinator
 from app.config import ConfigStore, load_settings
+from app.permissions import PermissionMode
 from app.presets import DEFAULT_PRESET_ID
 
 
@@ -87,3 +89,30 @@ async def configure(body: ConfigureRequest) -> JSONResponse:
 
 for preset_id, agent in agents.items():
     add_langgraph_fastapi_endpoint(app=app, agent=agent, path=f"/{preset_id}")
+
+# Register V2 coordinator AG-UI endpoints for presets with write-capable permission modes.
+# The coordinator wraps Plan->Do->Review subagents for multi-step task execution.
+for preset_id, preset in presets_by_id.items():
+    if preset.permission_mode not in (PermissionMode.BALANCED, PermissionMode.FULL_ACCESS):
+        continue
+
+    # Convert model format from "provider:model_name" to "provider/model_name"
+    # as expected by build_v2_coordinator.
+    v2_model = preset.model.replace(":", "/", 1)
+
+    coordinator_graph = build_v2_coordinator(
+        model=v2_model,
+        permission_mode=preset.permission_mode.value,
+    )
+
+    coordinator_agent = LangGraphAGUIAgent(
+        name=f"coordinator-{preset_id}",
+        description=f"Coordinator ({preset.label})",
+        graph=coordinator_graph,
+    )
+
+    add_langgraph_fastapi_endpoint(
+        app=app,
+        agent=coordinator_agent,
+        path=f"/coordinator-{preset_id}",
+    )
