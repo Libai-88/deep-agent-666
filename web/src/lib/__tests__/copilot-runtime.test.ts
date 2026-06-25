@@ -93,8 +93,8 @@ describe("createRuntimeFromCatalog", () => {
         }
       },
     }));
-    vi.doMock("@copilotkit/runtime/langgraph", () => ({
-      LangGraphHttpAgent: class {
+    vi.doMock("@ag-ui/client", () => ({
+      HttpAgent: class {
         constructor(public options: Record<string, unknown>) {
           agentInstances.push(this);
         }

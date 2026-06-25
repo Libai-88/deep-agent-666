@@ -1,9 +1,9 @@
 import { mkdirSync } from "node:fs";
 import { dirname } from "node:path";
 
-import { LangGraphHttpAgent } from "@copilotkit/runtime/langgraph";
 import { CopilotRuntime } from "@copilotkit/runtime/v2";
 import { SqliteAgentRunner } from "@copilotkit/sqlite-runner";
+import { HttpAgent } from "@ag-ui/client";
 
 import {
   type AgentPresetCatalog,
@@ -24,16 +24,16 @@ export function buildRemoteAgentUrl(
 export function createRemoteAgents(
   baseUrl: string,
   catalog: AgentPresetCatalog,
-): Record<string, LangGraphHttpAgent> {
-  const agents: Record<string, LangGraphHttpAgent> = {};
+): Record<string, HttpAgent> {
+  const agents: Record<string, HttpAgent> = {};
   const defaultPresetId = catalog.defaultPresetId ?? catalog.presets[0]?.id;
 
   for (const preset of catalog.presets) {
-    agents[preset.id] = new LangGraphHttpAgent({
+    agents[preset.id] = new HttpAgent({
       url: buildRemoteAgentUrl(baseUrl, preset.id),
     });
     // Add coordinator endpoint for this preset
-    agents[`coordinator-${preset.id}`] = new LangGraphHttpAgent({
+    agents[`coordinator-${preset.id}`] = new HttpAgent({
       url: `${baseUrl.replace(/\/$/, "")}/coordinator-${preset.id}`,
     });
   }
