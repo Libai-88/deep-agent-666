@@ -110,7 +110,7 @@ describe("createRuntimeFromCatalog", () => {
 
     expect(runtimeInstances).toHaveLength(1);
     expect(runnerInstances).toHaveLength(1);
-    expect(agentInstances).toHaveLength(2);
+    expect(agentInstances).toHaveLength(4);
 
     const runtimeOptions = runtimeInstances[0]?.options as {
       agents: Record<string, { options: { url: string } }>;
@@ -123,14 +123,22 @@ describe("createRuntimeFromCatalog", () => {
     });
     expect(Object.keys(runtimeOptions.agents)).toEqual([
       "openai-balanced",
+      "coordinator-openai-balanced",
       "google-full-access",
+      "coordinator-google-full-access",
       "default",
     ]);
     expect(runtimeOptions.agents["openai-balanced"]?.options).toEqual({
       url: "http://127.0.0.1:8123/openai-balanced",
     });
+    expect(runtimeOptions.agents["coordinator-openai-balanced"]?.options).toEqual({
+      url: "http://127.0.0.1:8123/coordinator-openai-balanced",
+    });
     expect(runtimeOptions.agents["google-full-access"]?.options).toEqual({
       url: "http://127.0.0.1:8123/google-full-access",
+    });
+    expect(runtimeOptions.agents["coordinator-google-full-access"]?.options).toEqual({
+      url: "http://127.0.0.1:8123/coordinator-google-full-access",
     });
   });
 });

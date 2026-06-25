@@ -50,11 +50,15 @@ def test_main_starts_with_only_openai_configured(monkeypatch, tmp_path) -> None:
     assert {preset["id"] for preset in payload["presets"]} == {
         preset_id for preset_id in ALL_PRESETS if preset_id.startswith("openai-")
     }
-    assert set(main_module.agents) == {
-        preset_id for preset_id in ALL_PRESETS if preset_id.startswith("openai-")
-    }
+
+    # SDK agent names should only include OpenAI presets + their coordinators
+    agent_names = {a.name for a in main_module.sdk.agents}
+    expected_openai = {pid for pid in ALL_PRESETS if pid.startswith("openai-")}
+    expected_coordinators = {f"coordinator-{pid}" for pid in expected_openai
+                            if ALL_PRESETS[pid].permission_mode.value in ("balanced", "full-access")}
+    assert expected_openai.issubset(agent_names), "Missing V1 OpenAI agents"
+    assert expected_coordinators.issubset(agent_names), "Missing coordinator agents"
+    assert not any("anthropic" in n or "google" in n for n in agent_names), "Unconfigured providers appeared"
 
     route_paths = {route.path for route in main_module.app.routes}
-    assert "/openai-balanced" in route_paths
-    assert "/anthropic-balanced" not in route_paths
-    assert "/google-balanced" not in route_paths
+    assert "/copilotkit/{path:path}" in route_paths

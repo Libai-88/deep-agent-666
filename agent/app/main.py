@@ -2,8 +2,9 @@ from pathlib import Path
 from fastapi import FastAPI, HTTPException, Query
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
-from ag_ui_langgraph import add_langgraph_fastapi_endpoint
-from copilotkit import LangGraphAGUIAgent
+
+from copilotkit import CopilotKitRemoteEndpoint, LangGraphAGUIAgent
+from copilotkit.integrations.fastapi import add_fastapi_endpoint
 
 from app.agent_factory import available_presets, build_langgraph_agents, build_v2_coordinator
 from app.config import ConfigStore, load_settings
@@ -15,7 +16,6 @@ from app.tools.workspace import resolve_workspace_path
 settings = load_settings()
 store = ConfigStore(settings)
 presets_by_id = available_presets(settings)
-agents = build_langgraph_agents(settings)
 app = FastAPI(title="deep-agent-666-agent")
 
 
@@ -28,18 +28,60 @@ class ConfigureRequest(BaseModel):
     google_base_url: str | None = None
 
 
-def _reload_agents() -> None:
-    global presets_by_id, agents
-    presets_by_id = available_presets(settings)
-    agents = build_langgraph_agents(settings)
-    # Coordinators are rebuilt once at module level below (and on configure via app.state)
+def _build_all_agents() -> list[LangGraphAGUIAgent]:
+    """Build V1 + V2 coordinator agents as a unified list for CopilotKitRemoteEndpoint."""
+    agent_list: list[LangGraphAGUIAgent] = []
+    v1_agents = build_langgraph_agents(settings)
 
-app.state.coordinator_agents = {}
+    # V1 agents
+    for preset_id, graph in v1_agents.items():
+        preset = presets_by_id.get(preset_id)
+        agent_list.append(LangGraphAGUIAgent(
+            name=preset_id,
+            description=f"Agent ({preset.label})" if preset else preset_id,
+            graph=graph,
+        ))
+
+    # V2 coordinators (balanced/full-access only)
+    for preset_id, preset in presets_by_id.items():
+        if preset.permission_mode not in (PermissionMode.BALANCED, PermissionMode.FULL_ACCESS):
+            continue
+        v2_model = preset.model.replace(":", "/", 1)
+        try:
+            coord_graph = build_v2_coordinator(
+                model=v2_model,
+                permission_mode=preset.permission_mode.value,
+            )
+            agent_list.append(LangGraphAGUIAgent(
+                name=f"coordinator-{preset_id}",
+                description=f"Coordinator ({preset.label})",
+                graph=coord_graph,
+            ))
+        except ValueError:
+            continue  # Provider not configured, skip
+
+    return agent_list
+
+
+# Build and register all agents via CopilotKitRemoteEndpoint (official pattern)
+all_agents = _build_all_agents()
+sdk = CopilotKitRemoteEndpoint(agents=all_agents)
+add_fastapi_endpoint(app, sdk, "/copilotkit")
+
+
+def _reload_agents() -> None:
+    """Reload V1 presets after /configure.
+
+    Note: CopilotKitRemoteEndpoint routes cannot be removed at runtime.
+    A server restart is required for coordinator endpoint changes to take full effect.
+    """
+    global presets_by_id
+    presets_by_id = available_presets(settings)
 
 
 @app.get("/health")
 async def health() -> JSONResponse:
-    return JSONResponse({"status": "ok", "preset_count": len(agents)})
+    return JSONResponse({"status": "ok", "preset_count": len(all_agents)})
 
 
 @app.get("/presets")
@@ -86,56 +128,11 @@ async def configure(body: ConfigureRequest) -> JSONResponse:
     return JSONResponse(
         {
             "status": "ok",
-            "preset_count": len(agents),
+            "preset_count": len(presets_by_id),
             "preset_ids": list(presets_by_id.keys()),
         }
     )
 
-
-for preset_id, agent in agents.items():
-    add_langgraph_fastapi_endpoint(app=app, agent=agent, path=f"/{preset_id}")
-
-# Register V2 coordinator AG-UI endpoints
-# Wrapped in a callable so _reload_agents can re-run on configure
-_COORDINATOR_PATHS: set[str] = set()
-
-
-def _register_coordinators() -> None:
-    """Register or re-register coordinator endpoints for available presets.
-
-    Note: FastAPI does not support removing routes at runtime, so old coordinator
-    endpoints from a previous registration remain. They will 404 for removed presets.
-    A server restart is the cleanest way to fully reset after /configure changes.
-    """
-    for preset_id, preset in presets_by_id.items():
-        if preset.permission_mode not in (PermissionMode.BALANCED, PermissionMode.FULL_ACCESS):
-            continue
-
-        coord_path = f"/coordinator-{preset_id}"
-        if coord_path in _COORDINATOR_PATHS:
-            continue  # Already registered
-
-        v2_model = preset.model.replace(":", "/", 1)
-        coordinator_graph = build_v2_coordinator(
-            model=v2_model,
-            permission_mode=preset.permission_mode.value,
-        )
-
-        coordinator_agent = LangGraphAGUIAgent(
-            name=f"coordinator-{preset_id}",
-            description=f"Coordinator ({preset.label})",
-            graph=coordinator_graph,
-        )
-
-        add_langgraph_fastapi_endpoint(
-            app=app,
-            agent=coordinator_agent,
-            path=coord_path,
-        )
-        _COORDINATOR_PATHS.add(coord_path)
-
-
-_register_coordinators()
 
 
 # ──────────────────────────────────────────────
