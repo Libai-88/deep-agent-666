@@ -1,19 +1,23 @@
+import { HttpAgent } from "@ag-ui/client";
+import { CopilotRuntime } from "@copilotkit/runtime/v2";
 import { createCopilotRuntimeHandler } from "@copilotkit/runtime/v2";
 
-import { STATIC_AGENT_PRESET_CATALOG } from "@/lib/agent-presets";
-import { createRuntimeFromCatalog } from "@/lib/copilot-runtime";
+const BACKEND_URL = "http://127.0.0.1:8123";
 
-const DEFAULT_AGENT_BASE_URL = "http://127.0.0.1:8123";
-const DEFAULT_THREADS_DB_PATH = "./data/threads.db";
+const runtime = new CopilotRuntime({
+  agents: {
+    "default": new HttpAgent({ url: `${BACKEND_URL}/openai-balanced` }),
+    "openai-read-only": new HttpAgent({ url: `${BACKEND_URL}/openai-read-only` }),
+    "openai-balanced": new HttpAgent({ url: `${BACKEND_URL}/openai-balanced` }),
+    "openai-full-access": new HttpAgent({ url: `${BACKEND_URL}/openai-full-access` }),
+  },
+});
 
-const baseUrl = process.env.AGENT_BASE_URL ?? DEFAULT_AGENT_BASE_URL;
-const dbPath =
-  process.env.COPILOTKIT_THREADS_DB_PATH ?? DEFAULT_THREADS_DB_PATH;
-
-const handler = createCopilotRuntimeHandler({
-  runtime: createRuntimeFromCatalog(STATIC_AGENT_PRESET_CATALOG, baseUrl, dbPath),
+const runtimeHandler = createCopilotRuntimeHandler({
+  runtime,
   basePath: "/api/copilotkit",
 });
 
-export const GET = handler;
-export const POST = handler;
+export const GET = runtimeHandler;
+export const POST = runtimeHandler;
+

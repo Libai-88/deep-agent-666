@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { formatDistanceToNow } from "date-fns";
 import { CircleX, PanelRightClose } from "lucide-react";
 
@@ -44,6 +44,12 @@ export function ThreadList({
 }: ThreadListProps) {
   const [filter, setFilter] = useState<string>("all");
   const [loading] = useState(false);
+  const [mounted, setMounted] = useState(false);
+
+  // Defer date-dependent rendering to client to avoid hydration mismatch
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   const filtered = useMemo(() => {
     return filter === "all"
@@ -52,6 +58,7 @@ export function ThreadList({
   }, [threads, filter]);
 
   const grouped = useMemo(() => {
+    if (!mounted) return new Map<GroupKey, LocalThread[]>();
     const groups = new Map<GroupKey, LocalThread[]>();
     for (const thread of filtered) {
       const key = groupKey(new Date(thread.updatedAt));
@@ -59,7 +66,7 @@ export function ThreadList({
       groups.get(key)!.push(thread);
     }
     return groups;
-  }, [filtered]);
+  }, [filtered, mounted]);
 
   return (
     <div className="flex h-full flex-col panel-enter">
