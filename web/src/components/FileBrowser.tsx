@@ -19,6 +19,7 @@ interface FileItem {
 
 interface FileBrowserProps {
   onOpenFile: (path: string) => void;
+  changedPaths?: Set<string>;
   className?: string;
 }
 
@@ -28,12 +29,14 @@ function FileTreeItem({
   isDir,
   depth,
   onOpenFile,
+  changedPaths,
 }: {
   path: string;
   name: string;
   isDir: boolean;
   depth: number;
   onOpenFile: (path: string) => void;
+  changedPaths?: Set<string>;
 }) {
   const [expanded, setExpanded] = useState(false);
   const [children, setChildren] = useState<FileItem[] | null>(null);
@@ -95,6 +98,9 @@ function FileTreeItem({
           </>
         )}
         <span className="truncate text-foreground">{name}</span>
+        {!isDir && changedPaths?.has(path) && (
+          <span className="ml-1.5 inline-block h-2 w-2 shrink-0 rounded-full bg-purple-500" title="Modified by agent" />
+        )}
         {loading && <Loader2 className="ml-auto h-3 w-3 animate-spin text-muted-foreground" />}
       </button>
       {expanded && children && (
@@ -115,6 +121,7 @@ function FileTreeItem({
               isDir={child.is_dir}
               depth={depth + 1}
               onOpenFile={onOpenFile}
+              changedPaths={changedPaths}
             />
           ))}
         </div>
@@ -123,7 +130,7 @@ function FileTreeItem({
   );
 }
 
-export function FileBrowser({ onOpenFile, className }: FileBrowserProps) {
+export function FileBrowser({ onOpenFile, changedPaths, className }: FileBrowserProps) {
   const [rootItems, setRootItems] = useState<FileItem[] | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -163,6 +170,7 @@ export function FileBrowser({ onOpenFile, className }: FileBrowserProps) {
           isDir={item.is_dir}
           depth={0}
           onOpenFile={onOpenFile}
+          changedPaths={changedPaths}
         />
       ))}
     </div>

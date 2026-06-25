@@ -48,6 +48,7 @@ import { ThemeToggle } from "@/components/ThemeToggle";
 import { SubAgentProgress } from "@/components/SubAgentProgress";
 import { DiffViewer } from "@/components/DiffViewer";
 import { FileBrowser } from "@/components/FileBrowser";
+import { FileViewDialog } from "@/components/FileViewDialog";
 
 function seedThreads(): LocalThread[] {
   const stored = loadThreads();
@@ -78,6 +79,25 @@ function HomePageContent() {
   const [activeTab, setActiveTab] = useState<"tasks" | "workspace">("tasks");
   const [previewFile, setPreviewFile] = useState<string | null>(null);
   const [previewOpen, setPreviewOpen] = useState(false);
+  const [previewContent, setPreviewContent] = useState("");
+  const [previewLoading, setPreviewLoading] = useState(false);
+
+  const handleOpenWorkspaceFile = useCallback(async (path: string) => {
+    setPreviewFile(path);
+    setPreviewOpen(true);
+    setPreviewLoading(true);
+    try {
+      const res = await fetch(`/workspace/file?path=${encodeURIComponent(path)}`);
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const data = await res.json();
+      setPreviewContent(data.content ?? "");
+    } catch {
+      setPreviewContent("// Failed to load file");
+    } finally {
+      setPreviewLoading(false);
+    }
+  }, []);
+
   const processedKeys = useRef<Set<string>>(new Set());
 
   // Monitor tool calls via useRenderTool
@@ -366,7 +386,6 @@ function HomePageContent() {
               </div>
 
               <SubAgentProgress agentId={`coordinator-${activeThread.presetId}`} />
-              <GenUIRenderer agentId={`coordinator-${activeThread.presetId}`} />
 
               {/* Chat area */}
               <div className="flex-1 min-h-0">
@@ -430,10 +449,8 @@ function HomePageContent() {
                       <TasksFilesSidebar todos={todos} files={files} />
                     ) : (
                       <FileBrowser
-                        onOpenFile={(path) => {
-                          setPreviewFile(path);
-                          setPreviewOpen(true);
-                        }}
+                        onOpenFile={handleOpenWorkspaceFile}
+                        changedPaths={new Set(files.map((f) => f.path))}
                         className="py-2"
                       />
                     )}
@@ -453,6 +470,12 @@ function HomePageContent() {
         onSwitchPreset={handleSwitchPreset}
       />
       <GenUIRenderer agentId={`coordinator-${activeThread?.presetId ?? "openai-balanced"}`} />
+      {previewOpen && previewFile && (
+        <FileViewDialog
+          file={{ path: previewFile, content: previewLoading ? "// Loading..." : previewContent }}
+          onClose={() => setPreviewOpen(false)}
+        />
+      )}
     </div>
   );
 }
