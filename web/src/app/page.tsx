@@ -341,25 +341,26 @@ function HomePageContent() {
       {/* Content */}
       <div className="flex-1 overflow-hidden">
         <ResizablePanelGroup direction="horizontal">
-          {sidebar && (
-            <>
-              <ResizablePanel
-                id="thread-history"
-                order={1}
-                defaultSize={25}
-                minSize={18}
-                className="min-w-[280px]"
-              >
-                <ThreadList
-                  threads={threads}
-                  activeThreadId={activeThread.id}
-                  onSelect={handleSelectThread}
-                  onClose={() => setSidebar(null)}
-                />
-              </ResizablePanel>
-              <ResizableHandle />
-            </>
-          )}
+          <ResizablePanel
+            id="thread-history"
+            order={1}
+            defaultSize={25}
+            minSize={18}
+            maxSize={40}
+            className={`min-w-[280px] transition-all duration-300 ${sidebar ? "" : "!w-0 !min-w-0 !max-w-0 overflow-hidden"}`}
+            collapsible
+            collapsedSize={0}
+          >
+            <div className={`h-full ${sidebar ? "" : "hidden"}`}>
+              <ThreadList
+                threads={threads}
+                activeThreadId={activeThread.id}
+                onSelect={handleSelectThread}
+                onClose={() => setSidebar(null)}
+              />
+            </div>
+          </ResizablePanel>
+          {sidebar && <ResizableHandle />}
 
           <ResizablePanel id="chat" order={2}>
             <div className="flex h-full flex-col">
@@ -623,14 +624,14 @@ function SettingsDialog({
   };
 
   return (
-    <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/50"
-      onClick={() => onOpenChange(false)}
-    >
       <div
-        className="w-full max-w-lg rounded-xl border border-border bg-card p-6 shadow-lg"
-        onClick={(e) => e.stopPropagation()}
+        className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm"
+        onClick={() => onOpenChange(false)}
       >
+        <div
+          className="w-full max-w-lg rounded-xl border border-border bg-card p-6 shadow-xl"
+          onClick={(e) => e.stopPropagation()}
+        >
         <h2 className="text-lg font-semibold text-card-foreground">Settings</h2>
         <p className="mt-1 text-sm text-muted-foreground">
           Configure provider API keys and base URLs.

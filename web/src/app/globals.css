@@ -123,17 +123,13 @@
 [data-copilotkit] {
   --primary: oklch(0.72 0.12 280);
   --primary-foreground: oklch(0.99 0 0);
-  --background: oklch(1 0 0);
-  --foreground: oklch(0.145 0 0);
-  --muted: oklch(0.96 0.005 280);
-  --border: oklch(0.92 0.008 280);
+  --background: hsl(var(--background));
+  --foreground: hsl(var(--foreground));
+  --muted: hsl(var(--muted));
+  --border: hsl(var(--border));
   --radius: 0.75rem;
-}
-
-.dark [data-copilotkit] {
-  --background: oklch(0.145 0 0);
-  --foreground: oklch(0.985 0 0);
-  --border: oklch(0.269 0 0);
+  --card: hsl(var(--card));
+  --card-foreground: hsl(var(--card-foreground));
 }
 
 /* === 全息渐变按钮 === */
