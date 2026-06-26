@@ -2,6 +2,7 @@ export type RecoverableErrorCode =
   | "backend_unreachable"
   | "no_available_presets"
   | "configuration_failed"
+  | "workspace_root_invalid"
   | "thread_missing_or_invalid"
   | "thread_history_unavailable"
   | "provider_rate_limited"
@@ -38,6 +39,8 @@ export function resolveRecoverableActions(
         { label: "Retry save", action: "retry_save" },
         { label: "Check base URL", action: "check_base_url" },
       ];
+    case "workspace_root_invalid":
+      return [{ label: "Open settings", action: "open_settings" }];
     case "thread_missing_or_invalid":
       return [
         {
@@ -130,6 +133,10 @@ export function resolveRecoverableErrorCode(value: unknown): RecoverableErrorCod
 
   if (code === "provider_rate_limited") {
     return "provider_rate_limited";
+  }
+
+  if (code === "workspace_root_invalid") {
+    return "workspace_root_invalid";
   }
 
   if (code === "provider_model_unavailable") {

@@ -1,38 +1,10 @@
 import { expect, test } from "@playwright/test";
 
-function buildAssistantRunStream(threadId: string, runId: string): string {
-  return [
-    `data: ${JSON.stringify({ type: "RUN_STARTED", threadId, runId })}`,
-    `data: ${JSON.stringify({
-      type: "TEXT_MESSAGE_START",
-      messageId: "assistant-message-1",
-      role: "assistant",
-    })}`,
-    `data: ${JSON.stringify({
-      type: "TEXT_MESSAGE_CONTENT",
-      messageId: "assistant-message-1",
-      delta: "Mock assistant response from the first guided task.",
-    })}`,
-    `data: ${JSON.stringify({
-      type: "TEXT_MESSAGE_END",
-      messageId: "assistant-message-1",
-    })}`,
-    `data: ${JSON.stringify({
-      type: "RUN_FINISHED",
-      threadId,
-      runId,
-      outcome: { type: "success" },
-    })}`,
-    "",
-    "",
-  ].join("\n\n");
-}
-
-test("first run configure launches and renders the first assistant response", async ({
+test("settings loads and saves the active workspace root through the app route", async ({
   page,
 }) => {
   let configured = false;
-  let capturedConfigureBody: Record<string, unknown> | null = null;
+  let capturedRuntimeConfigBody: Record<string, unknown> | null = null;
 
   await page.addInitScript(() => {
     window.localStorage.removeItem("deep-agent-666.threads");
@@ -71,7 +43,9 @@ test("first run configure launches and renders the first assistant response", as
         status: 200,
         contentType: "application/json",
         body: JSON.stringify({
-          workspaceRoot: "D:\\AgentBuild\\seed-workspace",
+          workspaceRoot: configured
+            ? "D:\\Repos\\demo-project"
+            : "D:\\AgentBuild\\seed-workspace",
           providers: {
             openai: {
               configured: configured,
@@ -91,10 +65,9 @@ test("first run configure launches and renders the first assistant response", as
       return;
     }
 
-    capturedConfigureBody = JSON.parse(route.request().postData() ?? "{}") as Record<
-      string,
-      unknown
-    >;
+    capturedRuntimeConfigBody = JSON.parse(
+      route.request().postData() ?? "{}",
+    ) as Record<string, unknown>;
     configured = true;
 
     await route.fulfill({
@@ -104,7 +77,7 @@ test("first run configure launches and renders the first assistant response", as
         status: "ok",
         preset_count: 1,
         preset_ids: ["openai-balanced"],
-        workspaceRoot: "D:\\AgentBuild\\seed-workspace",
+        workspaceRoot: "D:\\Repos\\demo-project",
         providers: {
           openai: {
             configured: true,
@@ -142,56 +115,26 @@ test("first run configure launches and renders the first assistant response", as
     });
   });
 
-  await page.route(
-    "**/api/copilotkit/agent/**/run",
-    async (route) => {
-      const requestBody = route.request().postDataJSON() as {
-        threadId?: string;
-        runId?: string;
-      };
-      const threadId = requestBody.threadId ?? "thread-first-run";
-      const runId = requestBody.runId ?? "run-first-run";
-
-      await route.fulfill({
-        status: 200,
-        contentType: "text/event-stream",
-        body: buildAssistantRunStream(threadId, runId),
-      });
-    },
-  );
-
-  await page.route("**/api/copilotkit/agent/**/connect", async (route) => {
-    await route.fulfill({
-      status: 200,
-      contentType: "text/event-stream",
-      body: ": connected\n\n",
-    });
-  });
-
   await page.goto("/");
   await page.waitForLoadState("networkidle");
 
-  await expect(page.getByText("Configure your providers")).toBeVisible();
-  await page.getByRole("button", { name: "Configure provider" }).click();
+  await page.getByRole("button", { name: "Settings" }).click();
+  await expect(page.getByTestId("workspace-root-input")).toHaveValue(
+    "D:\\AgentBuild\\seed-workspace",
+  );
 
+  await page.getByTestId("workspace-root-input").fill("D:\\Repos\\demo-project");
   await page.locator('input[type="password"]').first().fill("test-openai-key");
   await page.getByRole("button", { name: "Save & Apply" }).click();
 
-  await expect(page.getByText("Start with a guided task")).toBeVisible();
+  expect(capturedRuntimeConfigBody).toEqual({
+    agent_workspace_root: "D:\\Repos\\demo-project",
+    openai_api_key: "test-openai-key",
+    openai_base_url: "https://api.openai.com/v1",
+  });
 
-  await page
-    .getByRole("button", { name: /Analyze the repository structure/i })
-    .click();
-
-  await expect(
-    page.locator('[data-testid="copilot-assistant-message"]').first(),
-  ).toBeVisible({ timeout: 10_000 });
-  await expect(
-    page.locator('[data-testid="copilot-assistant-message"]').first(),
-  ).toContainText("Mock assistant response from the first guided task.");
-
-  expect(capturedConfigureBody?.["openai_api_key"]).toBe("test-openai-key");
-  expect(capturedConfigureBody?.["openai_base_url"]).toBe(
-    "https://api.openai.com/v1",
+  await expect(page.getByTestId("workspace-root-input")).toHaveCount(0);
+  await expect(page.getByTestId("workspace-root-label")).toContainText(
+    "D:\\Repos\\demo-project",
   );
 });

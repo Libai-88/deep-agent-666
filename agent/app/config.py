@@ -20,6 +20,15 @@ def load_settings() -> AgentSettings:
     return AgentSettings()
 
 
+def normalize_runtime_workspace_root(value: str | Path) -> Path:
+    candidate = Path(value).expanduser().resolve()
+    if not candidate.exists():
+        raise ValueError("workspace root does not exist")
+    if not candidate.is_dir():
+        raise ValueError("workspace root is not a directory")
+    return candidate
+
+
 class ConfigStore:
     """Runtime-mutable configuration, reloadable without restarting the process."""
 
@@ -28,6 +37,14 @@ class ConfigStore:
 
     def snapshot(self) -> AgentSettings:
         return self._settings.model_copy(deep=True)
+
+    @property
+    def workspace_root(self) -> Path:
+        return self._settings.workspace_root
+
+    @workspace_root.setter
+    def workspace_root(self, value: Path) -> None:
+        self._settings.workspace_root = value
 
     @property
     def openai_api_key(self) -> str | None:

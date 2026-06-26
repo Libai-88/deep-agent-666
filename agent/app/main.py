@@ -19,7 +19,7 @@ from ag_ui.encoder import EventEncoder
 from copilotkit import CopilotKitRemoteEndpoint
 from copilotkit.integrations.fastapi import add_fastapi_endpoint
 
-from app.config import ConfigStore, load_settings
+from app.config import ConfigStore, load_settings, normalize_runtime_workspace_root
 from app.presets import DEFAULT_PRESET_ID
 from app.runtime_registry import (
     LiveAgentAccessor,
@@ -45,6 +45,7 @@ app.add_middleware(
 
 
 class ConfigureRequest(BaseModel):
+    agent_workspace_root: str | None = None
     openai_api_key: str | None = None
     openai_base_url: str | None = None
     anthropic_api_key: str | None = None
@@ -122,6 +123,27 @@ def _classify_route_exception(exc: Exception) -> tuple[str | None, str]:
     return None, f"agent run failed: {exc.__class__.__name__} (see server logs)"
 
 
+def _runtime_config_payload() -> dict[str, object]:
+    snapshot = store.snapshot()
+    return {
+        "workspaceRoot": str(snapshot.workspace_root),
+        "providers": {
+            "openai": {
+                "configured": bool(snapshot.openai_api_key),
+                "baseUrl": snapshot.openai_base_url,
+            },
+            "anthropic": {
+                "configured": bool(snapshot.anthropic_api_key),
+                "baseUrl": snapshot.anthropic_base_url,
+            },
+            "google": {
+                "configured": bool(snapshot.google_api_key),
+                "baseUrl": snapshot.google_base_url,
+            },
+        },
+    }
+
+
 @app.get("/health")
 async def health() -> JSONResponse:
     agents = _current_registry().all_agents
@@ -144,9 +166,29 @@ async def presets() -> JSONResponse:
     )
 
 
+@app.get("/config")
+async def config() -> JSONResponse:
+    return JSONResponse(_runtime_config_payload())
+
+
 @app.post("/configure")
 async def configure(body: ConfigureRequest) -> JSONResponse:
     changed = False
+
+    if body.agent_workspace_root is not None:
+        try:
+            store.workspace_root = normalize_runtime_workspace_root(
+                body.agent_workspace_root
+            )
+        except ValueError as exc:
+            return JSONResponse(
+                {
+                    "detail": str(exc),
+                    "code": "workspace_root_invalid",
+                },
+                status_code=400,
+            )
+        changed = True
 
     if body.openai_api_key is not None:
         store.openai_api_key = body.openai_api_key
@@ -175,6 +217,7 @@ async def configure(body: ConfigureRequest) -> JSONResponse:
             "status": "ok",
             "preset_count": len(_current_registry().presets_by_id),
             "preset_ids": list(_current_registry().presets_by_id.keys()),
+            **_runtime_config_payload(),
         }
     )
 

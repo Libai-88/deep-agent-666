@@ -1,6 +1,6 @@
 # Deep Agent 666 — 当前状态
 
-> 最后更新：2026-06-27 (V1 完成，V2 release hardening 完成，V3 首用引导完成，V4 本地持久化线程运行时完成，V5 live provider activation 完成，V6 first response roundtrip 完成，V7 provider alignment/runtime recovery 完成，V8 runtime failure normalization 完成，V9 retry replay recovery 完成，V10 thread history gap recovery 完成，V11 thread history drift recovery 完成，V12 runtime persistence proof 完成，V13 runtime catalog fallback 完成，V14 coordinator workbench regression 完成)
+> 最后更新：2026-06-27 (V1 完成，V2 release hardening 完成，V3 首用引导完成，V4 本地持久化线程运行时完成，V5 live provider activation 完成，V6 first response roundtrip 完成，V7 provider alignment/runtime recovery 完成，V8 runtime failure normalization 完成，V9 retry replay recovery 完成，V10 thread history gap recovery 完成，V11 thread history drift recovery 完成，V12 runtime persistence proof 完成，V13 runtime catalog fallback 完成，V14 coordinator workbench regression 完成，V15 runtime-config workspace root 完成)
 
 ## 当前结论
 
@@ -13,10 +13,10 @@
 
 | 套件 | 数量 | 状态 |
 |------|------|------|
-| 后端 (pytest) | 59 | ✅ 全通过 |
-| 前端 (vitest) | 66 | ✅ 全通过 |
+| 后端 (pytest) | 61 | ✅ 全通过 |
+| 前端 (vitest) | 72 | ✅ 全通过 |
 | Build (next build) | — | ✅ |
-| E2E (playwright) | 13 | ✅ 全通过 |
+| E2E (playwright) | 14 | ✅ 全通过 |
 | Docker Compose 配置校验 | — | ⚠️ 当前机器未安装 `docker`，未执行命令级验证 |
 
 ## 已完成
@@ -97,6 +97,11 @@
 - 浏览器回归现已覆盖 starter template 启动 coordinator 的主路径，而不只验证基础聊天和恢复线程
 - 新增场景证明：planner / executor / reviewer 卡片、timeline 任务、results summary 会在同一线程里稳定出现
 - timeline 状态文案已从原始内部值改为更适合新手理解的可读标签
+
+### V15: Runtime Config Workspace Root ✅
+- 产品层新增同源 `/api/runtime-config` 路由，设置读写不再让浏览器直接调用 `127.0.0.1:8123/configure`
+- Settings 现在会加载当前 runtime 配置，并允许新手直接查看和切换 active workspace root
+- FastAPI runtime 现已支持 `GET /config` 快照和 `agent_workspace_root` 热更新校验，非法路径会返回专用错误码
 
 ## 关键提交
 

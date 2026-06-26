@@ -2,6 +2,7 @@ import asyncio
 import importlib
 import json
 import sys
+from pathlib import Path
 
 from fastapi.testclient import TestClient
 
@@ -97,3 +98,69 @@ def test_direct_agent_health_route_activates_after_configure(monkeypatch, tmp_pa
     after = client.get("/anthropic-balanced/health")
     assert after.status_code == 200
     assert after.json()["agent"]["name"] == "anthropic-balanced"
+
+
+def test_configure_updates_workspace_root_and_exposes_runtime_config(
+    monkeypatch,
+    tmp_path,
+) -> None:
+    monkeypatch.setenv("OPENAI_API_KEY", "test-openai-key")
+
+    main_module = _reload_main(monkeypatch, tmp_path)
+    client = TestClient(main_module.app)
+
+    initial_config = client.get("/config")
+    assert initial_config.status_code == 200
+    initial_workspace_root = Path(initial_config.json()["workspaceRoot"])
+    assert initial_workspace_root.exists()
+
+    next_workspace = tmp_path / "second-workspace"
+    next_workspace.mkdir()
+    (next_workspace / "note.txt").write_text("hello", encoding="utf-8")
+
+    response = client.post(
+        "/configure",
+        json={"agent_workspace_root": str(next_workspace)},
+    )
+    assert response.status_code == 200
+    assert Path(response.json()["workspaceRoot"]) == next_workspace.resolve()
+
+    updated_config = client.get("/config")
+    assert updated_config.status_code == 200
+    payload = updated_config.json()
+    assert Path(payload["workspaceRoot"]) == next_workspace.resolve()
+    assert payload["providers"]["openai"]["configured"] is True
+    assert payload["providers"]["anthropic"]["configured"] is False
+
+    workspace_listing = client.get("/workspace/files")
+    assert workspace_listing.status_code == 200
+    assert workspace_listing.json()["items"][0]["name"] == "note.txt"
+
+
+def test_configure_rejects_invalid_workspace_root_without_mutating_snapshot(
+    monkeypatch,
+    tmp_path,
+) -> None:
+    monkeypatch.setenv("OPENAI_API_KEY", "test-openai-key")
+
+    main_module = _reload_main(monkeypatch, tmp_path)
+    client = TestClient(main_module.app)
+
+    before = client.get("/config")
+    assert before.status_code == 200
+    original_workspace_root = before.json()["workspaceRoot"]
+
+    missing_workspace = tmp_path / "missing-workspace"
+    response = client.post(
+        "/configure",
+        json={"agent_workspace_root": str(missing_workspace)},
+    )
+    assert response.status_code == 400
+    assert response.json() == {
+        "detail": "workspace root does not exist",
+        "code": "workspace_root_invalid",
+    }
+
+    after = client.get("/config")
+    assert after.status_code == 200
+    assert after.json()["workspaceRoot"] == original_workspace_root

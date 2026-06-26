@@ -17,7 +17,9 @@ This repository is set up so a beginner can get from clone to running product wi
    - `OPENAI_API_KEY`
    - `ANTHROPIC_API_KEY`
    - `GOOGLE_API_KEY`
-3. Set `AGENT_WORKSPACE_ROOT` to the workspace the agent is allowed to inspect.
+3. Set `AGENT_WORKSPACE_ROOT` to the initial workspace the agent is allowed to inspect.
+
+You can change the active workspace root later from the in-product `Settings` dialog without restarting the services.
 
 ## Install
 
@@ -88,7 +90,8 @@ Open `http://127.0.0.1:3000`.
 - Real upstream provider failures on the direct Python AG-UI route now terminate with protocol-valid `RUN_ERROR` events, including structured codes such as `provider_access_denied`.
 - The web runtime now persists the last live preset catalog to `COPILOTKIT_RUNTIME_CATALOG_PATH` (default `./data/runtime-catalog.json`), so the main CopilotKit route can keep restoring persisted threads when `/presets` is temporarily unavailable.
 - The coordinator starter flow now has a browser regression that proves planner/executor/reviewer cards, timeline tasks, and results summary appear together in one thread, and timeline statuses are rendered with beginner-friendly labels instead of raw internal values.
-- `npm run e2e` now covers first-run launch, coordinator workbench rendering, restored-thread retry recovery, full history-gap detection, and partial history-drift detection with deterministic AG-UI stream fixtures. The Vitest suite also includes runtime-level proofs for both fresh-instance SQLite restore and route-level restore during preset-catalog outages. Remaining hardening is broader multi-entry and true process-restart coverage.
+- Runtime settings now flow through the app-owned `/api/runtime-config` route, and beginners can inspect/change the active workspace root from `Settings` without editing `.env` or calling the backend directly from the browser.
+- `npm run e2e` now covers first-run launch, workspace-root settings saves, coordinator workbench rendering, restored-thread retry recovery, full history-gap detection, and partial history-drift detection with deterministic AG-UI stream fixtures. The Vitest suite also includes runtime-level proofs for both fresh-instance SQLite restore and route-level restore during preset-catalog outages. Remaining hardening is broader multi-entry and true process-restart coverage.
 
 ## Test
 

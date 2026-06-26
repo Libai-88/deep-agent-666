@@ -18,6 +18,7 @@
 - `V12` 已补齐真实 CopilotKit runtime handler + SQLite thread store 的跨实例恢复证明。
 - `V13` 已为主 `[[...slug]]` 路由补齐 preset catalog 本地缓存回退，`/presets` 临时不可达时仍可恢复已持久化线程。
 - `V14` 已补齐 coordinator starter flow 的浏览器回归，并把 timeline 状态文案改为更适合新手理解的形式。
+- `V15` 已把 runtime 配置收口到同源 `/api/runtime-config`，并让新手可在 Settings 中直接查看和切换 workspace root。
 
 ---
 
@@ -60,10 +61,10 @@ CopilotRuntime (Next.js route handler)
 
 | 套件 | 数量 | 状态 |
 |------|------|------|
-| 后端 pytest | **59** | ✅ 全通过 |
-| 前端 vitest | **66** | ✅ 全通过 |
+| 后端 pytest | **61** | ✅ 全通过 |
+| 前端 vitest | **72** | ✅ 全通过 |
 | Next.js build | — | ✅ 无错误 |
-| E2E (playwright) | **13** | ✅ 全通过 |
+| E2E (playwright) | **14** | ✅ 全通过 |
 | Docker Compose 配置校验 | — | ⚠️ 当前机器未安装 `docker`，未执行命令级验证 |
 
 ---
@@ -132,6 +133,7 @@ TasksFilesSidebar   — todo + 文件管理侧栏
 FileBrowser         — 工作区树浏览
 ThreadList          — 会话历史
 SettingsDialog      — 多 provider 密钥配置
+                    — 支持同源 runtime-config 读写与 workspace root 热更新
 FileViewDialog      — 文件内容预览
 DiffViewer          — 内联 diff 查看器
 ThemeToggle         — 明暗主题切换
@@ -160,8 +162,9 @@ Middleware:
 
 Endpoints:
   GET  /health                — agent 列表 + 数量
+  GET  /config                — 当前 runtime 配置快照（不暴露 API key）
   GET  /presets               — 预设定义（供前端动态获取）
-  POST /configure             — API 密钥热重载（仅 V1）
+  POST /configure             — API 密钥 + workspace root 热更新（仅 runtime 内存态）
   GET  /workspace/files       — 目录浏览
   GET  /workspace/file        — 文件读取
   POST /{preset_id}           — AG-UI endpoint per agent
@@ -182,7 +185,7 @@ CopilotRuntime (Next.js route handler):
 
 Python FastAPI:
   uvicorn on port 8123
-  59 tests passing
+  61 tests passing
 ```
 
 ---
@@ -209,9 +212,9 @@ Python FastAPI:
 
 | 标准 | 当前 | 达标 |
 |------|------|------|
-| 后端测试 ≥ 50 | 59 ✅ | 已达标 |
-| 前端测试 ≥ 20 | 66 ✅ | 已达标 |
-| E2E ≥ 5 条 | 13 ✅ | 已达标 |
+| 后端测试 ≥ 50 | 61 ✅ | 已达标 |
+| 前端测试 ≥ 20 | 72 ✅ | 已达标 |
+| E2E ≥ 5 条 | 14 ✅ | 已达标 |
 | 0 个 Console Error | 有 Inspector 警告 | SDK 升级 |
 | Docker 部署 | ❌ | Dockerfile + compose |
 | Windows 桌面壳 | ❌ | Electron wrapper |
@@ -247,6 +250,7 @@ V10 基线提交: `7558e16` — thread history gap recovery baseline
 V12 基线提交: `d5b5508` — runtime persistence proof baseline
 V13 基线提交: `898172a` — runtime catalog fallback baseline
 V14 基线提交: `见最新提交` — coordinator workbench regression baseline
+V15 基线提交: `见最新提交` — runtime config workspace-root baseline
 
 日志：
 ```

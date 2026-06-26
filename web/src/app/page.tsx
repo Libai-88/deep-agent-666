@@ -99,6 +99,11 @@ import {
   restoredMessagesIncludePrompt,
   shouldFlagThreadHistoryGap,
 } from "@/lib/thread-history-gap";
+import {
+  buildRuntimeConfigRequestBody,
+  normalizeRuntimeSettings,
+  type RuntimeSettings,
+} from "@/lib/runtime-settings";
 
 export default function HomePage() {
   return (
@@ -133,6 +138,17 @@ async function fetchRuntimeAvailability(): Promise<RuntimeAvailability> {
   }
 }
 
+async function fetchRuntimeSettings(): Promise<RuntimeSettings> {
+  const response = await fetch("/api/runtime-config", {
+    cache: "no-store",
+  });
+  if (!response.ok) {
+    throw new Error(`Failed to load runtime config: ${response.status}`);
+  }
+
+  return normalizeRuntimeSettings((await response.json()) as unknown);
+}
+
 function HomePageContent() {
   const [sidebar, setSidebar] = useQueryParamState("sidebar");
   const [threadId, setThreadId] = useQueryParamState("threadId");
@@ -147,6 +163,9 @@ function HomePageContent() {
   const [catalogChecking, setCatalogChecking] = useState(true);
   const [runtimeAvailability, setRuntimeAvailability] =
     useState<RuntimeAvailability>("empty");
+  const [runtimeSettings, setRuntimeSettings] = useState<RuntimeSettings>(() =>
+    normalizeRuntimeSettings(null),
+  );
   const [recoverableError, setRecoverableError] =
     useState<RecoverableErrorCode | null>(null);
   const [pendingThreadRun, setPendingThreadRun] =
@@ -179,6 +198,15 @@ function HomePageContent() {
   useEffect(() => {
     saveThreads(threads);
   }, [threads]);
+
+  const reloadRuntimeSettings = useCallback(async () => {
+    try {
+      const nextSettings = await fetchRuntimeSettings();
+      setRuntimeSettings(nextSettings);
+    } catch {
+      // Keep the last known runtime settings when the backend is unavailable.
+    }
+  }, []);
 
   const reloadCatalogState = useCallback(async () => {
     setCatalogChecking(true);
@@ -218,6 +246,10 @@ function HomePageContent() {
   useEffect(() => {
     void reloadCatalogState();
   }, [reloadCatalogState]);
+
+  useEffect(() => {
+    void reloadRuntimeSettings();
+  }, [reloadRuntimeSettings]);
 
   useEffect(() => {
     if (typeof window === "undefined") {
@@ -423,6 +455,7 @@ function HomePageContent() {
             <h1 className="text-base font-semibold">Deep Agent 666</h1>
           </div>
           <div className="flex items-center gap-2">
+            <WorkspaceRootLabel workspaceRoot={runtimeSettings.workspaceRoot} />
             <ThemeToggle />
             <Button
               variant="outline"
@@ -452,9 +485,10 @@ function HomePageContent() {
           onOpenChange={setSettingsOpen}
           currentPreset={settingsPreset}
           onSwitchPreset={handleSwitchPreset}
-          onSaved={() => {
+          onSaved={async (nextSettings) => {
             setRecoverableError(null);
-            void reloadCatalogState();
+            setRuntimeSettings(nextSettings);
+            await reloadCatalogState();
           }}
           onSaveFailed={(code) => setRecoverableError(code)}
         />
@@ -482,6 +516,7 @@ function HomePageContent() {
           )}
         </div>
         <div className="flex items-center gap-2">
+          <WorkspaceRootLabel workspaceRoot={runtimeSettings.workspaceRoot} />
           <ThemeToggle />
           <span className="text-xs text-muted-foreground">
             {currentPreset.label}
@@ -603,6 +638,7 @@ function HomePageContent() {
                     activeThread={activeThread}
                     currentPreset={currentPreset}
                     threadId={threadId}
+                    workspaceRoot={runtimeSettings.workspaceRoot}
                     pendingThreadRun={pendingThreadRun}
                     setThreads={setThreads}
                     setWorkbenchState={setWorkbenchState}
@@ -635,9 +671,10 @@ function HomePageContent() {
         onOpenChange={setSettingsOpen}
         currentPreset={settingsPreset}
         onSwitchPreset={handleSwitchPreset}
-        onSaved={() => {
+        onSaved={async (nextSettings) => {
           setRecoverableError(null);
-          void reloadCatalogState();
+          setRuntimeSettings(nextSettings);
+          await reloadCatalogState();
         }}
         onSaveFailed={(code) => setRecoverableError(code)}
       />
@@ -992,6 +1029,7 @@ function ActiveThreadChat({
   activeThread,
   currentPreset,
   threadId,
+  workspaceRoot,
   pendingThreadRun,
   setThreads,
   setWorkbenchState,
@@ -1000,6 +1038,7 @@ function ActiveThreadChat({
   activeThread: LocalThread;
   currentPreset: AgentPresetDefinition;
   threadId: string | null;
+  workspaceRoot: string | null;
   pendingThreadRun: PendingThreadRun | null;
   setThreads: React.Dispatch<React.SetStateAction<LocalThread[]>>;
   setWorkbenchState: React.Dispatch<React.SetStateAction<ThreadWorkbenchState>>;
@@ -1010,14 +1049,14 @@ function ActiveThreadChat({
 
   const workspaceContext = useMemo(
     () => ({
-      workspaceRoot: process.env.AGENT_WORKSPACE_ROOT ?? "D:\\AgentBuild",
+      workspaceRoot: workspaceRoot ?? "unknown",
       projectName: "deep-agent-666",
       platform: "windows",
       shell: "powershell",
       currentThreadId: threadId ?? null,
       currentPresetId: currentPreset.id,
     }),
-    [currentPreset.id, threadId],
+    [currentPreset.id, threadId, workspaceRoot],
   );
 
   useAgentContext({
@@ -1142,6 +1181,26 @@ function ActiveThreadChat({
   );
 }
 
+function WorkspaceRootLabel({
+  workspaceRoot,
+}: {
+  workspaceRoot: string | null;
+}) {
+  if (!workspaceRoot) {
+    return null;
+  }
+
+  return (
+    <span
+      data-testid="workspace-root-label"
+      title={workspaceRoot}
+      className="inline-flex max-w-[300px] truncate rounded-md border border-border bg-card/30 px-2 py-1 text-xs text-muted-foreground"
+    >
+      Workspace: {workspaceRoot}
+    </span>
+  );
+}
+
 function resolveGatePresentation(
   state: FirstRunState,
   recoverableError: RecoverableErrorCode | null,
@@ -1198,6 +1257,12 @@ function resolveRecoverablePresentation(
         title: "Configuration failed",
         description:
           "The provider settings could not be saved. Review the API key and base URL, then try again.",
+      };
+    case "workspace_root_invalid":
+      return {
+        title: "Workspace folder unavailable",
+        description:
+          "The selected workspace folder does not exist or is not a directory. Reopen settings and choose a valid local folder.",
       };
     case "thread_missing_or_invalid":
       return {
@@ -1312,42 +1377,108 @@ function SettingsDialog({
   onOpenChange: (open: boolean) => void;
   currentPreset: AgentPresetDefinition;
   onSwitchPreset: (id: AgentPresetId) => void;
-  onSaved: () => void | Promise<void>;
+  onSaved: (settings: RuntimeSettings) => void | Promise<void>;
   onSaveFailed: (code: RecoverableErrorCode) => void;
 }) {
   const [apiKeys, setApiKeys] = useState<Record<string, string>>({});
   const [baseUrls, setBaseUrls] = useState<Record<string, string>>({});
+  const [workspaceRoot, setWorkspaceRoot] = useState("");
+  const [loadingConfig, setLoadingConfig] = useState(false);
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState<{ type: "ok" | "error"; text: string } | null>(null);
 
-  if (!open) return null;
-
   const permissions = ["read-only", "balanced", "full-access"] as const;
+
+  useEffect(() => {
+    if (!open) {
+      return;
+    }
+
+    let cancelled = false;
+
+    const loadCurrentRuntimeConfig = async () => {
+      setLoadingConfig(true);
+      setMessage(null);
+      try {
+        const settings = await fetchRuntimeSettings();
+        if (cancelled) {
+          return;
+        }
+
+        setWorkspaceRoot(settings.workspaceRoot ?? "");
+        setBaseUrls({
+          openai: settings.providers.openai.baseUrl ?? "",
+          anthropic: settings.providers.anthropic.baseUrl ?? "",
+          google: settings.providers.google.baseUrl ?? "",
+        });
+        setApiKeys({});
+      } catch {
+        if (cancelled) {
+          return;
+        }
+
+        setMessage({
+          type: "error",
+          text: "Failed to load the current runtime settings.",
+        });
+      } finally {
+        if (!cancelled) {
+          setLoadingConfig(false);
+        }
+      }
+    };
+
+    void loadCurrentRuntimeConfig();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [open]);
+
+  if (!open) return null;
 
   const handleSave = async () => {
     setSaving(true);
     setMessage(null);
     try {
-      const body: Record<string, string> = {};
-      for (const cfg of PROVIDER_CONFIGS) {
-        const key = apiKeys[cfg.key];
-        if (key) body[cfg.apiKeyName] = key;
-        const url = baseUrls[cfg.key];
-        if (url) body[cfg.baseUrlName] = url;
-      }
-      const res = await fetch("http://127.0.0.1:8123/configure", {
+      const body = buildRuntimeConfigRequestBody({
+        workspaceRoot,
+        apiKeys: {
+          openai: apiKeys.openai ?? "",
+          anthropic: apiKeys.anthropic ?? "",
+          google: apiKeys.google ?? "",
+        },
+        baseUrls: {
+          openai: baseUrls.openai ?? "",
+          anthropic: baseUrls.anthropic ?? "",
+          google: baseUrls.google ?? "",
+        },
+      });
+      const res = await fetch("/api/runtime-config", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(body),
       });
-      const data = await res.json();
+      const payload = (await res.json()) as unknown;
       if (res.ok) {
-        setMessage({ type: "ok", text: `Configured — ${data.preset_count} presets available` });
-        await requestRuntimeBootstrapRefresh();
-        await onSaved();
+        const data = normalizeRuntimeSettings(payload);
+        setMessage({
+          type: "ok",
+          text: "Runtime settings applied.",
+        });
+        await onSaved(data);
+        onOpenChange(false);
+        void requestRuntimeBootstrapRefresh();
       } else {
-        setMessage({ type: "error", text: "Failed to save configuration" });
-        onSaveFailed("configuration_failed");
+        const errorCode = resolveRecoverableErrorCode(payload);
+        setMessage({
+          type: "error",
+          text:
+            errorCode === "workspace_root_invalid"
+              ? "Choose an existing local folder before saving."
+              : "Failed to save configuration.",
+        });
+        onSaveFailed(errorCode);
       }
     } catch {
       setMessage({ type: "error", text: "Backend is not running" });
@@ -1363,13 +1494,33 @@ function SettingsDialog({
         onClick={() => onOpenChange(false)}
       >
         <div
-          className="w-full max-w-lg rounded-xl border border-border bg-white shadow-lg"
+          className="w-full max-w-lg rounded-xl border border-border bg-white p-6 shadow-lg"
           onClick={(e) => e.stopPropagation()}
         >
         <h2 className="text-lg font-semibold text-card-foreground">Settings</h2>
         <p className="mt-1 text-sm text-muted-foreground">
-          Configure provider API keys and base URLs.
+          Configure the workspace root, provider API keys, and base URLs.
         </p>
+
+        <div className="mt-5 space-y-1.5">
+          <label
+            htmlFor="workspace-root-input"
+            className="block text-xs font-semibold uppercase tracking-wider text-muted-foreground"
+          >
+            Workspace Root
+          </label>
+          <input
+            id="workspace-root-input"
+            data-testid="workspace-root-input"
+            placeholder="D:\\Projects\\my-app"
+            value={workspaceRoot}
+            onChange={(e) => setWorkspaceRoot(e.target.value)}
+            className="w-full rounded-md border border-[#D0D0D8] bg-white px-3 py-1.5 text-sm text-[#1a1a1a] placeholder:text-[#999] focus:outline-none focus:ring-1 focus:ring-[#7c6fe0]"
+          />
+          <p className="text-xs text-muted-foreground">
+            Choose the local folder this agent is allowed to inspect and edit.
+          </p>
+        </div>
 
         {/* Provider / Permission selector */}
         <div className="mt-4 flex gap-4">
@@ -1466,6 +1617,12 @@ function SettingsDialog({
           </p>
         )}
 
+        {loadingConfig ? (
+          <p className="mt-3 text-xs text-muted-foreground">
+            Loading current runtime settings...
+          </p>
+        ) : null}
+
         <div className="mt-5 flex items-center justify-end gap-2">
           <button
             onClick={() => onOpenChange(false)}
@@ -1475,7 +1632,7 @@ function SettingsDialog({
           </button>
           <button
             onClick={handleSave}
-            disabled={saving}
+            disabled={saving || loadingConfig}
             className="rounded-lg bg-[#7c6fe0] px-4 py-1.5 text-sm font-medium text-white hover:bg-[#6a5ed0] disabled:opacity-50"
           >
             {saving ? "Saving..." : "Save & Apply"}

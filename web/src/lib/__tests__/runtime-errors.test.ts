@@ -40,6 +40,15 @@ describe("runtime-errors", () => {
     ]);
   });
 
+  it("classifies invalid workspace-root saves as a dedicated recoverable error", () => {
+    expect(
+      resolveRecoverableErrorCode({
+        code: "workspace_root_invalid",
+        detail: "workspace root does not exist",
+      }),
+    ).toBe("workspace_root_invalid");
+  });
+
   it("offers retry and fresh-thread recovery when runtime history is missing", () => {
     expect(resolveRecoverableActions("thread_history_unavailable")).toEqual([
       { label: "Retry last task", action: "retry_last_task" },
