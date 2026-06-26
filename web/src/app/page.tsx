@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useCallback, useEffect, useMemo, useState } from "react";
+import { z } from "zod";
 import {
   CopilotChat,
   useRenderTool,
@@ -8,6 +9,7 @@ import {
   useConfigureSuggestions,
   useAgentContext,
   useAgent,
+  UseAgentUpdate,
 } from "@copilotkit/react-core/v2";
 import { useQueryState } from "nuqs";
 import {
@@ -46,7 +48,8 @@ import {
 } from "@/components/TasksFilesSidebar";
 import { ToolCallCard } from "@/components/ToolCallCard";
 import { ThemeToggle } from "@/components/ThemeToggle";
-import { SubAgentProgress } from "@/components/SubAgentProgress";
+import { DelegationLog } from "@/components/DelegationLog";
+import { SupervisorActivityBanner } from "@/components/SupervisorActivityBanner";
 import { DiffViewer } from "@/components/DiffViewer";
 import { FileBrowser } from "@/components/FileBrowser";
 import { FileViewDialog } from "@/components/FileViewDialog";
@@ -99,25 +102,51 @@ function HomePageContent() {
     }
   }, []);
 
-  // Monitor tool calls via useRenderTool
+  // ── Precise sub-agent tool renderers ──
+  // Reference: showcase/integrations/langgraph-fastapi/demos/subagents/page.tsx
+  useRenderTool({
+    name: "planner_tool",
+    parameters: z.object({ task: z.string().optional() }),
+    render: ({ parameters, status, result }) => (
+      <SubAgentActivityCard
+        subAgent="planner"
+        task={typeof parameters?.task === "string" ? parameters.task : undefined}
+        status={status === "complete" ? "complete" : status === "executing" ? "executing" : "inProgress"}
+        result={typeof result === "string" ? result : undefined}
+      />
+    ),
+  });
+
+  useRenderTool({
+    name: "executor_tool",
+    parameters: z.object({ task: z.string().optional() }),
+    render: ({ parameters, status, result }) => (
+      <SubAgentActivityCard
+        subAgent="executor"
+        task={typeof parameters?.task === "string" ? parameters.task : undefined}
+        status={status === "complete" ? "complete" : status === "executing" ? "executing" : "inProgress"}
+        result={typeof result === "string" ? result : undefined}
+      />
+    ),
+  });
+
+  useRenderTool({
+    name: "reviewer_tool",
+    parameters: z.object({ task: z.string().optional() }),
+    render: ({ parameters, status, result }) => (
+      <SubAgentActivityCard
+        subAgent="reviewer"
+        task={typeof parameters?.task === "string" ? parameters.task : undefined}
+        status={status === "complete" ? "complete" : status === "executing" ? "executing" : "inProgress"}
+        result={typeof result === "string" ? result : undefined}
+      />
+    ),
+  });
+
+  // ── Generic tool monitor for all other tools ──
   useRenderTool({
     name: "*",
     render: ({ name, status, args, result }) => {
-      const toolStatus = status === "complete" ? "complete" : status === "executing" ? "executing" : "inProgress";
-
-      // Render sub-agent tools as beautiful cards
-      if (["planner_tool", "executor_tool", "reviewer_tool"].includes(name)) {
-        const subAgentName = name.replace("_tool", "");
-        return (
-          <SubAgentActivityCard
-            subAgent={subAgentName as "planner" | "executor" | "reviewer"}
-            task={typeof args?.task === "string" ? args.task : undefined}
-            status={toolStatus}
-            result={typeof result === "string" ? result : undefined}
-          />
-        );
-      }
-
       // Track write_todos tool calls
       if (name === "write_todos" && status === "complete" && args?.todos) {
         const newTodos = (args.todos as Array<{ content: string; status?: string }>).map(
@@ -201,7 +230,7 @@ function HomePageContent() {
         message: "Analyze the project structure and suggest improvements",
       },
     ],
-    available: "before-first-message",
+    available: "always",
   });
 
   const [threads, setThreads] = useState<LocalThread[]>(seedThreads);
@@ -392,10 +421,8 @@ function HomePageContent() {
                 />
               </div>
 
-              <SubAgentProgress agentId={`coordinator-${activeThread.presetId}`} />
-
               {/* Chat area */}
-              <div className="flex-1 min-h-0">
+              <div className="flex-1 min-h-0 flex flex-col">
                 <CopilotChat
                   className="h-full"
                   agentId={activeThread.presetId}
