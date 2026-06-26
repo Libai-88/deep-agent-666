@@ -1,20 +1,19 @@
 "use client";
 
-import React, { useCallback, useEffect, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { z } from "zod";
 import {
-  usePathname,
-  useRouter,
-  useSearchParams,
-} from "next/navigation";
-import {
+  CopilotChatConfigurationProvider,
   CopilotChat,
+  useCopilotKit,
   useRenderTool,
   useInterrupt,
   useConfigureSuggestions,
   useAgentContext,
   useAgent,
 } from "@copilotkit/react-core/v2";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import type { Message } from "@ag-ui/core";
 import {
   ResizableHandle,
   ResizablePanel,
@@ -34,6 +33,7 @@ import {
   deriveThreadTitle,
   loadThreads,
   saveThreads,
+  sanitizeThreads,
   type LocalThread,
 } from "@/lib/thread-registry";
 import {
@@ -63,22 +63,31 @@ import {
 } from "@/lib/agent-presets";
 import { ToolCallCard } from "@/components/ToolCallCard";
 import { ThemeToggle } from "@/components/ThemeToggle";
-import { DelegationLog } from "@/components/DelegationLog";
-import { SupervisorActivityBanner } from "@/components/SupervisorActivityBanner";
 import { FileBrowser } from "@/components/FileBrowser";
 import { FileViewDialog } from "@/components/FileViewDialog";
 import { TaskTimelinePanel } from "@/components/TaskTimelinePanel";
 import { ArtifactResultsPanel } from "@/components/ArtifactResultsPanel";
-
-function seedThreads(): LocalThread[] {
-  const stored = loadThreads();
-  if (stored.length > 0) return stored;
-  const defaultId = resolveDefaultPresetId({
-    defaultPresetId: "openai-balanced",
-    presets: [...ALL_AGENT_PRESETS],
-  });
-  return defaultId ? [createLocalThread(defaultId)] : [];
-}
+import { HomePageShell } from "@/components/HomePageShell";
+import { WorkbenchStatusNotice } from "@/components/WorkbenchStatusNotice";
+import {
+  resolveFirstRunState,
+  type FirstRunState,
+} from "@/lib/first-run-state";
+import {
+  resolveRecoverableActions,
+  type RecoverableAction,
+  type RecoverableErrorCode,
+} from "@/lib/runtime-errors";
+import {
+  fetchCatalogStateFromUrl,
+  type CatalogState,
+} from "@/lib/preset-catalog";
+import {
+  STARTER_TEMPLATES,
+  createStarterThread,
+  type StarterTemplate,
+  seedWorkbenchForStarterTemplate,
+} from "@/lib/starter-templates";
 
 export default function HomePage() {
   return (
@@ -95,6 +104,15 @@ function HomePageContent() {
   const [previewOpen, setPreviewOpen] = useState(false);
   const [previewContent, setPreviewContent] = useState("");
   const [previewLoading, setPreviewLoading] = useState(false);
+  const [catalogState, setCatalogState] = useState<CatalogState>({
+    catalog: { defaultPresetId: null, presets: [] },
+    source: "fallback",
+  });
+  const [catalogChecking, setCatalogChecking] = useState(true);
+  const [recoverableError, setRecoverableError] =
+    useState<RecoverableErrorCode | null>(null);
+  const [pendingThreadRun, setPendingThreadRun] =
+    useState<PendingThreadRun | null>(null);
 
   const handleOpenWorkspaceFile = useCallback(async (path: string) => {
     setPreviewFile(path);
@@ -250,7 +268,7 @@ function HomePageContent() {
     available: "always",
   });
 
-  const [threads, setThreads] = useState<LocalThread[]>(seedThreads);
+  const [threads, setThreads] = useState<LocalThread[]>(() => loadThreads());
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [workbenchState, setWorkbenchState] = useState<ThreadWorkbenchState>(
     () => createEmptyWorkbenchState(),
@@ -262,13 +280,56 @@ function HomePageContent() {
     saveThreads(threads);
   }, [threads]);
 
-  const activeThread = useMemo(
-    () =>
-      threads.find((t) => t.id === (threadId ?? threads[0]?.id)) ??
-      threads[0] ??
-      null,
-    [threads, threadId],
-  );
+  const reloadCatalogState = useCallback(async () => {
+    setCatalogChecking(true);
+    try {
+      const nextState = await fetchCatalogStateFromUrl("/api/preset-state", {
+        cache: "no-store",
+      });
+      setCatalogState(nextState);
+      setThreads((previous) =>
+        sanitizeThreads(previous, nextState.catalog.presets),
+      );
+      setRecoverableError(null);
+    } catch {
+      setRecoverableError("backend_unreachable");
+    } finally {
+      setCatalogChecking(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    void reloadCatalogState();
+  }, [reloadCatalogState]);
+
+  useEffect(() => {
+    if (typeof window === "undefined") {
+      return undefined;
+    }
+
+    const handleRuntimeError = (event: Event) => {
+      const detail = (event as CustomEvent<{ source?: string }>).detail;
+      if (detail?.source === "copilotkit") {
+        setRecoverableError("runtime_request_failed");
+      }
+    };
+
+    window.addEventListener("deep-agent-666.runtime-error", handleRuntimeError);
+    return () => {
+      window.removeEventListener(
+        "deep-agent-666.runtime-error",
+        handleRuntimeError,
+      );
+    };
+  }, []);
+
+  const activeThread = useMemo(() => {
+    if (threadId) {
+      return threads.find((thread) => thread.id === threadId) ?? null;
+    }
+
+    return threads[0] ?? null;
+  }, [threadId, threads]);
 
   const currentPreset = useMemo(() => {
     if (!activeThread) return null;
@@ -286,7 +347,11 @@ function HomePageContent() {
   });
 
   useEffect(() => {
-    if (!activeThread) return;
+    if (!activeThread) {
+      setLoadedWorkbenchThreadId(null);
+      setWorkbenchState(createEmptyWorkbenchState());
+      return;
+    }
     setLoadedWorkbenchThreadId(null);
     setWorkbenchState(loadWorkbenchState(activeThread.id));
     setLoadedWorkbenchThreadId(activeThread.id);
@@ -425,20 +490,47 @@ function HomePageContent() {
     value: workspaceContext,
   });
 
+  const effectiveRecoverableError =
+    recoverableError ?? (activeThread && !currentPreset ? "thread_missing_or_invalid" : null);
+
+  const firstRunState = resolveFirstRunState({
+    isChecking: catalogChecking,
+    catalog: catalogState.catalog,
+    catalogSource: catalogState.source,
+    threads,
+    activeThreadId: threadId ?? activeThread?.id ?? null,
+    recoverableError: effectiveRecoverableError,
+  });
+
+  const gatePresentation = useMemo(
+    () => resolveGatePresentation(firstRunState, effectiveRecoverableError),
+    [effectiveRecoverableError, firstRunState],
+  );
+
+  const noticePresentation = useMemo(
+    () =>
+      effectiveRecoverableError
+        ? resolveRecoverablePresentation(effectiveRecoverableError)
+        : null,
+    [effectiveRecoverableError],
+  );
+
   const handleNewThread = useCallback(() => {
-    const defaultId = resolveDefaultPresetId({
-      defaultPresetId: "openai-balanced",
-      presets: [...ALL_AGENT_PRESETS],
-    });
-    if (!defaultId) return;
+    const defaultId = resolveDefaultPresetId(catalogState.catalog);
+    if (!defaultId) {
+      setSettingsOpen(true);
+      return;
+    }
     const thread = createLocalThread(defaultId);
     setThreads((prev) => [thread, ...prev]);
     setThreadId(thread.id);
-  }, [setThreadId]);
+    setRecoverableError(null);
+  }, [catalogState.catalog, setThreadId]);
 
   const handleSelectThread = useCallback(
     (id: string) => {
       setThreadId(id);
+      setRecoverableError(null);
     },
     [setThreadId],
   );
@@ -455,16 +547,121 @@ function HomePageContent() {
     [activeThread],
   );
 
-  if (!currentPreset || !activeThread) {
+  const handleSelectStarterTemplate = useCallback(
+    (template: StarterTemplate) => {
+      const presetId = resolveDefaultPresetId(catalogState.catalog);
+      if (!presetId) {
+        setSettingsOpen(true);
+        return;
+      }
+
+      const thread = createStarterThread(presetId, template);
+      const seededWorkbench = seedWorkbenchForStarterTemplate(template.category);
+
+      saveWorkbenchState(thread.id, seededWorkbench);
+      setThreads((previous) => [thread, ...previous]);
+      setWorkbenchState(seededWorkbench);
+      setLoadedWorkbenchThreadId(thread.id);
+      setThreadId(thread.id);
+      setRecoverableError(null);
+      setPendingThreadRun({
+        id: crypto.randomUUID(),
+        threadId: thread.id,
+        agentId: resolveThreadAgentId(presetId, findPresetById(ALL_AGENT_PRESETS, presetId)?.permissionMode ?? "balanced"),
+        prompt: template.prompt,
+      });
+    },
+    [catalogState.catalog, setThreadId],
+  );
+
+  const handleRecoveryAction = useCallback(
+    (action: RecoverableAction["action"]) => {
+      switch (action) {
+        case "retry_connection":
+          void reloadCatalogState();
+          return;
+        case "open_settings":
+        case "configure_provider":
+        case "retry_save":
+        case "check_base_url":
+          setSettingsOpen(true);
+          return;
+        case "create_recommended_thread":
+          handleNewThread();
+          return;
+        case "retry_last_task":
+          if (!activeThread || !activeAgentId) {
+            return;
+          }
+          setRecoverableError(null);
+          setPendingThreadRun({
+            id: crypto.randomUUID(),
+            threadId: activeThread.id,
+            agentId: activeAgentId,
+          });
+          return;
+      }
+    },
+    [activeAgentId, activeThread, handleNewThread, reloadCatalogState],
+  );
+
+  const settingsPreset =
+    currentPreset ??
+    findPresetById(
+      ALL_AGENT_PRESETS,
+      resolveDefaultPresetId(catalogState.catalog) ?? "openai-balanced",
+    ) ??
+    ALL_AGENT_PRESETS[1];
+
+  if (
+    firstRunState !== "ready-active-thread" ||
+    !activeThread ||
+    !currentPreset ||
+    !activeAgentId
+  ) {
     return (
-      <div className="flex h-screen items-center justify-center">
-        <div className="text-center">
-          <Bot className="mx-auto h-12 w-12 text-muted-foreground" />
-          <h1 className="mt-4 text-xl font-semibold">Assistant</h1>
-          <p className="mt-2 text-sm text-muted-foreground">
-            No configured agent presets are available. Add at least one provider key.
-          </p>
+      <div className="flex h-screen flex-col">
+        <header className="flex h-14 items-center justify-between border-b border-border px-4">
+          <div className="flex items-center gap-3">
+            <Bot className="h-5 w-5 text-primary" />
+            <h1 className="text-base font-semibold">Deep Agent 666</h1>
+          </div>
+          <div className="flex items-center gap-2">
+            <ThemeToggle />
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setSettingsOpen(true)}
+            >
+              <Settings className="mr-1 h-4 w-4" />
+              Settings
+            </Button>
+          </div>
+        </header>
+        <div className="flex-1 overflow-hidden">
+          <HomePageShell
+            state={firstRunState}
+            starterTemplates={STARTER_TEMPLATES}
+            gateTitle={gatePresentation.title}
+            gateDescription={gatePresentation.description}
+            gateActions={gatePresentation.actions}
+            onGateAction={handleRecoveryAction}
+            onStarterSelect={handleSelectStarterTemplate}
+          >
+            <div />
+          </HomePageShell>
         </div>
+        <SettingsDialog
+          open={settingsOpen}
+          onOpenChange={setSettingsOpen}
+          currentPreset={settingsPreset}
+          onSwitchPreset={handleSwitchPreset}
+          onSaved={() => {
+            setRecoverableError(null);
+            void reloadCatalogState();
+          }}
+          onSaveFailed={(code) => setRecoverableError(code)}
+        />
       </div>
     );
   }
@@ -547,6 +744,14 @@ function HomePageContent() {
 
           <ResizablePanel id="chat" order={3}>
             <div className="flex h-full flex-col">
+              {noticePresentation && effectiveRecoverableError ? (
+                <WorkbenchStatusNotice
+                  title={noticePresentation.title}
+                  description={noticePresentation.description}
+                  actions={resolveRecoverableActions(effectiveRecoverableError)}
+                  onAction={handleRecoveryAction}
+                />
+              ) : null}
               {/* Model / Permission bar */}
               <div className="flex items-center gap-2 border-b border-border px-4 py-2">
                 <span className="text-xs text-muted-foreground">Model:</span>
@@ -571,6 +776,19 @@ function HomePageContent() {
 
               {/* Chat area */}
               <div className="flex-1 min-h-0 flex flex-col">
+                {pendingThreadRun && pendingThreadRun.threadId === activeThread.id ? (
+                  <CopilotChatConfigurationProvider
+                    agentId={activeAgentId}
+                    threadId={activeThread.id}
+                  >
+                    <PendingThreadRunController
+                      key={pendingThreadRun.id}
+                      run={pendingThreadRun}
+                      onComplete={() => setPendingThreadRun(null)}
+                      onError={() => setRecoverableError("runtime_request_failed")}
+                    />
+                  </CopilotChatConfigurationProvider>
+                ) : null}
                 <CopilotChat
                   className="h-full"
                   agentId={activeAgentId}
@@ -606,8 +824,13 @@ function HomePageContent() {
       <SettingsDialog
         open={settingsOpen}
         onOpenChange={setSettingsOpen}
-        currentPreset={currentPreset}
+        currentPreset={settingsPreset}
         onSwitchPreset={handleSwitchPreset}
+        onSaved={() => {
+          setRecoverableError(null);
+          void reloadCatalogState();
+        }}
+        onSaveFailed={(code) => setRecoverableError(code)}
       />
       {previewOpen && previewFile && (
         <FileViewDialog
@@ -647,6 +870,129 @@ function useQueryParamState(
 }
 
 // ── Shared helpers ──
+
+type PendingThreadRun = {
+  id: string;
+  threadId: string;
+  agentId: string;
+  prompt?: string;
+};
+
+function PendingThreadRunController({
+  run,
+  onComplete,
+  onError,
+}: {
+  run: PendingThreadRun;
+  onComplete: () => void;
+  onError: () => void;
+}) {
+  const launchedRef = useRef(false);
+  const { agent } = useAgent({
+    agentId: run.agentId,
+  });
+  const { copilotkit } = useCopilotKit();
+
+  useEffect(() => {
+    if (launchedRef.current || !agent) {
+      return;
+    }
+
+    launchedRef.current = true;
+
+    if (run.prompt) {
+      const message: Message = {
+        id: crypto.randomUUID(),
+        role: "user",
+        content: run.prompt,
+      };
+      agent.addMessage(message);
+    }
+
+    void copilotkit
+      .runAgent({ agent })
+      .catch(() => {
+        onError();
+      })
+      .finally(() => {
+        onComplete();
+      });
+  }, [agent, copilotkit, onComplete, onError, run]);
+
+  return null;
+}
+
+function resolveGatePresentation(
+  state: FirstRunState,
+  recoverableError: RecoverableErrorCode | null,
+): {
+  title: string;
+  description: string;
+  actions: RecoverableAction[];
+} {
+  if (state === "unconfigured") {
+    return {
+      title: "Configure your providers",
+      description:
+        "No launchable agent presets are available yet. Add at least one provider key to unlock the first task flow.",
+      actions: resolveRecoverableActions("no_available_presets"),
+    };
+  }
+
+  if (recoverableError) {
+    const presentation = resolveRecoverablePresentation(recoverableError);
+    return {
+      ...presentation,
+      actions: resolveRecoverableActions(recoverableError),
+    };
+  }
+
+  return {
+    title: "Start with a guided task",
+    description: "Pick a starter task to launch the first agent run.",
+    actions: [],
+  };
+}
+
+function resolveRecoverablePresentation(
+  code: RecoverableErrorCode,
+): {
+  title: string;
+  description: string;
+} {
+  switch (code) {
+    case "backend_unreachable":
+      return {
+        title: "Backend unavailable",
+        description:
+          "The agent backend could not be reached. Check the local backend URL or restart the backend service.",
+      };
+    case "no_available_presets":
+      return {
+        title: "Configure your providers",
+        description:
+          "No launchable agent presets are available yet. Add at least one provider key to continue.",
+      };
+    case "configuration_failed":
+      return {
+        title: "Configuration failed",
+        description:
+          "The provider settings could not be saved. Review the API key and base URL, then try again.",
+      };
+    case "thread_missing_or_invalid":
+      return {
+        title: "Thread unavailable",
+        description:
+          "The selected thread is missing or no longer matches an available preset. Create a fresh thread to continue.",
+      };
+    case "runtime_request_failed":
+      return {
+        title: "Agent run interrupted",
+        description:
+          "The last agent request did not complete cleanly. Retry the task or reopen settings if the runtime changed.",
+      };
+  }
+}
 
 function PresetSelector({
   presets,
@@ -709,11 +1055,15 @@ function SettingsDialog({
   onOpenChange,
   currentPreset,
   onSwitchPreset,
+  onSaved,
+  onSaveFailed,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   currentPreset: AgentPresetDefinition;
   onSwitchPreset: (id: AgentPresetId) => void;
+  onSaved: () => void;
+  onSaveFailed: (code: RecoverableErrorCode) => void;
 }) {
   const [apiKeys, setApiKeys] = useState<Record<string, string>>({});
   const [baseUrls, setBaseUrls] = useState<Record<string, string>>({});
@@ -743,11 +1093,14 @@ function SettingsDialog({
       const data = await res.json();
       if (res.ok) {
         setMessage({ type: "ok", text: `Configured — ${data.preset_count} presets available` });
+        onSaved();
       } else {
         setMessage({ type: "error", text: "Failed to save configuration" });
+        onSaveFailed("configuration_failed");
       }
     } catch {
       setMessage({ type: "error", text: "Backend is not running" });
+      onSaveFailed("backend_unreachable");
     } finally {
       setSaving(false);
     }

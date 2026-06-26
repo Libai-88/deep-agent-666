@@ -1,6 +1,59 @@
 import { test, expect } from "@playwright/test";
 
 test.describe("Page loads correctly", () => {
+  test("unconfigured launch shows the first-run gate", async ({ page }) => {
+    await page.addInitScript(() => {
+      window.localStorage.removeItem("deep-agent-666.threads");
+    });
+
+    await page.route("**/api/preset-state", async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({
+          source: "fallback",
+          defaultPresetId: null,
+          presets: [],
+        }),
+      });
+    });
+
+    await page.goto("/");
+    await page.waitForLoadState("networkidle");
+
+    await expect(page.getByText("Configure your providers")).toBeVisible();
+  });
+
+  test("configured launch without a thread shows starter templates", async ({ page }) => {
+    await page.addInitScript(() => {
+      window.localStorage.removeItem("deep-agent-666.threads");
+    });
+
+    await page.route("**/api/preset-state", async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({
+          source: "live",
+          defaultPresetId: "openai-balanced",
+          presets: [
+            {
+              id: "openai-balanced",
+              label: "OpenAI / Balanced",
+              provider: "openai",
+              permissionMode: "balanced",
+            },
+          ],
+        }),
+      });
+    });
+
+    await page.goto("/");
+    await page.waitForLoadState("networkidle");
+
+    await expect(page.getByText("Start with a guided task")).toBeVisible();
+  });
+
   test("home page shows no console errors", async ({ page }) => {
     const errors: string[] = [];
     page.on("console", (msg) => {
@@ -82,6 +135,25 @@ test.describe("Page loads correctly", () => {
       );
     }, [threadId]);
 
+    await page.route("**/api/preset-state", async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({
+          source: "live",
+          defaultPresetId: "openai-balanced",
+          presets: [
+            {
+              id: "openai-balanced",
+              label: "OpenAI / Balanced",
+              provider: "openai",
+              permissionMode: "balanced",
+            },
+          ],
+        }),
+      });
+    });
+
     await page.goto("/?threadId=e2e-engineering-thread");
 
     await expect(
@@ -131,6 +203,25 @@ test.describe("Page loads correctly", () => {
         }),
       );
     }, [threadId]);
+
+    await page.route("**/api/preset-state", async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({
+          source: "live",
+          defaultPresetId: "openai-balanced",
+          presets: [
+            {
+              id: "openai-balanced",
+              label: "OpenAI / Balanced",
+              provider: "openai",
+              permissionMode: "balanced",
+            },
+          ],
+        }),
+      });
+    });
 
     await page.goto("/?threadId=e2e-research-thread");
 

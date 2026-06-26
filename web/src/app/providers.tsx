@@ -15,6 +15,16 @@ export function Providers({ children }: { children: ReactNode }) {
       a2ui={{ catalog }}
       onError={(event) => {
         console.error("[copilotkit]", event);
+        if (typeof window !== "undefined") {
+          window.dispatchEvent(
+            new CustomEvent("deep-agent-666.runtime-error", {
+              detail: {
+                source: "copilotkit",
+                event,
+              },
+            }),
+          );
+        }
       }}
     >
       {children}

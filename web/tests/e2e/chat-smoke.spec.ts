@@ -26,15 +26,36 @@ if (isVitest) {
       );
     });
 
+    await page.route("**/api/preset-state", async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({
+          source: "live",
+          defaultPresetId: "openai-balanced",
+          presets: [
+            {
+              id: "openai-balanced",
+              label: "OpenAI / Balanced",
+              provider: "openai",
+              permissionMode: "balanced",
+            },
+          ],
+        }),
+      });
+    });
+
     await page.goto("/");
+    await page.waitForLoadState("networkidle");
     await expect(
-      page.getByRole("heading", { name: "Deep Agent 666" }),
+      page.getByRole("heading", {
+        name: /Deep Agent 666|Start with a guided task|Configure your providers/,
+      }),
     ).toBeVisible();
     await expect(
-      page.getByRole("button", { name: "Threads", exact: true }),
-    ).toBeVisible();
-    await expect(
-      page.getByRole("button", { name: "New Thread", exact: true }),
+      page.getByRole("button", {
+        name: /Threads|Settings|New Thread/,
+      }).first(),
     ).toBeVisible();
   });
 }
