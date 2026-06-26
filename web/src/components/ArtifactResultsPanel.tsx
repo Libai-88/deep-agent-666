@@ -10,7 +10,10 @@ export function ArtifactResultsPanel({
   onOpenFile: (path: string) => void;
 }) {
   return (
-    <section className="flex h-full flex-col bg-card/20">
+    <section
+      data-testid="artifact-results-panel"
+      className="flex h-full flex-col bg-card/20"
+    >
       <header className="border-b border-border px-4 py-3">
         <h2 className="text-sm font-semibold">Results</h2>
         <p className="mt-1 text-xs text-muted-foreground">
@@ -19,7 +22,10 @@ export function ArtifactResultsPanel({
       </header>
       <div className="flex-1 space-y-3 overflow-y-auto px-4 py-3">
         {finalSummary ? (
-          <div className="rounded-lg border border-border bg-background p-3 text-sm">
+          <div
+            data-testid="artifact-final-summary"
+            className="rounded-lg border border-border bg-background p-3 text-sm"
+          >
             {finalSummary}
           </div>
         ) : null}
@@ -31,6 +37,7 @@ export function ArtifactResultsPanel({
           artifacts.map((artifact) => (
             <div
               key={artifact.id}
+              data-testid={`artifact-card-${artifact.id}`}
               className="rounded-lg border border-border bg-background p-3"
             >
               {artifact.path ? (

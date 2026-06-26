@@ -9,6 +9,12 @@ function taskKindLabel(taskKind: WorkbenchTaskKind): string {
   return "General";
 }
 
+function todoStatusLabel(status: WorkbenchTodo["status"]): string {
+  if (status === "completed") return "Completed";
+  if (status === "in_progress") return "In progress";
+  return "Pending";
+}
+
 export function TaskTimelinePanel({
   taskKind,
   todos,
@@ -17,7 +23,10 @@ export function TaskTimelinePanel({
   todos: WorkbenchTodo[];
 }) {
   return (
-    <section className="flex h-full flex-col border-r border-border bg-card/30">
+    <section
+      data-testid="task-timeline-panel"
+      className="flex h-full flex-col border-r border-border bg-card/30"
+    >
       <header className="border-b border-border px-4 py-3">
         <h2 className="text-sm font-semibold">{taskKindLabel(taskKind)}</h2>
         <p className="mt-1 text-xs text-muted-foreground">
@@ -33,11 +42,12 @@ export function TaskTimelinePanel({
           todos.map((todo) => (
             <div
               key={todo.id}
+              data-testid={`timeline-todo-${todo.id}`}
               className="mb-3 rounded-lg border border-border bg-background p-3"
             >
               <div className="text-sm font-medium">{todo.content}</div>
               <div className="mt-1 text-xs text-muted-foreground">
-                {todo.status}
+                {todoStatusLabel(todo.status)}
               </div>
             </div>
           ))

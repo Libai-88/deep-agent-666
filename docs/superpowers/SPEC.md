@@ -34,7 +34,7 @@
 | 前端 | Next.js 16 + React 19 + @copilotkit/react-core v2 |
 | 代理层 | @ag-ui/client HttpAgent + createCopilotRuntimeHandler |
 | UI | shadcn/ui + Tailwind v4 + lucide-react |
-| 测试 | pytest (59) + vitest (66) + playwright (12) |
+| 测试 | pytest (59) + vitest (66) + playwright (13) |
 
 ## 关键决策
 
@@ -50,6 +50,6 @@
 
 | 问题 | P级 | 说明 |
 |------|-----|------|
-| 更广覆盖的 runtime restart/resume 仍待扩展 | P1 | V13 已证明主运行时和主路由在关键 fallback 场景下都可恢复消息，但跨更多入口与真实进程重启的覆盖仍可继续增强 |
+| 更广覆盖的 runtime restart/resume 仍待扩展 | P1 | V14 已证明主运行时、主路由和 coordinator 主工作流都已具备关键回归覆盖，但跨更多入口与真实进程重启的覆盖仍可继续增强 |
 | DataChart 组件 | P1 | V2 spec 可选组件，未实现 |
-| 更广对话恢复验证 | P1 | 已启用 `SqliteAgentRunner`，并覆盖 prompt 重放、历史缺失、部分历史漂移提示、主运行时跨实例恢复证明，以及主路由 catalog fallback 恢复；后续仍可扩展到更多入口与真实进程重启 |
+| 更广对话恢复验证 | P1 | 已启用 `SqliteAgentRunner`，并覆盖 prompt 重放、历史缺失、部分历史漂移提示、主运行时跨实例恢复证明、主路由 catalog fallback 恢复，以及 coordinator starter 主工作流回归；后续仍可扩展到更多入口与真实进程重启 |

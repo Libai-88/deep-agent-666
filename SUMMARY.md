@@ -17,6 +17,7 @@
 - `V11` 已能识别“runtime 恢复出部分旧消息，但缺了最后一条本地任务”的部分历史漂移场景。
 - `V12` 已补齐真实 CopilotKit runtime handler + SQLite thread store 的跨实例恢复证明。
 - `V13` 已为主 `[[...slug]]` 路由补齐 preset catalog 本地缓存回退，`/presets` 临时不可达时仍可恢复已持久化线程。
+- `V14` 已补齐 coordinator starter flow 的浏览器回归，并把 timeline 状态文案改为更适合新手理解的形式。
 
 ---
 
@@ -62,7 +63,7 @@ CopilotRuntime (Next.js route handler)
 | 后端 pytest | **59** | ✅ 全通过 |
 | 前端 vitest | **66** | ✅ 全通过 |
 | Next.js build | — | ✅ 无错误 |
-| E2E (playwright) | **12** | ✅ 全通过 |
+| E2E (playwright) | **13** | ✅ 全通过 |
 | Docker Compose 配置校验 | — | ⚠️ 当前机器未安装 `docker`，未执行命令级验证 |
 
 ---
@@ -181,7 +182,7 @@ CopilotRuntime (Next.js route handler):
 
 Python FastAPI:
   uvicorn on port 8123
-  44 tests passing
+  59 tests passing
 ```
 
 ---
@@ -194,7 +195,7 @@ Python FastAPI:
 | #4 同步 invoke 阻塞事件循环 | 🟡 P2 | LangGraph 工具同步设计，长命令影响性能 | 否 — LangGraph 设计特性 |
 | #6 预设双端维护 | 🟡 P3 | 新增预设需改 Python + TS 两处 | 否 — 有注释指引 |
 | A2UI 未与 Python 工具对接 | 🟡 P3 | 前端 catalog 就绪，coordinator 工具未调用 `a2ui.render()` | 否 — 阶段 B 未完成部分 |
-| Coordinator 无自动化端到端测试 | 🟡 P2 | curl 可跑通，但无 CI e2e | 否 — 可接受 |
+| Coordinator 更深层恢复场景仍缺浏览器覆盖 | 🟡 P2 | V14 已覆盖 starter -> planner/executor/reviewer -> workbench 主路径，但恢复线程下的 coordinator 连续场景仍可继续扩展 | 建议继续补强 |
 | interrupt_on 已禁用 | 🟡 P3 | 去掉后才无 Console Error | 建议修 — 需审批流程时恢复 |
 | Inspector `{}` 解析警告 | 🟢 P4 | `[CopilotKit Inspector] Failed to parse tool-call result content {}` | 否 — SDK 升级后解决 |
 | 运行时恢复回归覆盖不足 | 🟡 P2 | 已切到 SQLite，但还缺“重启后继续线程”的更深 E2E | 建议补 — 属于 V4 后续验证 |
@@ -208,9 +209,9 @@ Python FastAPI:
 
 | 标准 | 当前 | 达标 |
 |------|------|------|
-| 后端测试 ≥ 50 | 44 ✅ | 加 6 个边界测试 |
-| 前端测试 ≥ 20 | 15 ✅ | 加 5 个组件渲染测试 |
-| E2E ≥ 5 条 | 3 脚本就绪 | CI 运行 playwright |
+| 后端测试 ≥ 50 | 59 ✅ | 已达标 |
+| 前端测试 ≥ 20 | 66 ✅ | 已达标 |
+| E2E ≥ 5 条 | 13 ✅ | 已达标 |
 | 0 个 Console Error | 有 Inspector 警告 | SDK 升级 |
 | Docker 部署 | ❌ | Dockerfile + compose |
 | Windows 桌面壳 | ❌ | Electron wrapper |
@@ -243,8 +244,9 @@ gaps-complete  — 差距补齐 + 代码审计修复完成
 ```
 
 V10 基线提交: `7558e16` — thread history gap recovery baseline
-V12 基线提交: `本次提交` — runtime persistence proof baseline
-V13 基线提交: `本次提交` — runtime catalog fallback baseline
+V12 基线提交: `d5b5508` — runtime persistence proof baseline
+V13 基线提交: `898172a` — runtime catalog fallback baseline
+V14 基线提交: `见最新提交` — coordinator workbench regression baseline
 
 日志：
 ```

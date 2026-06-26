@@ -4,7 +4,7 @@ import { describe, expect, it } from "vitest";
 import { TaskTimelinePanel } from "../TaskTimelinePanel";
 
 describe("TaskTimelinePanel", () => {
-  it("renders task kind and statuses", () => {
+  it("renders task kind with human-readable statuses", () => {
     const html = renderToStaticMarkup(
       <TaskTimelinePanel
         taskKind="research"
@@ -28,5 +28,8 @@ describe("TaskTimelinePanel", () => {
     expect(html).toContain("Research");
     expect(html).toContain("Read docs");
     expect(html).toContain("Draft brief");
+    expect(html).toContain("Completed");
+    expect(html).toContain("In progress");
+    expect(html).not.toContain("in_progress");
   });
 });
