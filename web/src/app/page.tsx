@@ -94,6 +94,10 @@ import {
   extractLatestUserPrompt,
   resolvePendingRunPrompt,
 } from "@/lib/retry-run";
+import {
+  hasRestorableThreadContext,
+  shouldFlagThreadHistoryGap,
+} from "@/lib/thread-history-gap";
 
 export default function HomePage() {
   return (
@@ -140,6 +144,8 @@ function HomePageContent() {
     source: "fallback",
   });
   const [catalogChecking, setCatalogChecking] = useState(true);
+  const [runtimeAvailability, setRuntimeAvailability] =
+    useState<RuntimeAvailability>("empty");
   const [recoverableError, setRecoverableError] =
     useState<RecoverableErrorCode | null>(null);
   const [pendingThreadRun, setPendingThreadRun] =
@@ -189,6 +195,7 @@ function HomePageContent() {
       }
 
       const runtimeAvailability = await fetchRuntimeAvailability();
+      setRuntimeAvailability(runtimeAvailability);
       if (runtimeAvailability === "ready") {
         setRecoverableError(null);
         return;
@@ -200,6 +207,7 @@ function HomePageContent() {
           : "runtime_request_failed",
       );
     } catch {
+      setRuntimeAvailability("unreachable");
       setRecoverableError("backend_unreachable");
     } finally {
       setCatalogChecking(false);
@@ -571,6 +579,14 @@ function HomePageContent() {
                     activeAgentId={activeAgentId}
                     setWorkbenchState={setWorkbenchState}
                   />
+                  <ThreadHistoryGapMonitor
+                    activeAgentId={activeAgentId}
+                    runtimeAvailability={runtimeAvailability}
+                    workbenchState={workbenchState}
+                    pendingThreadRun={pendingThreadRun}
+                    recoverableError={recoverableError}
+                    setRecoverableError={setRecoverableError}
+                  />
                   {pendingThreadRun && pendingThreadRun.threadId === activeThread.id ? (
                     <PendingThreadRunController
                       key={pendingThreadRun.id}
@@ -868,6 +884,95 @@ function WorkbenchRuntimeHooks({
   return null;
 }
 
+function ThreadHistoryGapMonitor({
+  activeAgentId,
+  runtimeAvailability,
+  workbenchState,
+  pendingThreadRun,
+  recoverableError,
+  setRecoverableError,
+}: {
+  activeAgentId: string;
+  runtimeAvailability: RuntimeAvailability;
+  workbenchState: ThreadWorkbenchState;
+  pendingThreadRun: PendingThreadRun | null;
+  recoverableError: RecoverableErrorCode | null;
+  setRecoverableError: React.Dispatch<
+    React.SetStateAction<RecoverableErrorCode | null>
+  >;
+}) {
+  const { agent } = useAgent({
+    agentId: activeAgentId,
+  });
+
+  const restorableContext = useMemo(
+    () => hasRestorableThreadContext(workbenchState),
+    [workbenchState],
+  );
+
+  useEffect(() => {
+    if (recoverableError && recoverableError !== "thread_history_unavailable") {
+      return undefined;
+    }
+
+    if (
+      pendingThreadRun ||
+      !restorableContext ||
+      runtimeAvailability !== "ready"
+    ) {
+      setRecoverableError((previous) =>
+        previous === "thread_history_unavailable" ? null : previous,
+      );
+      return undefined;
+    }
+
+    const messageCount = Array.isArray(agent?.messages) ? agent.messages.length : 0;
+    if (!shouldFlagThreadHistoryGap({
+      runtimeAvailability,
+      hasRestorableContext: restorableContext,
+      messageCount,
+    })) {
+      setRecoverableError((previous) =>
+        previous === "thread_history_unavailable" ? null : previous,
+      );
+      return undefined;
+    }
+
+    const timer = window.setTimeout(() => {
+      const nextMessageCount = Array.isArray(agent?.messages)
+        ? agent.messages.length
+        : 0;
+      if (
+        shouldFlagThreadHistoryGap({
+          runtimeAvailability,
+          hasRestorableContext: restorableContext,
+          messageCount: nextMessageCount,
+        })
+      ) {
+        setRecoverableError((previous) =>
+          previous && previous !== "thread_history_unavailable"
+            ? previous
+            : "thread_history_unavailable",
+        );
+      }
+    }, 1200);
+
+    return () => {
+      window.clearTimeout(timer);
+    };
+  }, [
+    agent,
+    agent?.messages,
+    pendingThreadRun,
+    recoverableError,
+    restorableContext,
+    runtimeAvailability,
+    setRecoverableError,
+  ]);
+
+  return null;
+}
+
 function ActiveThreadChat({
   activeAgentId,
   activeThread,
@@ -1085,6 +1190,12 @@ function resolveRecoverablePresentation(
         title: "Thread unavailable",
         description:
           "The selected thread is missing or no longer matches an available preset. Create a fresh thread to continue.",
+      };
+    case "thread_history_unavailable":
+      return {
+        title: "Thread history unavailable",
+        description:
+          "The local thread still exists, but the runtime could not restore its message history. This usually happens after a backend restart or thread database reset. Retry the last task or start a fresh thread.",
       };
     case "provider_rate_limited":
       return {

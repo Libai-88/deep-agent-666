@@ -3,6 +3,7 @@ export type RecoverableErrorCode =
   | "no_available_presets"
   | "configuration_failed"
   | "thread_missing_or_invalid"
+  | "thread_history_unavailable"
   | "provider_rate_limited"
   | "provider_model_unavailable"
   | "provider_access_denied"
@@ -39,6 +40,14 @@ export function resolveRecoverableActions(
       ];
     case "thread_missing_or_invalid":
       return [
+        {
+          label: "Create recommended thread",
+          action: "create_recommended_thread",
+        },
+      ];
+    case "thread_history_unavailable":
+      return [
+        { label: "Retry last task", action: "retry_last_task" },
         {
           label: "Create recommended thread",
           action: "create_recommended_thread",

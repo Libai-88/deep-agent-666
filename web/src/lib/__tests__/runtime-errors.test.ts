@@ -40,6 +40,16 @@ describe("runtime-errors", () => {
     ]);
   });
 
+  it("offers retry and fresh-thread recovery when runtime history is missing", () => {
+    expect(resolveRecoverableActions("thread_history_unavailable")).toEqual([
+      { label: "Retry last task", action: "retry_last_task" },
+      {
+        label: "Create recommended thread",
+        action: "create_recommended_thread",
+      },
+    ]);
+  });
+
   it("classifies provider access-denied codes as recoverable access failures", () => {
     expect(
       resolveRecoverableErrorCode({

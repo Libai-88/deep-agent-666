@@ -5,17 +5,17 @@ function buildAssistantRunStream(threadId: string, runId: string): string {
     `data: ${JSON.stringify({ type: "RUN_STARTED", threadId, runId })}`,
     `data: ${JSON.stringify({
       type: "TEXT_MESSAGE_START",
-      messageId: "assistant-message-retry-1",
+      messageId: "assistant-message-history-gap-1",
       role: "assistant",
     })}`,
     `data: ${JSON.stringify({
       type: "TEXT_MESSAGE_CONTENT",
-      messageId: "assistant-message-retry-1",
-      delta: "Recovered assistant response.",
+      messageId: "assistant-message-history-gap-1",
+      delta: "Recovered after history gap.",
     })}`,
     `data: ${JSON.stringify({
       type: "TEXT_MESSAGE_END",
-      messageId: "assistant-message-retry-1",
+      messageId: "assistant-message-history-gap-1",
     })}`,
     `data: ${JSON.stringify({
       type: "RUN_FINISHED",
@@ -28,41 +28,10 @@ function buildAssistantRunStream(threadId: string, runId: string): string {
   ].join("\n\n");
 }
 
-function buildConnectHistoryStream(threadId: string): string {
-  return [
-    `data: ${JSON.stringify({
-      type: "RUN_STARTED",
-      threadId,
-      runId: "prior-run",
-      input: {
-        threadId,
-        runId: "prior-run",
-        parentRunId: undefined,
-        state: {},
-        messages: [
-          {
-            id: "prior-user-message",
-            role: "user",
-            content: "Inspect SUMMARY.md and tell me the next step.",
-          },
-        ],
-        tools: [],
-        context: [],
-      },
-    })}`,
-    `data: ${JSON.stringify({
-      type: "RUN_FINISHED",
-      threadId,
-      runId: "prior-run",
-      outcome: { type: "success" },
-    })}`,
-    "",
-    "",
-  ].join("\n\n");
-}
-
-test("retries the last stored task from a restored thread", async ({ page }) => {
-  const threadId = "retry-recovery-thread";
+test("warns when a restored thread has local context but runtime history is gone", async ({
+  page,
+}) => {
+  const threadId = "thread-history-gap";
   let capturedRunBody: Record<string, unknown> | null = null;
 
   await page.addInitScript(([storedThreadId]) => {
@@ -71,7 +40,7 @@ test("retries the last stored task from a restored thread", async ({ page }) => 
       JSON.stringify([
         {
           id: storedThreadId,
-          title: "Retry recovery thread",
+          title: "Restored thread",
           presetId: "openai-balanced",
           updatedAt: Date.now(),
         },
@@ -80,11 +49,11 @@ test("retries the last stored task from a restored thread", async ({ page }) => 
     window.localStorage.setItem(
       `deep-agent-666.workbench.${storedThreadId}`,
       JSON.stringify({
-        taskKind: "engineering",
+        taskKind: "general",
         todos: [],
         artifacts: [],
         finalSummary: null,
-        lastUserPrompt: "Inspect SUMMARY.md and tell me the next step.",
+        lastUserPrompt: "Recover this missing thread history.",
         updatedAt: Date.now(),
       }),
     );
@@ -128,9 +97,8 @@ test("retries the last stored task from a restored thread", async ({ page }) => 
 
   await page.route("**/api/copilotkit/agent/**/connect", async (route) => {
     await route.fulfill({
-      status: 200,
-      contentType: "text/event-stream",
-      body: buildConnectHistoryStream(threadId),
+      status: 204,
+      body: "",
     });
   });
 
@@ -142,40 +110,27 @@ test("retries the last stored task from a restored thread", async ({ page }) => 
       contentType: "text/event-stream",
       body: buildAssistantRunStream(
         requestBody.threadId ?? threadId,
-        requestBody.runId ?? "retry-run",
+        requestBody.runId ?? "history-gap-run",
       ),
     });
   });
 
   await page.goto(`/?threadId=${threadId}`);
   await page.waitForLoadState("networkidle");
-  await expect(page.getByRole("button", { name: "New Thread" })).toBeVisible();
 
-  await page.evaluate(() => {
-    window.dispatchEvent(
-      new CustomEvent("deep-agent-666.runtime-error", {
-        detail: {
-          source: "copilotkit",
-          event: {
-            code: "runtime_request_failed",
-            error: {
-              message: "The last run failed.",
-            },
-          },
-        },
-      }),
-    );
+  await expect(page.getByText("Thread history unavailable")).toBeVisible({
+    timeout: 5_000,
   });
-
-  await expect(page.getByText("Agent run interrupted")).toBeVisible();
   await page.getByRole("button", { name: "Retry last task" }).click();
 
-  await expect.poll(() => capturedRunBody !== null).toBe(true);
+  await expect(
+    page.locator('[data-testid="copilot-assistant-message"]').first(),
+  ).toContainText("Recovered after history gap.");
 
   const capturedMessages = Array.isArray(capturedRunBody?.["messages"])
     ? capturedRunBody["messages"]
     : [];
   expect(JSON.stringify(capturedMessages)).toContain(
-    "Inspect SUMMARY.md and tell me the next step.",
+    "Recover this missing thread history.",
   );
 });
