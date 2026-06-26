@@ -15,7 +15,7 @@ from langgraph.types import Command
 
 from app.config import AgentSettings, load_settings
 from app.middleware.genui import GenUIMiddleware
-from app.permissions import PermissionMode, interrupt_config_for_mode, mutable_tool_names
+from app.permissions import PermissionMode, mutable_tool_names
 from app.presets import ALL_PRESETS, AgentPreset
 from app.state import CoordinatorState, Delegation
 from app.tools.documents import read_document
@@ -148,7 +148,6 @@ def build_graph(preset: AgentPreset, settings: AgentSettings) -> object:
         model=_build_model(preset, settings),
         tools=_toolset_for_preset(settings.workspace_root, preset.permission_mode),
         system_prompt=SYSTEM_PROMPT,
-        interrupt_on=interrupt_config_for_mode(preset.permission_mode),
         checkpointer=MemorySaver(),
         name=preset.id,
     )
