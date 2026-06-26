@@ -1,0 +1,242 @@
+# Deep Agent 666 — 开发进展全总结
+
+> 生成于 2026-06-26 | Git Tag: `v1-foundation`, `v1-complete`, `gaps-complete` | 分支: `feat/deepagents-foundation`
+
+---
+
+## 一、产品是什么
+
+本地优先的通用型 AI Agent，基于 CopilotKit + LangGraph + FastAPI。支持：
+
+- **V1 单 agent**: 9 个预设（3 家模型提供商 × 3 种权限模式）
+- **V2 Coordinator**: 子 agent 编排（Planner → Executor → Reviewer），官方 supervisor+@tool+Command 模式
+- **A2A 跨语言**: A2AMiddlewareAgent 多进程编排
+- **A2UI 动态渲染**: DiffPreview 组件目录
+- **MCP 工具扩展**: 外部工具服务器集成
+
+### 架构
+
+```
+Web Client (Next.js 16 + React 19 + shadcn)
+  └─ CopilotChat · DelegationLog · SubAgentActivityCard · A2UI DiffPreview · ThreadList
+       │
+Copilot Bridge ([[...slug]] runtime handler)
+  ├─ POST /agent/:id/run → 透传 SSE
+  ├─ GET  /info → agent 列表
+  └─ connect/stop → CopilotRuntime
+       │
+Agent Core (FastAPI + LangGraph + Deep Agents)
+  ├─ V1: 9 presets (3 providers × 3 permission modes)
+  ├─ V2: Coordinator (Planner → Executor → Reviewer)
+  ├─ GenUI middleware (delegations emit)
+  └─ Workspace tools (list/search/read/write/replace/run/doc)
+       │
+CopilotRuntime (Next.js route handler)
+  ├─ A2UI: {}, openGenerativeUI: true
+  ├─ MCP Apps: workspace-tools server
+  └─ A2A: a2a-research middleware agent
+```
+
+---
+
+## 二、测试状态
+
+| 套件 | 数量 | 状态 |
+|------|------|------|
+| 后端 pytest | **44** | ✅ 全通过 |
+| 前端 vitest | **15** | ✅ |
+| Next.js build | — | ✅ 无错误 |
+| E2E smoke (playwright) | 3 脚本就绪 | 🔧 待 CI 运行 |
+
+---
+
+## 三、开发历程
+
+### 阶段 A：基础功能搭建（7 个 Phase）
+
+目标：从零搭起完整的前后端 + CopilotKit 集成框架。
+
+| Phase | 核心变更 | 关键问题 | 如何解决 |
+|-------|---------|---------|---------|
+| **P1 底座** | ADR、CI、E2E smoke、回滚脚本 | 初始项目无工程化规范 | 按官方最佳实践补充 ADR/ONBOARDING/CI，打基线 |
+| **P2 Subagent** | coordinator → supervisor+@tool+Command | Deep Agents 内置子 agent 不符合官方推荐 | 参考 `subagents.py`，每个子 agent 为独立 `@tool` + `Command(update={...})` |
+| **P3 A2UI** | Runtime `a2ui: {}` | A2UI 需前端目录 + Python render | 配置 runtime 启用，前端 catalog 后补 |
+| **P4 A2A** | `A2AMiddlewareAgent` 注册 | 需独立子 agent 服务 | 注册 a2a-research agent 指向现有 coordinator |
+| **P5 MCP** | `mcpApps` 配置 | — | `CopilotRuntime({ mcpApps: { servers: [...] } })` |
+| **P6 生产就绪** | 路由清理、env 校验 | `InMemoryAgentRunner` 与 `finalizeRunEvents` 冲突 | 清理 route.ts 去重 A2A，env-check 模块 |
+| **P7 桌面+E2E** | Playwright smoke、git tag | — | Tag `v1-foundation` |
+
+### 阶段 B：差距补齐（4 个 Phase）
+
+代码审计发现与官方 Showcase 的差距。
+
+| Phase | 官方参考 | 我们修复 | 之前的问题 |
+|-------|---------|---------|-----------|
+| **P1 布局+同步** | `demos/subagents/page.tsx`, `demo-layout.tsx` | 精确 `useRenderTool`（3 个子 agent 独立卡片 + Zod schema）、suggestion `"always"`、DelegationLog、SupervisorBanner | 通配符 `name: "*"` 一把梭、suggestion 发消息后消失 |
+| **P2 A2UI** | `a2ui_fixed.py`, `a2ui/catalog.ts` | `a2ui/` 组件目录（DiffPreview）、`providers.tsx` 配置 `a2ui={{ catalog }}` | A2UI 组件从未注册过 |
+| **P3 状态流** | 多处 showcase demo | 移除 `GenUIMiddleware`/`GenUIRenderer` | 旧状态流与 CoordinatorState 不兼容（读错字段） |
+| **P4 打磨** | 各处小改进 | 主题对比度调优、死代码清理 | UI 太浅看不清 |
+
+**里程碑: Tag `gaps-complete`**
+
+### 阶段 C：代码审计修复（6 个 P）
+
+全量代码审查后按严重度排期修复。
+
+| # | 问题 | 严重度 | 根因 | 解决方式 | 文件 |
+|---|------|--------|------|---------|------|
+| 1 | Coordinator 端点不存在 | 🔴 严重 | coordinator 只加了 SDK 路径，没有独立 AG-UI 端点 | `add_langgraph_fastapi_endpoint` 注册每个 coordinator | `main.py` |
+| 2 | GenUI 读错状态字段 | 🟡 主要 | 中间件读 `phase`/`plan_steps`，但 `CoordinatorState` 只有 `delegations` | 改读 `delegations` + 向下兼容 | `genui.py` |
+| 3 | 子 agent 缺 running 状态 | 🟡 主要 | `_delegation_command` 只在 completed/failed 时发状态 | `_running_command` 先发 running 再发 completed | `agent_factory.py` |
+| 4 | 同步 invoke 阻塞 | ⏸ 暂缓 | `agent.invoke()` 在 FastAPI 异步上下文 | LangGraph 工具同步设计特性 | `agent_factory.py` |
+| 5 | 模型构建逻辑重复 | 🔵 中等 | `_build_model` 和 `build_v2_coordinator` 各写了一遍提供者参数 | 提取 `_build_model_kwargs` 共享函数 | `agent_factory.py` |
+| 6 | 预设双端维护 | ⏸ 暂缓 | Python `presets.py` + TypeScript `agent-presets.ts` 各一份 | 加注释指引同步 | 两文件 |
+| 7 | 死代码 V2AgentState | 🔵 中等 | 已废弃但未删除 | 删除 + 更新 `__init__.py` 和测试 | `state.py` |
+| 8 | 测试覆盖 | 🔵 中等 | 仅 35 测试，核心路径无覆盖 | 新增 9 个 → 44 通过 | 多文件 |
+| 9 | API 密钥明文 | 🟢 轻微 | 输入框 `type="text"` | 改为 `type="password"` | `page.tsx` |
+| 10 | search 内存 | 🔵 中等 | 无文件大小限制，二进制直接读 | 10MB 上限 + 扩展白名单 | `workspace.py` |
+| 11 | 路径暴露客户端 | 🟢 轻微 | `NEXT_PUBLIC_` 前缀打进浏览器包 | 去掉 `NEXT_PUBLIC_` | `page.tsx` |
+
+---
+
+## 四、已装机功能清单
+
+### 前端
+
+```
+DelegationLog       — 📋⚡🧐 子 agent 委托日志（实时显示 delegations）
+SubAgentActivityCard — 聊天内联彩色卡片（per tool, per status）
+SupervisorBanner    — 运行时脉冲动画横幅
+A2UI DiffPreview    — 文件 diff 对比组件
+ToolCallCard        — 通用工具调用卡片
+CopilotChat         — 多线程聊天（suggestion "always"）
+TasksFilesSidebar   — todo + 文件管理侧栏
+FileBrowser         — 工作区树浏览
+ThreadList          — 会话历史
+SettingsDialog      — 多 provider 密钥配置
+FileViewDialog      — 文件内容预览
+DiffViewer          — 内联 diff 查看器
+ThemeToggle         — 明暗主题切换
+SubAgentProgress    — (已废弃，被 DelegationLog 取代)
+GenUIRenderer       — (已废弃，被 CopilotKitMiddleware 取代)
+```
+
+### 后端
+
+```
+V1 Agents:
+  9 presets: openai/anthropic/google × read-only/balanced/full-access
+  Workspace tools: list_workspace, search_workspace, read_text_file
+                   write_text_file, replace_text_in_file, run_command
+  Permission middlewares: interrupt_on for balanced mode (当前禁用)
+
+V2 Coordinator:
+  build_v2_coordinator: supervisor → planner/executor/reviewer
+  Delegation state: running → completed/failed with operator.add reducer
+  @tool wrappers: planner_tool, executor_tool, reviewer_tool
+
+Middleware:
+  CopilotKitMiddleware — state sync for V2
+  GenUIMiddleware — legacy middleware for V1 (emits delegations + V2 fields)
+  CORS middleware — localhost:3000
+
+Endpoints:
+  GET  /health                — agent 列表 + 数量
+  GET  /presets               — 预设定义（供前端动态获取）
+  POST /configure             — API 密钥热重载（仅 V1）
+  GET  /workspace/files       — 目录浏览
+  GET  /workspace/file        — 文件读取
+  POST /{preset_id}           — AG-UI endpoint per agent
+  POST /coordinator-{id}      — AG-UI endpoint per coordinator
+  POST /copilotkit/{path}     — CopilotKitRemoteEndpoint SDK
+```
+
+### 运行时
+
+```
+CopilotRuntime (Next.js route handler):
+  agents: LangGraphHttpAgent for each preset + coordinator
+          A2AMiddlewareAgent for a2a-research
+  runner: InMemoryAgentRunner
+  a2ui:   {} (enabled)
+  mcpApps: servers: [{workspace-tools}]
+  openGenerativeUI: true
+
+Python FastAPI:
+  uvicorn on port 8123
+  44 tests passing
+```
+
+---
+
+## 五、已知未解决问题
+
+| 问题 | 优先级 | 说明 | 必须修？ |
+|------|--------|------|---------|
+| SDK 版本不匹配 (0.1.x / 1.61.x) | 🔴 P0 | Python SDK 0.1.x 与 JS SDK 1.61.x 协议差异 | 是 — 升级 SDK 后修复 |
+| #4 同步 invoke 阻塞事件循环 | 🟡 P2 | LangGraph 工具同步设计，长命令影响性能 | 否 — LangGraph 设计特性 |
+| #6 预设双端维护 | 🟡 P3 | 新增预设需改 Python + TS 两处 | 否 — 有注释指引 |
+| A2UI 未与 Python 工具对接 | 🟡 P3 | 前端 catalog 就绪，coordinator 工具未调用 `a2ui.render()` | 否 — 阶段 B 未完成部分 |
+| Coordinator 无自动化端到端测试 | 🟡 P2 | curl 可跑通，但无 CI e2e | 否 — 可接受 |
+| interrupt_on 已禁用 | 🟡 P3 | 去掉后才无 Console Error | 建议修 — 需审批流程时恢复 |
+| Inspector `{}` 解析警告 | 🟢 P4 | `[CopilotKit Inspector] Failed to parse tool-call result content {}` | 否 — SDK 升级后解决 |
+
+---
+
+## 六、后续方向
+
+### 什么算 "开发结束"（发布标准）
+
+| 标准 | 当前 | 达标 |
+|------|------|------|
+| 后端测试 ≥ 50 | 44 ✅ | 加 6 个边界测试 |
+| 前端测试 ≥ 20 | 15 ✅ | 加 5 个组件渲染测试 |
+| E2E ≥ 5 条 | 3 脚本就绪 | CI 运行 playwright |
+| 0 个 Console Error | 有 Inspector 警告 | SDK 升级 |
+| Docker 部署 | ❌ | Dockerfile + compose |
+| Windows 桌面壳 | ❌ | Electron wrapper |
+
+### 建议优先级
+
+```
+P0: 升级 SDK 统一协议版本（解决 INCOMPLETE_STREAM + Inspector 警告）
+P1: CI 打通 E2E 测试（让 3 个 Smoke 脚本自动运行）
+P2: 补 Docker 部署方案
+P3: 恢复 interrupt_on + 修复空结果
+P4: 前端组件测试（5 个）
+P5: Windows 桌面壳（Electron）
+```
+
+### 技术债摘要
+
+- `GenUIMiddleware` 对 V1 是冗余的（V1 用 `create_deep_agent`，不用 middleware）
+- `all_agents` 在 SDK 中同时包含 V1 + coordinator，但 coordinator 也有独立 AG-UI 端点（双重注册）
+- `ConfigureRequest` 通过 HTTP 传 API 密钥（局域网可接受，生产需 HTTPS）
+- `search_workspace` 仍读整个文件到内存（10MB 上限是软限制）
+
+---
+
+## 七、Git 历史关键点
+
+```
+v1-foundation  — 初始 7 阶段完成
+v1-complete    — 全部基础功能就绪
+gaps-complete  — 差距补齐 + 代码审计修复完成
+```
+
+最新提交: `e5ec5a3` — 44 tests, build clean
+
+日志：
+```
+core.copilotkit.ai
+    └─ feat/deepagents-foundation
+         ├─ Phase 1: 底座 (CI/ADR/E2E)
+         ├─ Phase 2: Subagent (supervisor+@tool)
+         ├─ Phase 3-7: A2UI/A2A/MCP/生产
+         ├─ Gap P1: 布局+精准渲染
+         ├─ Gap P2: A2UI 目录
+         ├─ Gap P3: 状态流清理
+         ├─ Fix #1-3: 端点/running状态/GenUI
+         ├─ Fix #5-11: 模型去重/死代码/安全/搜索
+         └─ Fix #8: 测试覆盖 35→44
+```
