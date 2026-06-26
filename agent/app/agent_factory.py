@@ -60,20 +60,29 @@ def _build_model(preset: AgentPreset, settings: AgentSettings):
     provider = _preset_provider(preset)
     model_name = preset.model.split(":", maxsplit=1)[1]
     model_provider = "google_genai" if provider == "google" else provider
-
     api_key = _provider_api_key(settings, provider)
     if api_key is None:
         raise ValueError(f"provider is not configured: {provider}")
+    kwargs = _build_model_kwargs(provider, api_key, settings)
+    return init_chat_model(model=model_name, model_provider=model_provider, **kwargs)
 
-    kwargs: dict[str, str] = {}
+
+def _build_model_kwargs(
+    provider: str,
+    api_key: str,
+    settings: AgentSettings,
+) -> dict[str, str]:
+    """Build provider-specific init_chat_model kwargs.
+
+    Extracted to avoid duplication between _build_model and build_v2_coordinator.
+    """
+    kwargs: dict[str, str] = {"api_key": api_key}
 
     if provider == "openai":
-        kwargs["api_key"] = api_key
         if settings.openai_base_url:
             kwargs["base_url"] = settings.openai_base_url
 
     elif provider == "anthropic":
-        kwargs["api_key"] = api_key
         # ChatAnthropic uses anthropic_api_url (full base, SDK appends /v1/messages)
         if settings.anthropic_base_url:
             kwargs["anthropic_api_url"] = settings.anthropic_base_url
@@ -84,7 +93,7 @@ def _build_model(preset: AgentPreset, settings: AgentSettings):
             kwargs["transport"] = "rest"
             kwargs["base_url"] = settings.google_base_url
 
-    return init_chat_model(model=model_name, model_provider=model_provider, **kwargs)
+    return kwargs
 
 
 def _toolset_for_preset(workspace_root: Path, permission_mode: PermissionMode) -> list[object]:
@@ -198,21 +207,7 @@ def build_v2_coordinator(
     if api_key is None:
         raise ValueError(f"provider is not configured: {provider}")
 
-    kwargs: dict[str, str] = {}
-    if provider == "openai":
-        kwargs["api_key"] = api_key
-        if settings.openai_base_url:
-            kwargs["base_url"] = settings.openai_base_url
-    elif provider == "anthropic":
-        kwargs["api_key"] = api_key
-        if settings.anthropic_base_url:
-            kwargs["anthropic_api_url"] = settings.anthropic_base_url
-    elif provider == "google":
-        kwargs["google_api_key"] = api_key
-        if settings.google_base_url:
-            kwargs["transport"] = "rest"
-            kwargs["base_url"] = settings.google_base_url
-
+    kwargs = _build_model_kwargs(provider, api_key, settings)
     llm = init_chat_model(model=model_name, model_provider=model_provider, **kwargs)
 
     permission = PermissionMode(permission_mode)
