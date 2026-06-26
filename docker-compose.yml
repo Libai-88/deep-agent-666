@@ -1,0 +1,28 @@
+services:
+  agent:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.agent
+    env_file:
+      - .env
+    environment:
+      AGENT_WORKSPACE_ROOT: /workspace
+    volumes:
+      - ./:/workspace
+    ports:
+      - "8123:8123"
+
+  web:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.web
+    env_file:
+      - .env
+    environment:
+      AGENT_BASE_URL: http://agent:8123
+      COPILOTKIT_TELEMETRY_DISABLED: "true"
+      ENABLE_A2A_RESEARCH: "false"
+    depends_on:
+      - agent
+    ports:
+      - "3000:3000"

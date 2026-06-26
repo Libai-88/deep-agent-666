@@ -20,10 +20,16 @@ describe("copilot runtime helpers", () => {
 });
 
 describe("next 16 lint setup", () => {
-  it("uses the official eslint cli script, typegen-aware typecheck, and flat config", () => {
+  it("uses the official eslint cli script, typegen-aware typecheck, and hardened production startup config", () => {
     const webRoot = path.resolve(import.meta.dirname, "../../..");
-    const packageJson = JSON.parse(
+    const repoRoot = path.resolve(webRoot, "..");
+    const webPackageJson = JSON.parse(
       readFileSync(path.join(webRoot, "package.json"), "utf8"),
+    ) as {
+      scripts?: Record<string, string>;
+    };
+    const rootPackageJson = JSON.parse(
+      readFileSync(path.join(repoRoot, "package.json"), "utf8"),
     ) as {
       scripts?: Record<string, string>;
     };
@@ -32,8 +38,18 @@ describe("next 16 lint setup", () => {
     const nextEnvPath = path.join(webRoot, "next-env.d.ts");
     const nextConfigPath = path.join(webRoot, "next.config.ts");
 
-    expect(packageJson.scripts?.lint).toBe("eslint .");
-    expect(packageJson.scripts?.typecheck).toBe("next typegen && tsc --noEmit");
+    expect(webPackageJson.scripts?.lint).toBe("eslint .");
+    expect(webPackageJson.scripts?.typecheck).toBe("next typegen && tsc --noEmit");
+    expect(rootPackageJson.scripts?.["build:web"]).toBe(
+      'powershell -NoProfile -Command "npm --prefix web run build"',
+    );
+    expect(rootPackageJson.scripts?.["start:web"]).toBe(
+      'powershell -NoProfile -Command "npm --prefix web run start"',
+    );
+    expect(rootPackageJson.scripts?.["start:agent"]).toBe(
+      'powershell -NoProfile -Command "uv run --project agent uvicorn app.main:app --host 127.0.0.1 --port 8123"',
+    );
+    expect(rootPackageJson.scripts?.start).toContain("concurrently");
     expect(existsSync(eslintConfigPath)).toBe(true);
 
     const eslintConfig = readFileSync(eslintConfigPath, "utf8");
@@ -48,6 +64,10 @@ describe("next 16 lint setup", () => {
     expect(nextConfig).toContain("turbopack");
     expect(nextConfig).toContain("root");
     expect(nextConfig).toContain("transpilePackages");
+
+    const playwrightConfigPath = path.join(webRoot, "playwright.config.ts");
+    const playwrightConfig = readFileSync(playwrightConfigPath, "utf8");
+    expect(playwrightConfig).toContain('command: "npm run start"');
 
     const nextEnv = readFileSync(nextEnvPath, "utf8");
     expect(nextEnv).toContain("reference types=\"next\"");

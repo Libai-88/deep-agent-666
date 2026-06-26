@@ -7,7 +7,7 @@ export default defineConfig({
     headless: true,
   },
   webServer: {
-    command: "npm run dev",
+    command: "npm run start",
     cwd: "..",
     reuseExistingServer: true,
     url: "http://127.0.0.1:3000",

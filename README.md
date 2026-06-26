@@ -1,6 +1,14 @@
 # deep-agent-666
 
-Local-first single-assistant MVP built on Deep Agents, LangGraph, and CopilotKit.
+Local-first general-purpose workspace agent built on Deep Agents, LangGraph, and CopilotKit.
+
+## Who This Is For
+
+This repository is set up so a beginner can get from clone to running product with a small number of commands. There are two recommended paths:
+
+- `npm run dev`: best for active development
+- `npm run start`: best for a stable production-like local run
+- `docker compose up --build`: best when you want the whole product booted in containers
 
 ## Windows setup
 
@@ -22,13 +30,40 @@ uv sync --project agent --extra dev
 ### Frontend
 
 ```powershell
-cd web
-npm install
-npx playwright install chromium
-cd ..
+npm --prefix web install
+npx --prefix web playwright install chromium
 ```
 
-## Run
+## Quick Start
+
+### Development mode
+
+```powershell
+npm run dev
+```
+
+This starts:
+
+- Next.js dev server on `http://127.0.0.1:3000`
+- FastAPI agent on `http://127.0.0.1:8123`
+
+### Stable production-like mode
+
+```powershell
+npm run start
+```
+
+This command builds the frontend first, then starts the web app and agent together in production mode.
+
+### Docker mode
+
+```powershell
+docker compose up --build
+```
+
+This starts the same two-service topology (`web` + `agent`) using `.env`.
+
+## Manual Run
 
 ### Backend
 
@@ -39,8 +74,7 @@ uv run --project agent uvicorn app.main:app --host 127.0.0.1 --port 8123 --reloa
 ### Frontend
 
 ```powershell
-cd web
-npm run dev
+npm --prefix web run dev
 ```
 
 Open `http://127.0.0.1:3000`.
@@ -55,19 +89,33 @@ Open `http://127.0.0.1:3000`.
 ### Python
 
 ```powershell
-uv run --project agent pytest
+uv run --project agent pytest -v
 ```
 
 ### TypeScript
 
 ```powershell
-cd web
-npm run test
+npm --prefix web run test
 ```
 
 ### Browser smoke
 
 ```powershell
-cd web
-npm run e2e
+npm --prefix web run e2e
 ```
+
+### Production build
+
+```powershell
+npm --prefix web run build
+```
+
+## V2 Release Hardening
+
+V2 focuses on:
+
+- production startup reliability
+- CI running browser smoke against production startup
+- Docker delivery for beginners and operators
+
+See [docs/releases/v2-release-hardening.md](docs/releases/v2-release-hardening.md) for the phase notes.
