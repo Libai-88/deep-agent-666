@@ -77,3 +77,9 @@ export async function POST(request: Request) {
 export async function OPTIONS(request: Request) {
   return handle(request);
 }
+
+export function __closeRunnerForTests() {
+  cachedHandler = null;
+  cachedCatalogKey = "";
+  runner.close();
+}

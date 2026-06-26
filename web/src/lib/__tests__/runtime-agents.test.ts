@@ -1,4 +1,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { mkdtempSync, readFileSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 
 import type { AgentPresetCatalog } from "../agent-presets";
 
@@ -6,6 +9,7 @@ afterEach(() => {
   vi.resetModules();
   vi.restoreAllMocks();
   delete process.env.ENABLE_A2A_RESEARCH;
+  delete process.env.COPILOTKIT_RUNTIME_CATALOG_PATH;
 });
 
 describe("buildRuntimeAgents", () => {
@@ -146,5 +150,58 @@ describe("buildRuntimeAgents", () => {
     ]);
     expect(agents["a2a-research"]).toBeUndefined();
     expect(agents["coordinator-openai-read-only"]).toBeUndefined();
+  });
+});
+
+describe("loadRuntimeCatalog", () => {
+  it("reuses the cached live catalog when the next preset fetch fails", async () => {
+    const tempDir = mkdtempSync(join(tmpdir(), "runtime-catalog-cache-"));
+    const cachePath = join(tempDir, "runtime-catalog.json");
+    const liveCatalog: AgentPresetCatalog = {
+      defaultPresetId: "openai-balanced",
+      presets: [
+        {
+          id: "openai-balanced",
+          label: "OpenAI / Balanced",
+          provider: "openai",
+          permissionMode: "balanced",
+        },
+      ],
+    };
+
+    process.env.COPILOTKIT_RUNTIME_CATALOG_PATH = cachePath;
+
+    vi.doMock("../preset-catalog", async () => {
+      const actual = await vi.importActual<typeof import("../preset-catalog")>(
+        "../preset-catalog",
+      );
+
+      return {
+        ...actual,
+        fetchPresetCatalog: vi
+          .fn()
+          .mockResolvedValueOnce(liveCatalog)
+          .mockRejectedValueOnce(new Error("preset catalog offline")),
+      };
+    });
+
+    try {
+      const { loadRuntimeCatalog } = await import("../runtime-agents");
+
+      const first = await loadRuntimeCatalog("http://127.0.0.1:8123");
+      expect(first).toEqual({
+        catalog: liveCatalog,
+        source: "live",
+      });
+      expect(JSON.parse(readFileSync(cachePath, "utf8"))).toEqual(liveCatalog);
+
+      const second = await loadRuntimeCatalog("http://127.0.0.1:8123");
+      expect(second).toEqual({
+        catalog: liveCatalog,
+        source: "fallback",
+      });
+    } finally {
+      rmSync(tempDir, { recursive: true, force: true });
+    }
   });
 });

@@ -1,6 +1,6 @@
 # Deep Agent 666 — 当前状态
 
-> 最后更新：2026-06-27 (V1 完成，V2 release hardening 完成，V3 首用引导完成，V4 本地持久化线程运行时完成，V5 live provider activation 完成，V6 first response roundtrip 完成，V7 provider alignment/runtime recovery 完成，V8 runtime failure normalization 完成，V9 retry replay recovery 完成，V10 thread history gap recovery 完成，V11 thread history drift recovery 完成，V12 runtime persistence proof 完成)
+> 最后更新：2026-06-27 (V1 完成，V2 release hardening 完成，V3 首用引导完成，V4 本地持久化线程运行时完成，V5 live provider activation 完成，V6 first response roundtrip 完成，V7 provider alignment/runtime recovery 完成，V8 runtime failure normalization 完成，V9 retry replay recovery 完成，V10 thread history gap recovery 完成，V11 thread history drift recovery 完成，V12 runtime persistence proof 完成，V13 runtime catalog fallback 完成)
 
 ## 当前结论
 
@@ -14,7 +14,7 @@
 | 套件 | 数量 | 状态 |
 |------|------|------|
 | 后端 (pytest) | 59 | ✅ 全通过 |
-| 前端 (vitest) | 64 | ✅ 全通过 |
+| 前端 (vitest) | 66 | ✅ 全通过 |
 | Build (next build) | — | ✅ |
 | E2E (playwright) | 12 | ✅ 全通过 |
 | Docker Compose 配置校验 | — | ⚠️ 当前机器未安装 `docker`，未执行命令级验证 |
@@ -88,6 +88,11 @@
 - 新增用例证明：首个 runtime 实例完成一次线程后，第二个 runtime 实例可以从同一个 SQLite 文件恢复原始用户消息与 assistant 回复
 - 恢复断言同时证明：恢复阶段不依赖原始 backend surface 继续存活
 
+### V13: Runtime Catalog Fallback ✅
+- Web 运行时现在会把最后一次 live preset catalog 落到本地文件，在 `/presets` 临时不可达时仍能保留已知 agent surface
+- 新增 route-level 回归证明：主 `[[...slug]]` 路由在 catalog outage 下仍可恢复 SQLite 中的已持久化线程
+- 恢复断言同时证明：route 级恢复不需要再次请求远端 agent backend
+
 ## 关键提交
 
 | Commit | 说明 |
@@ -102,6 +107,6 @@
 
 ## 下一步
 
-- 下一阶段重点不再是“是否能恢复主路径线程”的基础证明，而是把更多 runtime 入口与真实进程重启场景的覆盖继续扩展。
+- 下一阶段重点不再是“主路由在 catalog 掉线时能否恢复线程”的基础证明，而是把更多 runtime 入口与真实进程重启场景的覆盖继续扩展。
 - 完成标准是：真实模型失败与成功路径在所有主要入口都能稳定结束，并且新手能基于产品内提示完成恢复而不是靠猜。
 - 文档中若仍出现旧的 `openrouter/free`、或把 OpenAI 默认路径与 OpenRouter 混写的表述，应以本页和最新提交为准。

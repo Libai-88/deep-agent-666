@@ -86,7 +86,8 @@ Open `http://127.0.0.1:3000`.
 - Provider configuration now re-bootstraps the root runtime in the same session, so a beginner can save a key and launch the first guided task without a manual reload.
 - OpenAI presets now align with the OpenAI default base URL and use `gpt-4.1-mini` instead of an OpenRouter-specific model id.
 - Real upstream provider failures on the direct Python AG-UI route now terminate with protocol-valid `RUN_ERROR` events, including structured codes such as `provider_access_denied`.
-- `npm run e2e` now covers first-run launch, restored-thread retry recovery, full history-gap detection, and partial history-drift detection with deterministic AG-UI stream fixtures. The Vitest suite now also includes a real runtime-level proof that a finished thread can be restored from the shared SQLite store on a fresh runtime instance, even after the original backend surface is gone. Remaining hardening is broader multi-entry and true process-restart coverage.
+- The web runtime now persists the last live preset catalog to `COPILOTKIT_RUNTIME_CATALOG_PATH` (default `./data/runtime-catalog.json`), so the main CopilotKit route can keep restoring persisted threads when `/presets` is temporarily unavailable.
+- `npm run e2e` now covers first-run launch, restored-thread retry recovery, full history-gap detection, and partial history-drift detection with deterministic AG-UI stream fixtures. The Vitest suite now also includes runtime-level proofs for both fresh-instance SQLite restore and route-level restore during preset-catalog outages. Remaining hardening is broader multi-entry and true process-restart coverage.
 
 ## Test
 
