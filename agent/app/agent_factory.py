@@ -265,10 +265,33 @@ def build_v2_coordinator(
             return ""
         return str(messages[-1].content)
 
+    def _running_command(
+        sub_agent: str,
+        task: str,
+        tool_call_id: str,
+    ) -> Command:
+        """Emit a 'running' delegation entry so the frontend shows the pulse
+        indicator before the sub-agent completes."""
+        entry: Delegation = {
+            "id": str(uuid.uuid4()),
+            "sub_agent": sub_agent,  # type: ignore[typeddict-item]
+            "task": task,
+            "status": "running",
+            "result": "",
+        }
+        return Command(
+            update={
+                "delegations": [entry],
+                "messages": [
+                    ToolMessage(content="starting...", tool_call_id=tool_call_id)
+                ],
+            }
+        )
+
     def _delegation_command(
         sub_agent: str,
         task: str,
-        status: Literal["completed", "failed"],
+        status: Literal["running", "completed", "failed"],
         result: str,
         tool_call_id: str,
     ) -> Command:
@@ -295,7 +318,10 @@ def build_v2_coordinator(
         tool_call_id: str,
     ) -> Command:
         try:
+            # First emit running status
+            running_cmd = _running_command(sub_agent_name, task, tool_call_id)
             result = _invoke_sub_agent(agent, task)
+            # Then emit completed
             return _delegation_command(
                 sub_agent_name, task, "completed", result, tool_call_id
             )

@@ -46,7 +46,7 @@ v1_agents = build_langgraph_agents(settings)
 for preset_id, agent in v1_agents.items():
     add_langgraph_fastapi_endpoint(app=app, agent=agent, path=f"/{preset_id}")
 
-# Build coordinator agents and register via CopilotKitRemoteEndpoint
+# Build and register coordinator agents with direct AG-UI endpoints
 coordinator_agents: list[LangGraphAGUIAgent] = []
 for preset_id, preset in presets_by_id.items():
     if preset.permission_mode not in (PermissionMode.BALANCED, PermissionMode.FULL_ACCESS):
@@ -57,14 +57,17 @@ for preset_id, preset in presets_by_id.items():
             model=v2_model,
             permission_mode=preset.permission_mode.value,
         )
-        coordinator_agents.append(LangGraphAGUIAgent(
+        coord_agent = LangGraphAGUIAgent(
             name=f"coordinator-{preset_id}",
             description=f"Coordinator ({preset.label})",
             graph=coord_graph,
-        ))
+        )
+        add_langgraph_fastapi_endpoint(app=app, agent=coord_agent, path=f"/coordinator-{preset_id}")
+        coordinator_agents.append(coord_agent)
     except ValueError:
         continue
 
+# All agents aggregated for CopilotKitRemoteEndpoint SDK compatibility
 all_agents = list(v1_agents.values()) + coordinator_agents
 sdk = CopilotKitRemoteEndpoint(agents=all_agents)
 add_fastapi_endpoint(app, sdk, "/copilotkit")

@@ -698,6 +698,7 @@ function SettingsDialog({
                 {cfg.label}
               </label>
               <input
+                type="password"
                 placeholder="API Key (sk-...)"
                 value={apiKeys[cfg.key] ?? ""}
                 onChange={(e) =>
