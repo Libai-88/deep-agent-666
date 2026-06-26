@@ -1,17 +1,23 @@
 from __future__ import annotations
 
+import uuid
 from pathlib import Path
+from typing import Literal
 
-from copilotkit import LangGraphAGUIAgent
+from copilotkit import CopilotKitMiddleware, LangGraphAGUIAgent
 from deepagents import create_deep_agent
+from langchain.agents import create_agent
 from langchain.chat_models import init_chat_model
-from langchain.tools import tool
+from langchain.tools import ToolRuntime, tool
+from langchain_core.messages import HumanMessage, ToolMessage
 from langgraph.checkpoint.memory import MemorySaver
+from langgraph.types import Command
 
 from app.config import AgentSettings, load_settings
 from app.middleware.genui import GenUIMiddleware
 from app.permissions import PermissionMode, interrupt_config_for_mode, mutable_tool_names
 from app.presets import ALL_PRESETS, AgentPreset
+from app.state import CoordinatorState, Delegation
 from app.tools.documents import read_document
 from app.tools.workspace import (
     list_workspace,
@@ -177,10 +183,11 @@ def build_v2_coordinator(
     model: str,
     permission_mode: str = "balanced",
 ):
-    """Build a Plan->Do->Review coordinator agent with three subagents.
+    """Build a supervisor coordinator that delegates to planner/executor/reviewer sub-agents.
 
-    The coordinator receives a user task, delegates to planner/executor/reviewer
-    subagents sequentially, and synthesizes the final result.
+    Uses the official LangGraph supervisor+@tool+Command pattern from CopilotKit's
+    subagents.py reference. Each sub-agent is a full create_agent wrapped as a @tool.
+    Delegations are appended to shared state for real-time frontend rendering.
     """
     parts = model.split("/", maxsplit=1)
     provider = parts[0]
@@ -217,30 +224,130 @@ def build_v2_coordinator(
         "read_text_file_tool", "read_document_tool",
     )]
 
-    coordinator = create_deep_agent(
+    # ── Shared state ──────────────────────────────────────────────────
+    # CoordinatorState and Delegation are defined in app/state.py
+
+    # ── Sub-agents (full create_agent instances) ──────────────────────
+    _planner_agent = create_agent(
+        model=llm,
+        tools=read_only_tools,
+        system_prompt=(
+            "You are the planner sub-agent. Given a task, produce a "
+            "numbered step-by-step plan. Identify files to read or modify. "
+            "Be concrete and specific. No preamble."
+        ),
+    )
+
+    _executor_agent = create_agent(
         model=llm,
         tools=toolset,
-        middleware=[GenUIMiddleware()],
-        subagents=[
-            {
-                "name": "planner",
-                "description": "Analyze task, break into steps, identify files to modify",
-                "system_prompt": "You are the planner subagent. Analyze the task, break it into clear steps, and identify files that need to be modified.",
-                "tools": read_only_tools,
-            },
-            {
-                "name": "executor",
-                "description": "Execute planned steps using file and command tools",
-                "system_prompt": "You are the executor subagent. Execute the planned steps using file and command tools to make the required changes.",
-                "tools": toolset,
-            },
-            {
-                "name": "reviewer",
-                "description": "Verify results match plan, check for errors",
-                "system_prompt": "You are the reviewer subagent. Verify the executed results match the original plan and check for any errors or issues.",
-                "tools": read_only_tools,
-            },
-        ],
+        system_prompt=(
+            "You are the executor sub-agent. Given a plan, execute the "
+            "steps using file and command tools. Read files before editing. "
+            "Report what you did. No preamble."
+        ),
+    )
+
+    _reviewer_agent = create_agent(
+        model=llm,
+        tools=read_only_tools,
+        system_prompt=(
+            "You are the reviewer sub-agent. Given a plan and execution "
+            "results, verify correctness. Check: (1) all planned files "
+            "were modified, (2) changes are correct, (3) no errors. "
+            "Provide a pass/fail verdict with evidence. No preamble."
+        ),
+    )
+
+    # ── Invoke helpers ────────────────────────────────────────────────
+    def _invoke_sub_agent(agent, task: str) -> str:
+        result = agent.invoke({"messages": [HumanMessage(content=task)]})
+        messages = result.get("messages", [])
+        if not messages:
+            return ""
+        return str(messages[-1].content)
+
+    def _delegation_command(
+        sub_agent: str,
+        task: str,
+        status: Literal["completed", "failed"],
+        result: str,
+        tool_call_id: str,
+    ) -> Command:
+        entry: Delegation = {
+            "id": str(uuid.uuid4()),
+            "sub_agent": sub_agent,  # type: ignore[typeddict-item]
+            "task": task,
+            "status": status,
+            "result": result,
+        }
+        return Command(
+            update={
+                "delegations": [entry],
+                "messages": [
+                    ToolMessage(content=result, tool_call_id=tool_call_id)
+                ],
+            }
+        )
+
+    def _delegate(
+        sub_agent_name: str,
+        agent,
+        task: str,
+        tool_call_id: str,
+    ) -> Command:
+        try:
+            result = _invoke_sub_agent(agent, task)
+            return _delegation_command(
+                sub_agent_name, task, "completed", result, tool_call_id
+            )
+        except Exception as exc:
+            message = (
+                f"sub-agent call failed: {exc.__class__.__name__} "
+                f"(see server logs for details)"
+            )
+            return _delegation_command(
+                sub_agent_name, task, "failed", message, tool_call_id
+            )
+
+    # ── Supervisor tools ──────────────────────────────────────────────
+    @tool
+    def planner_tool(task: str, runtime: ToolRuntime) -> Command:
+        """Delegate planning to the planner sub-agent.
+        Use for: breaking down tasks, identifying files, creating step-by-step plans."""
+        return _delegate("planner", _planner_agent, task, runtime.tool_call_id)
+
+    @tool
+    def executor_tool(task: str, runtime: ToolRuntime) -> Command:
+        """Delegate execution to the executor sub-agent.
+        Use for: making file changes, running commands, implementing the plan."""
+        return _delegate("executor", _executor_agent, task, runtime.tool_call_id)
+
+    @tool
+    def reviewer_tool(task: str, runtime: ToolRuntime) -> Command:
+        """Delegate review to the reviewer sub-agent.
+        Use for: verifying results, checking correctness, providing pass/fail verdict."""
+        return _delegate("reviewer", _reviewer_agent, task, runtime.tool_call_id)
+
+    # ── Supervisor graph ──────────────────────────────────────────────
+    coordinator = create_agent(
+        model=llm,
+        tools=[planner_tool, executor_tool, reviewer_tool],
+        middleware=[CopilotKitMiddleware()],
+        state_schema=CoordinatorState,
         checkpointer=MemorySaver(),
+        system_prompt=(
+            "You are a supervisor agent that coordinates three specialized "
+            "sub-agents to produce high-quality results.\n\n"
+            "Available sub-agents (call them as tools):\n"
+            "  - planner_tool: breaks a task into steps and identifies files.\n"
+            "  - executor_tool: executes planned steps using file/command tools.\n"
+            "  - reviewer_tool: verifies results match the plan.\n\n"
+            "For most user requests, delegate in sequence: "
+            "plan -> execute -> review. "
+            "Pass relevant context through the `task` argument of each tool. "
+            "Keep your own messages short. "
+            "The UI shows the user a live log of every delegation."
+        ),
     )
     return coordinator

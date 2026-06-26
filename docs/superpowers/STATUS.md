@@ -6,7 +6,7 @@
 
 | 套件 | 数量 | 状态 |
 |------|------|------|
-| 后端 (pytest) | 34 | ✅ |
+| 后端 (pytest) | 35 | ✅ |
 | 前端 (vitest) | 15 | ✅ |
 | Build (next build) | — | ✅ |
 | E2E smoke (playwright) | 3 | 🔧 脚本就绪，待 CI 运行 |
