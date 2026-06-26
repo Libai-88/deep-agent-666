@@ -259,7 +259,7 @@ function HomePageContent() {
   // Share workspace context with the agent
   const workspaceContext = useMemo(
     () => ({
-      workspaceRoot: process.env.NEXT_PUBLIC_AGENT_WORKSPACE_ROOT ?? "D:\\AgentBuild",
+      workspaceRoot: process.env.AGENT_WORKSPACE_ROOT ?? "D:\\AgentBuild",
       projectName: "deep-agent-666",
       platform: "windows",
       shell: "powershell",

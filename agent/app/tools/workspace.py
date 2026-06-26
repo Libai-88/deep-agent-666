@@ -1,7 +1,23 @@
 from __future__ import annotations
 
+import os
 from pathlib import Path
 import subprocess
+
+
+# Skip files larger than this when searching (prevents OOM)
+_MAX_SEARCH_FILE_SIZE = 10 * 1024 * 1024  # 10 MB
+
+# Binary extensions to skip when searching
+_BINARY_EXTENSIONS = frozenset({
+    ".exe", ".dll", ".so", ".dylib", ".bin", ".dat",
+    ".png", ".jpg", ".jpeg", ".gif", ".ico", ".svg",
+    ".woff", ".woff2", ".ttf", ".eot",
+    ".zip", ".tar", ".gz", ".bz2", ".7z", ".rar",
+    ".pyc", ".pyo", ".pyd",
+    ".o", ".a", ".lib",
+    ".pdf", ".doc", ".docx", ".xls", ".xlsx",
+})
 
 
 def resolve_workspace_path(workspace_root: Path, relative_path: str) -> Path:
@@ -26,10 +42,20 @@ def search_workspace(workspace_root: Path, query: str, glob: str = "*") -> str:
     for path in workspace_root.rglob(glob):
         if not path.is_file():
             continue
+
+        # Skip binary files and files larger than 10 MB
+        if path.suffix.lower() in _BINARY_EXTENSIONS:
+            continue
         try:
+            size = path.stat().st_size
+            if size > _MAX_SEARCH_FILE_SIZE:
+                continue
             text = path.read_text(encoding="utf-8")
         except UnicodeDecodeError:
             continue
+        except OSError:
+            continue
+
         for line_number, line in enumerate(text.splitlines(), start=1):
             if query.lower() in line.lower():
                 relative = path.relative_to(workspace_root)
