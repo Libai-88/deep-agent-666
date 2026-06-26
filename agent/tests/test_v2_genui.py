@@ -64,6 +64,17 @@ def test_genui_middleware_empty_file_changes():
     assert True
 
 
+def test_genui_middleware_delegations():
+    """CoordinatorState delegations should not cause errors."""
+    state = {
+        "delegations": [
+            {"id": "1", "sub_agent": "planner", "task": "plan", "status": "running", "result": ""},
+        ],
+    }
+    asyncio.run(genui_middleware(state, {}))
+    assert True
+
+
 def test_genui_middleware_is_agent_middleware():
     """GenUIMiddleware class should be an AgentMiddleware subclass."""
     mw = GenUIMiddleware()
