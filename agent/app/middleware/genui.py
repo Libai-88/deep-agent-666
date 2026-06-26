@@ -3,9 +3,7 @@
 Uses copilotkit_emit_state to push structured data that the frontend
 consumes via useAgent().state subscriptions.
 
-Can be used either as:
-1. A standalone async function: await genui_middleware(state, config)
-2. An AgentMiddleware instance via GenUIMiddleware() for create_deep_agent
+Adapted for CoordinatorState with delegations field.
 """
 from typing import Any
 
@@ -36,17 +34,20 @@ async def genui_middleware(state: dict[str, Any], config: RunnableConfig) -> Non
         except RuntimeError:
             pass  # Outside a runnable context (e.g., tests, startup)
 
-    # Emit phase transition
+    # Emit delegations from CoordinatorState
+    delegations = _get_state_field(state, "delegations", [])
+    if delegations:
+        await _emit("delegations", delegations)
+
+    # Also check for legacy V2 fields (backward compat)
     phase = _get_state_field(state, "phase")
     if phase and phase != "idle":
         await _emit("phase", phase)
 
-    # Emit plan steps when available
     plan_steps = _get_state_field(state, "plan_steps")
     if plan_steps:
         await _emit("genui_plan", plan_steps)
 
-    # Emit file changes for DiffViewer
     file_changes = _get_state_field(state, "file_changes", [])
     if file_changes:
         latest = file_changes[-1]
@@ -59,7 +60,6 @@ async def genui_middleware(state: dict[str, Any], config: RunnableConfig) -> Non
             },
         )
 
-    # Emit review result
     review_result = _get_state_field(state, "review_result")
     if review_result:
         await _emit("genui_review", review_result)
