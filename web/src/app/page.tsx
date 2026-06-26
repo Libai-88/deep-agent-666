@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import {
   CopilotChat,
   useRenderTool,
@@ -25,6 +25,7 @@ import {
   FileText,
 } from "lucide-react";
 import { ThreadList } from "@/components/ThreadList";
+import { SubAgentActivityCard } from "@/components/SubAgentActivityCard";
 import {
   createLocalThread,
   loadThreads,
@@ -98,18 +99,24 @@ function HomePageContent() {
     }
   }, []);
 
-  const processedKeys = useRef<Set<string>>(new Set());
-
   // Monitor tool calls via useRenderTool
   useRenderTool({
     name: "*",
     render: ({ name, status, args, result }) => {
-      // Deduplication
-      const key = `${name}-${JSON.stringify(args)}-${status}`;
-      if (processedKeys.current.has(key)) {
-        return <ToolCallCard name={name} status={status} args={args} result={result} />;
+      const toolStatus = status === "complete" ? "complete" : status === "executing" ? "executing" : "inProgress";
+
+      // Render sub-agent tools as beautiful cards
+      if (["planner_tool", "executor_tool", "reviewer_tool"].includes(name)) {
+        const subAgentName = name.replace("_tool", "");
+        return (
+          <SubAgentActivityCard
+            subAgent={subAgentName as "planner" | "executor" | "reviewer"}
+            task={typeof args?.task === "string" ? args.task : undefined}
+            status={toolStatus}
+            result={typeof result === "string" ? result : undefined}
+          />
+        );
       }
-      processedKeys.current.add(key);
 
       // Track write_todos tool calls
       if (name === "write_todos" && status === "complete" && args?.todos) {
@@ -120,7 +127,6 @@ function HomePageContent() {
             status: (t.status ?? "pending") as TodoItem["status"],
           }),
         );
-        // Use queueMicrotask to avoid state update during render
         queueMicrotask(() => {
           setTodos((prev) => [...prev, ...newTodos]);
           setTasksOpen(true);
@@ -391,7 +397,7 @@ function HomePageContent() {
               {/* Chat area */}
               <div className="flex-1 min-h-0">
                 <CopilotChat
-                  className="h-full"
+                  className="h-full [&_[data-slot=copilot-chat-message]]:prose-sm [&_[data-slot=copilot-chat-message]]:prose-pre:bg-muted [&_[data-slot=copilot-chat-message]]:prose-code:before:hidden [&_[data-slot=copilot-chat-message]]:prose-code:after:hidden"
                   agentId={activeThread.presetId}
                   threadId={activeThread.id}
                   labels={{
