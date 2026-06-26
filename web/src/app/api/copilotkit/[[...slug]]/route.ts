@@ -3,71 +3,69 @@ import {
   InMemoryAgentRunner,
   createCopilotRuntimeHandler,
 } from "@copilotkit/runtime/v2";
-import type { AbstractAgent } from "@ag-ui/client";
-import { HttpAgent } from "@ag-ui/client";
-import { LangGraphHttpAgent } from "@copilotkit/runtime/langgraph";
-import { A2AMiddlewareAgent } from "@ag-ui/a2a-middleware";
 
-import { STATIC_AGENT_PRESET_CATALOG } from "@/lib/agent-presets";
-import type { AgentPresetCatalog } from "@/lib/agent-presets";
+import { buildRuntimeAgents, loadRuntimeCatalog } from "@/lib/runtime-agents";
 
 const BACKEND_URL = process.env.AGENT_BASE_URL ?? "http://127.0.0.1:8123";
+const runner = new InMemoryAgentRunner();
 
-/** Build all agents for the CopilotRuntime. */
-function buildAgents(catalog: AgentPresetCatalog): Record<string, AbstractAgent> {
-  const agents: Record<string, AbstractAgent> = {};
+let cachedHandler: ReturnType<typeof createCopilotRuntimeHandler> | null = null;
+let cachedCatalogKey = "";
 
-  // V1 + V2 coordinator agents via LangGraphHttpAgent
-  for (const preset of catalog.presets) {
-    agents[preset.id] = new LangGraphHttpAgent({ url: `${BACKEND_URL}/${preset.id}` });
-    agents[`coordinator-${preset.id}`] = new LangGraphHttpAgent({
-      url: `${BACKEND_URL}/coordinator-${preset.id}`,
-    });
-  }
-
-  // Alias "default" for CopilotChat auto-detection
-  const defaultId = catalog.defaultPresetId ?? catalog.presets[0]?.id;
-  if (defaultId && agents[defaultId]) {
-    agents.default = agents[defaultId];
-  }
-
-  // A2A multi-agent coordinator (reference: examples/integrations/a2a-middleware)
-  agents["a2a-research"] = new A2AMiddlewareAgent({
-    agentId: "a2a-research",
-    description: "Multi-agent research via A2A protocol",
-    agentUrls: [`${BACKEND_URL}/coordinator-openai-balanced`],
-    instructions: `
-      You are a multi-agent research coordinator.
-      Delegate work to available specialized agents and synthesize results.
-      Call agents ONE AT A TIME. Never make parallel calls.
-    `,
-    orchestrationAgent: new HttpAgent({ url: `${BACKEND_URL}/openai-balanced` }),
+function createRuntimeHandler(catalogKey: string, runtime: CopilotRuntime) {
+  cachedCatalogKey = catalogKey;
+  cachedHandler = createCopilotRuntimeHandler({
+    runtime,
+    basePath: "/api/copilotkit",
   });
-
-  return agents;
+  return cachedHandler;
 }
 
-const runtime = new CopilotRuntime({
-  agents: buildAgents(STATIC_AGENT_PRESET_CATALOG),
-  runner: new InMemoryAgentRunner(),
-  a2ui: {},
-  openGenerativeUI: true,
-  mcpApps: {
-    servers: [
-      {
-        type: "http" as const,
-        url: process.env.MCP_SERVER_URL || "http://localhost:3108/mcp",
-        serverId: "workspace-tools",
-      },
-    ],
-  },
-});
+async function getHandler() {
+  const { catalog } = await loadRuntimeCatalog(BACKEND_URL);
+  const catalogKey = [
+    catalog.defaultPresetId ?? "",
+    ...catalog.presets.map((preset) => preset.id),
+  ].join("|");
 
-const handler = createCopilotRuntimeHandler({
-  runtime,
-  basePath: "/api/copilotkit",
-});
+  if (cachedHandler && cachedCatalogKey === catalogKey) {
+    return cachedHandler;
+  }
 
-export const GET = handler;
-export const POST = handler;
-export const OPTIONS = handler;
+  const runtime = new CopilotRuntime({
+    agents: buildRuntimeAgents(catalog, BACKEND_URL),
+    runner,
+    a2ui: {},
+    openGenerativeUI: true,
+    mcpApps: {
+      servers: [
+        {
+          type: "http" as const,
+          url: process.env.MCP_SERVER_URL || "http://localhost:3108/mcp",
+          serverId: "workspace-tools",
+        },
+      ],
+    },
+  });
+
+  return createRuntimeHandler(catalogKey, runtime);
+}
+
+async function handle(request: Request) {
+  const handler = await getHandler();
+  return handler(request);
+}
+
+export const dynamic = "force-dynamic";
+
+export async function GET(request: Request) {
+  return handle(request);
+}
+
+export async function POST(request: Request) {
+  return handle(request);
+}
+
+export async function OPTIONS(request: Request) {
+  return handle(request);
+}

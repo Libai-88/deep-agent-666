@@ -27,10 +27,14 @@ if (isVitest) {
     });
 
     await page.goto("/");
-    await expect(page.getByText("Assistant")).toBeVisible();
-    await expect(page.getByText("Threads")).toBeVisible();
     await expect(
-      page.getByRole("button", { name: "+ New", exact: true }),
+      page.getByRole("heading", { name: "Deep Agent 666" }),
+    ).toBeVisible();
+    await expect(
+      page.getByRole("button", { name: "Threads", exact: true }),
+    ).toBeVisible();
+    await expect(
+      page.getByRole("button", { name: "New Thread", exact: true }),
     ).toBeVisible();
   });
 }
