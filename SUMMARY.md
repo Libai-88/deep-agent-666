@@ -1,6 +1,12 @@
 # Deep Agent 666 — 开发进展全总结
 
-> 生成于 2026-06-26 | Git Tag: `v1-foundation`, `v1-complete`, `gaps-complete` | 分支: `feat/deepagents-foundation`
+> 生成于 2026-06-27 | Git Tag: `v1-foundation`, `v1-complete`, `gaps-complete` | 分支: `feat/deepagents-foundation`
+
+## 2026-06-27 更新
+
+- `V1` 已在 `6a33da3 feat(v1): complete coordinator workbench runtime` 完成。
+- `V2` 已在 `69d6d96 feat(v2): add release hardening baseline` 完成并推送远端。
+- 当前主分支状态不应再解读为 “V1 未完成”；后续阶段应从 V3 新手体验和可恢复性继续推进。
 
 ---
 
@@ -43,10 +49,11 @@ CopilotRuntime (Next.js route handler)
 
 | 套件 | 数量 | 状态 |
 |------|------|------|
-| 后端 pytest | **44** | ✅ 全通过 |
-| 前端 vitest | **15** | ✅ |
+| 后端 pytest | **52** | ✅ 全通过 |
+| 前端 vitest | **30** | ✅ 全通过 |
 | Next.js build | — | ✅ 无错误 |
-| E2E smoke (playwright) | 3 脚本就绪 | 🔧 待 CI 运行 |
+| E2E (playwright) | **6** | ✅ 全通过 |
+| Docker Compose 配置校验 | — | ⚠️ 当前机器未安装 `docker`，未执行命令级验证 |
 
 ---
 
@@ -224,7 +231,7 @@ v1-complete    — 全部基础功能就绪
 gaps-complete  — 差距补齐 + 代码审计修复完成
 ```
 
-最新提交: `e5ec5a3` — 44 tests, build clean
+最新提交: `69d6d96` — V2 release hardening baseline
 
 日志：
 ```
@@ -238,5 +245,7 @@ core.copilotkit.ai
          ├─ Gap P3: 状态流清理
          ├─ Fix #1-3: 端点/running状态/GenUI
          ├─ Fix #5-11: 模型去重/死代码/安全/搜索
-         └─ Fix #8: 测试覆盖 35→44
+         ├─ feat(workbench): 混合场景任务工作台
+         ├─ feat(v1): coordinator workbench runtime 完成
+         └─ feat(v2): release hardening baseline
 ```
