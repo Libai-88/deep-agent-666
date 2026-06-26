@@ -15,6 +15,7 @@
 - `V9` 已把 `Retry last task` 做成可持久化重放，恢复线程在刷新后也能重试上一个任务。
 - `V10` 已能识别“线程本地仍在，但 runtime 历史已丢失”的漂移场景，并给出明确恢复入口。
 - `V11` 已能识别“runtime 恢复出部分旧消息，但缺了最后一条本地任务”的部分历史漂移场景。
+- `V12` 已补齐真实 CopilotKit runtime handler + SQLite thread store 的跨实例恢复证明。
 
 ---
 
@@ -58,7 +59,7 @@ CopilotRuntime (Next.js route handler)
 | 套件 | 数量 | 状态 |
 |------|------|------|
 | 后端 pytest | **59** | ✅ 全通过 |
-| 前端 vitest | **63** | ✅ 全通过 |
+| 前端 vitest | **64** | ✅ 全通过 |
 | Next.js build | — | ✅ 无错误 |
 | E2E (playwright) | **12** | ✅ 全通过 |
 | Docker Compose 配置校验 | — | ⚠️ 当前机器未安装 `docker`，未执行命令级验证 |
@@ -188,7 +189,7 @@ Python FastAPI:
 
 | 问题 | 优先级 | 说明 | 必须修？ |
 |------|--------|------|---------|
-| 更深层 runtime path 恢复体验仍待统一 | 🔴 P0 | V11 已能识别全空与部分历史漂移并给出恢复入口，但跨入口真实 backend restart/resume 证明仍可继续加强 | 是 — 下一阶段继续收敛 |
+| 更广覆盖的 runtime restart/resume 验证仍待补齐 | 🟡 P1 | V12 已证明主运行时可跨实例从同一 SQLite 线程库恢复消息，但跨更多入口与真实进程重启的覆盖仍可继续增强 | 建议继续补强 |
 | #4 同步 invoke 阻塞事件循环 | 🟡 P2 | LangGraph 工具同步设计，长命令影响性能 | 否 — LangGraph 设计特性 |
 | #6 预设双端维护 | 🟡 P3 | 新增预设需改 Python + TS 两处 | 否 — 有注释指引 |
 | A2UI 未与 Python 工具对接 | 🟡 P3 | 前端 catalog 就绪，coordinator 工具未调用 `a2ui.render()` | 否 — 阶段 B 未完成部分 |
@@ -196,7 +197,7 @@ Python FastAPI:
 | interrupt_on 已禁用 | 🟡 P3 | 去掉后才无 Console Error | 建议修 — 需审批流程时恢复 |
 | Inspector `{}` 解析警告 | 🟢 P4 | `[CopilotKit Inspector] Failed to parse tool-call result content {}` | 否 — SDK 升级后解决 |
 | 运行时恢复回归覆盖不足 | 🟡 P2 | 已切到 SQLite，但还缺“重启后继续线程”的更深 E2E | 建议补 — 属于 V4 后续验证 |
-| 线程恢复与更深层入口回归覆盖仍不足 | 🔴 P0 | 当前已证明恢复线程可以识别全空与部分历史漂移并重放上一个任务，但真实 backend 重启后的消息恢复与跨入口一致性还缺更强证明 | 必须修 — 属于下一阶段 |
+| 线程恢复与更深层入口回归覆盖仍可继续扩展 | 🟡 P1 | 当前已证明产品层可识别全空与部分历史漂移，并证明运行时主路径可跨实例恢复消息；后续重点是扩展到更多入口与真实进程重启 | 建议继续补强 |
 
 ---
 
@@ -216,7 +217,7 @@ Python FastAPI:
 ### 建议优先级
 
 ```
-P0: 继续补齐真实 backend restart/resume、完整消息恢复与更深层 runtime path 的一致性验证
+P1: 扩展更多 runtime 入口与真实进程重启下的 restart/resume 一致性验证
 P1: CI 打通 E2E 测试（让 smoke/chat round-trip 自动运行）
 P2: 补 Docker 部署方案
 P3: 恢复 interrupt_on + 修复空结果
@@ -241,6 +242,7 @@ gaps-complete  — 差距补齐 + 代码审计修复完成
 ```
 
 V10 基线提交: `7558e16` — thread history gap recovery baseline
+V12 基线提交: `本次提交` — runtime persistence proof baseline
 
 日志：
 ```

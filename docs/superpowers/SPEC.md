@@ -34,7 +34,7 @@
 | 前端 | Next.js 16 + React 19 + @copilotkit/react-core v2 |
 | 代理层 | @ag-ui/client HttpAgent + createCopilotRuntimeHandler |
 | UI | shadcn/ui + Tailwind v4 + lucide-react |
-| 测试 | pytest (59) + vitest (63) + playwright (12) |
+| 测试 | pytest (59) + vitest (64) + playwright (12) |
 
 ## 关键决策
 
@@ -50,6 +50,6 @@
 
 | 问题 | P级 | 说明 |
 |------|-----|------|
-| 更深层 runtime path 仍待统一恢复体验 | P0 | V11 已让恢复线程的全空与部分历史漂移都可见且可恢复，但更深层入口的真实 backend restart/resume 与消息恢复仍可继续硬化 |
+| 更广覆盖的 runtime restart/resume 仍待扩展 | P1 | V12 已证明主运行时可跨实例从同一 SQLite 线程库恢复消息，但跨更多入口与真实进程重启的覆盖仍可继续增强 |
 | DataChart 组件 | P1 | V2 spec 可选组件，未实现 |
-| 更深层对话恢复验证 | P1 | 已启用 `SqliteAgentRunner`，并覆盖了恢复线程的 prompt 重放、历史缺失与部分历史漂移提示，但仍需要更完整的对话恢复与重启回归验证 |
+| 更广对话恢复验证 | P1 | 已启用 `SqliteAgentRunner`，并覆盖 prompt 重放、历史缺失、部分历史漂移提示，以及主运行时跨实例恢复证明；后续仍可扩展到更多入口与真实进程重启 |
