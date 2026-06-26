@@ -58,7 +58,7 @@ def replace_text_in_file(workspace_root: Path, path: str, old_text: str, new_tex
     return f"updated {target.relative_to(workspace_root)}"
 
 
-def run_command(workspace_root: Path, command: str, cwd: str = ".") -> dict[str, str | int]:
+def run_command(workspace_root: Path, command: str, cwd: str = ".") -> str:
     target_cwd = resolve_workspace_path(workspace_root, cwd)
     completed = subprocess.run(
         [
@@ -74,9 +74,12 @@ def run_command(workspace_root: Path, command: str, cwd: str = ".") -> dict[str,
         text=True,
         timeout=60,
     )
-    return {
-        "cwd": str(target_cwd),
-        "stdout": completed.stdout[-8000:],
-        "stderr": completed.stderr[-8000:],
-        "exit_code": completed.returncode,
-    }
+    stdout = completed.stdout[-8000:] if completed.stdout else ""
+    stderr = completed.stderr[-8000:] if completed.stderr else ""
+    parts = [f"cwd: {target_cwd}"]
+    if stdout:
+        parts.append(f"stdout: {stdout}")
+    if stderr:
+        parts.append(f"stderr: {stderr}")
+    parts.append(f"exit_code: {completed.returncode}")
+    return "\n".join(parts)

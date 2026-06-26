@@ -134,7 +134,7 @@ def _toolset_for_preset(workspace_root: Path, permission_mode: PermissionMode) -
 
     if "run_command" in mutable_tool_names(permission_mode):
         @tool
-        def run_command_tool(command: str, cwd: str = ".") -> dict[str, str | int]:
+        def run_command_tool(command: str, cwd: str = ".") -> str:
             """Execute a PowerShell command rooted to the workspace."""
             return run_command(workspace_root, command, cwd)
 
