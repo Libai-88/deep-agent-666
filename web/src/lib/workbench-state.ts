@@ -69,6 +69,13 @@ export function saveWorkbenchState(
   storage.setItem(`${STORAGE_KEY_PREFIX}.${threadId}`, JSON.stringify(state));
 }
 
+export function removeWorkbenchState(
+  threadId: string,
+  storage: Storage = window.localStorage,
+): void {
+  storage.removeItem(`${STORAGE_KEY_PREFIX}.${threadId}`);
+}
+
 export function replaceWorkbenchTodos(
   state: ThreadWorkbenchState,
   todos: WorkbenchTodo[],

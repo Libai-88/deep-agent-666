@@ -1,6 +1,6 @@
 # Deep Agent 666 — 当前状态
 
-> 最后更新：2026-06-27 (V1 完成，V2 release hardening 完成，V3 首用引导完成，V4 本地持久化线程运行时完成，V5 live provider activation 完成，V6 first response roundtrip 完成，V7 provider alignment/runtime recovery 完成，V8 runtime failure normalization 完成，V9 retry replay recovery 完成，V10 thread history gap recovery 完成，V11 thread history drift recovery 完成，V12 runtime persistence proof 完成，V13 runtime catalog fallback 完成，V14 coordinator workbench regression 完成，V15 runtime-config workspace root 完成，V16 coordinator restored-thread continuity 完成)
+> 最后更新：2026-06-27 (V1 完成，V2 release hardening 完成，V3 首用引导完成，V4 本地持久化线程运行时完成，V5 live provider activation 完成，V6 first response roundtrip 完成，V7 provider alignment/runtime recovery 完成，V8 runtime failure normalization 完成，V9 retry replay recovery 完成，V10 thread history gap recovery 完成，V11 thread history drift recovery 完成，V12 runtime persistence proof 完成，V13 runtime catalog fallback 完成，V14 coordinator workbench regression 完成，V15 runtime-config workspace root 完成，V16 coordinator restored-thread continuity 完成，V17 thread management 完成)
 
 ## 当前结论
 
@@ -14,9 +14,9 @@
 | 套件 | 数量 | 状态 |
 |------|------|------|
 | 后端 (pytest) | 61 | ✅ 全通过 |
-| 前端 (vitest) | 72 | ✅ 全通过 |
+| 前端 (vitest) | 74 | ✅ 全通过 |
 | Build (next build) | — | ✅ |
-| E2E (playwright) | 15 | ✅ 全通过 |
+| E2E (playwright) | 16 | ✅ 全通过 |
 | Docker Compose 配置校验 | — | ⚠️ 当前机器未安装 `docker`，未执行命令级验证 |
 
 ## 已完成
@@ -107,6 +107,11 @@
 - 浏览器回归现已覆盖 coordinator 完成线程的健康恢复路径，而不只覆盖缺历史时的恢复告警
 - 新增场景证明：同一线程在刷新后可以同时恢复 chat 历史、timeline 任务和 results summary
 - 页面不会把“最新 prompt 已恢复”的健康线程误判成 `thread_history_unavailable`
+
+### V17: Thread Management ✅
+- 线程列表现在支持直接重命名和删除，不再只能被动堆积自动生成标题
+- 删除线程时会同步清理本地 workbench 持久化，避免残留过期恢复状态
+- 如果删除的是当前线程，页面会自动回退到下一个最近线程；如果已经没有线程，则回到 starter gate
 
 ## 关键提交
 

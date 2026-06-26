@@ -34,7 +34,7 @@
 | 前端 | Next.js 16 + React 19 + @copilotkit/react-core v2 |
 | 代理层 | @ag-ui/client HttpAgent + createCopilotRuntimeHandler |
 | UI | shadcn/ui + Tailwind v4 + lucide-react |
-| 测试 | pytest (61) + vitest (72) + playwright (15) |
+| 测试 | pytest (61) + vitest (74) + playwright (16) |
 
 ## 关键决策
 
@@ -46,6 +46,7 @@
 - Provider 文案必须与默认模型/默认 base URL 一致 — `OpenAI` 预设不能再引用 OpenRouter 专属模型名
 - Runtime config 应走应用自有同源路由 — UI 读取/写入 runtime 配置时优先经过 Next.js route，而不是浏览器直连后端端口
 - Workspace root 应可在运行时切换 — 新手不应被迫为了改工作目录而手改 `.env` 或重启服务
+- Local threads 应支持基础生命周期管理 — 新手必须能在产品内重命名和删除线程，而不是依赖浏览器 localStorage 清理
 - CORS middleware (Python) — 开发模式需要（已不再需要，因为不走浏览器直连）
 
 ## 已知技术债

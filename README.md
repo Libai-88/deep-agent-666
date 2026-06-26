@@ -92,6 +92,7 @@ Open `http://127.0.0.1:3000`.
 - The coordinator starter flow now has a browser regression that proves planner/executor/reviewer cards, timeline tasks, and results summary appear together in one thread, and timeline statuses are rendered with beginner-friendly labels instead of raw internal values.
 - Runtime settings now flow through the app-owned `/api/runtime-config` route, and beginners can inspect/change the active workspace root from `Settings` without editing `.env` or calling the backend directly from the browser.
 - `npm run e2e` now also proves that a completed coordinator thread reopens cleanly after reload with restored chat history plus persisted timeline/results surfaces. The suite covers first-run launch, workspace-root settings saves, coordinator workbench rendering, healthy restored-thread continuity, restored-thread retry recovery, full history-gap detection, and partial history-drift detection with deterministic AG-UI stream fixtures. The Vitest suite also includes runtime-level proofs for both fresh-instance SQLite restore and route-level restore during preset-catalog outages. Remaining hardening is broader multi-entry and true process-restart coverage.
+- Local threads can now be renamed and deleted directly from the thread list, with deletion also cleaning persisted workbench state and automatically falling back to the next most recent thread or the starter gate.
 
 ## Test
 

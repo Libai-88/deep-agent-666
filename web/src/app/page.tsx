@@ -32,14 +32,18 @@ import {
   createLocalThread,
   deriveThreadTitle,
   loadThreads,
+  renameThread,
+  resolveNextThreadIdAfterDelete,
   saveThreads,
   sanitizeThreads,
+  sortThreadsByUpdatedAt,
   type LocalThread,
 } from "@/lib/thread-registry";
 import {
   createEmptyWorkbenchState,
   appendWorkbenchArtifacts,
   loadWorkbenchState,
+  removeWorkbenchState,
   replaceWorkbenchArtifacts,
   replaceWorkbenchTodos,
   saveWorkbenchState,
@@ -365,6 +369,42 @@ function HomePageContent() {
     [activeThread],
   );
 
+  const handleRenameThread = useCallback((id: string, title: string) => {
+    setThreads((previous) =>
+      sortThreadsByUpdatedAt(
+        previous.map((thread) =>
+          thread.id === id ? renameThread(thread, title) : thread,
+        ),
+      ),
+    );
+  }, []);
+
+  const handleDeleteThread = useCallback(
+    (id: string) => {
+      const targetThread = threads.find((thread) => thread.id === id);
+      if (!targetThread) {
+        return;
+      }
+
+      if (!window.confirm(`Delete thread "${targetThread.title}"?`)) {
+        return;
+      }
+
+      removeWorkbenchState(id);
+      const remainingThreads = threads.filter((thread) => thread.id !== id);
+      const nextThreadId = resolveNextThreadIdAfterDelete({
+        deletedThreadId: id,
+        activeThreadId: activeThread?.id ?? null,
+        remainingThreads,
+      });
+
+      setThreads(sortThreadsByUpdatedAt(remainingThreads));
+      setThreadId(nextThreadId);
+      setRecoverableError(null);
+    },
+    [activeThread?.id, setThreadId, threads],
+  );
+
   const handleSelectStarterTemplate = useCallback(
     (template: StarterTemplate) => {
       const presetId = resolveDefaultPresetId(catalogState.catalog);
@@ -558,6 +598,8 @@ function HomePageContent() {
                 threads={threads}
                 activeThreadId={activeThread.id}
                 onSelect={handleSelectThread}
+                onRename={handleRenameThread}
+                onDelete={handleDeleteThread}
                 onClose={() => setSidebar(null)}
               />
             </div>

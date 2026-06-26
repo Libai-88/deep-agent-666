@@ -1,8 +1,8 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { KeyboardEvent, useEffect, useMemo, useState } from "react";
 import { formatDistanceToNow } from "date-fns";
-import { CircleX, PanelRightClose } from "lucide-react";
+import { Check, Pencil, PanelRightClose, Trash2, X } from "lucide-react";
 
 import type { AgentPresetId } from "@/lib/agent-presets";
 import type { LocalThread } from "@/lib/thread-registry";
@@ -33,6 +33,8 @@ interface ThreadListProps {
   threads: LocalThread[];
   activeThreadId: string | null;
   onSelect: (id: string) => void;
+  onRename: (id: string, title: string) => void;
+  onDelete: (id: string) => void;
   onClose: () => void;
 }
 
@@ -40,11 +42,15 @@ export function ThreadList({
   threads,
   activeThreadId,
   onSelect,
+  onRename,
+  onDelete,
   onClose,
 }: ThreadListProps) {
   const [filter, setFilter] = useState<string>("all");
   const [loading] = useState(false);
   const [mounted, setMounted] = useState(false);
+  const [editingThreadId, setEditingThreadId] = useState<string | null>(null);
+  const [draftTitle, setDraftTitle] = useState("");
 
   // Defer date-dependent rendering to client to avoid hydration mismatch
   useEffect(() => {
@@ -67,6 +73,36 @@ export function ThreadList({
     }
     return groups;
   }, [filtered, mounted]);
+
+  const commitRename = (thread: LocalThread) => {
+    const nextTitle = draftTitle.trim();
+    if (nextTitle && nextTitle !== thread.title) {
+      onRename(thread.id, nextTitle);
+    }
+    setEditingThreadId(null);
+    setDraftTitle("");
+  };
+
+  const cancelRename = () => {
+    setEditingThreadId(null);
+    setDraftTitle("");
+  };
+
+  const handleRenameKeyDown = (
+    event: KeyboardEvent<HTMLInputElement>,
+    thread: LocalThread,
+  ) => {
+    if (event.key === "Enter") {
+      event.preventDefault();
+      commitRename(thread);
+      return;
+    }
+
+    if (event.key === "Escape") {
+      event.preventDefault();
+      cancelRename();
+    }
+  };
 
   return (
     <div className="flex h-full flex-col panel-enter">
@@ -114,9 +150,10 @@ export function ThreadList({
                   {GROUP_LABELS[key]}
                 </p>
                 {items.map((thread) => (
-                  <button
+                  <div
                     key={thread.id}
-                    onClick={() => onSelect(thread.id)}
+                    data-testid={`thread-item-${thread.id}`}
+                    data-active={thread.id === activeThreadId ? "true" : "false"}
                     className={`w-full rounded-lg px-3 py-2 text-left text-sm transition-colors ${
                       thread.id === activeThreadId
                         ? "bg-accent text-accent-foreground"
@@ -124,19 +161,99 @@ export function ThreadList({
                     }`}
                   >
                     <div className="flex items-start justify-between gap-2">
-                      <span className="flex-1 truncate font-medium">
-                        {thread.title}
-                      </span>
-                      <span className="shrink-0 text-xs text-muted-foreground">
-                        {formatDistanceToNow(new Date(thread.updatedAt), {
-                          addSuffix: true,
-                        })}
-                      </span>
+                      {editingThreadId === thread.id ? (
+                        <div className="min-w-0 flex-1">
+                          <input
+                            autoFocus
+                            data-testid={`thread-title-input-${thread.id}`}
+                            value={draftTitle}
+                            onChange={(event) => setDraftTitle(event.target.value)}
+                            onKeyDown={(event) => handleRenameKeyDown(event, thread)}
+                            className="w-full rounded border border-border bg-background px-2 py-1 text-sm font-medium text-foreground outline-none"
+                          />
+                          <span className="mt-0.5 block text-xs text-muted-foreground">
+                            {thread.presetId}
+                          </span>
+                        </div>
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={() => onSelect(thread.id)}
+                          className="min-w-0 flex-1 text-left"
+                        >
+                          <span className="flex-1 truncate font-medium">
+                            {thread.title}
+                          </span>
+                          <span className="mt-0.5 block text-xs text-muted-foreground">
+                            {thread.presetId}
+                          </span>
+                        </button>
+                        )}
+                      <div className="flex shrink-0 items-center gap-1">
+                        {editingThreadId === thread.id ? (
+                          <>
+                            <button
+                              type="button"
+                              data-testid={`thread-rename-save-${thread.id}`}
+                              onClick={(event) => {
+                                event.stopPropagation();
+                                commitRename(thread);
+                              }}
+                              className="rounded p-1 text-muted-foreground hover:bg-muted hover:text-foreground"
+                              aria-label="Save thread title"
+                            >
+                              <Check className="h-4 w-4" />
+                            </button>
+                            <button
+                              type="button"
+                              data-testid={`thread-rename-cancel-${thread.id}`}
+                              onClick={(event) => {
+                                event.stopPropagation();
+                                cancelRename();
+                              }}
+                              className="rounded p-1 text-muted-foreground hover:bg-muted hover:text-foreground"
+                              aria-label="Cancel thread rename"
+                            >
+                              <X className="h-4 w-4" />
+                            </button>
+                          </>
+                        ) : (
+                          <>
+                            <button
+                              type="button"
+                              data-testid={`thread-rename-${thread.id}`}
+                              onClick={(event) => {
+                                event.stopPropagation();
+                                setEditingThreadId(thread.id);
+                                setDraftTitle(thread.title);
+                              }}
+                              className="rounded p-1 text-muted-foreground hover:bg-muted hover:text-foreground"
+                              aria-label={`Rename ${thread.title}`}
+                            >
+                              <Pencil className="h-4 w-4" />
+                            </button>
+                            <button
+                              type="button"
+                              data-testid={`thread-delete-${thread.id}`}
+                              onClick={(event) => {
+                                event.stopPropagation();
+                                onDelete(thread.id);
+                              }}
+                              className="rounded p-1 text-muted-foreground hover:bg-muted hover:text-destructive"
+                              aria-label={`Delete ${thread.title}`}
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </button>
+                          </>
+                        )}
+                        <span className="ml-1 shrink-0 text-xs text-muted-foreground">
+                          {formatDistanceToNow(new Date(thread.updatedAt), {
+                            addSuffix: true,
+                          })}
+                        </span>
+                      </div>
                     </div>
-                    <span className="mt-0.5 block text-xs text-muted-foreground">
-                      {thread.presetId}
-                    </span>
-                  </button>
+                  </div>
                 ))}
               </div>
             ))

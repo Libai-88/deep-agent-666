@@ -13,6 +13,12 @@ export type LocalThread = {
   updatedAt: number;
 };
 
+type ResolveNextThreadIdAfterDeleteInput = {
+  deletedThreadId: string;
+  activeThreadId: string | null;
+  remainingThreads: LocalThread[];
+};
+
 const STORAGE_KEY = "deep-agent-666.threads";
 const VALID_PRESET_IDS = new Set(
   ALL_AGENT_PRESETS.map((preset) => preset.id),
@@ -34,6 +40,12 @@ function isLocalThread(value: unknown): value is LocalThread {
   );
 }
 
+export function sortThreadsByUpdatedAt(
+  threads: readonly LocalThread[],
+): LocalThread[] {
+  return [...threads].sort((a, b) => b.updatedAt - a.updatedAt);
+}
+
 export function loadThreads(
   storage?: Storage,
 ): LocalThread[] {
@@ -48,7 +60,9 @@ export function loadThreads(
   try {
     const parsed = JSON.parse(rawThreads) as unknown;
 
-    return Array.isArray(parsed) ? parsed.filter(isLocalThread) : [];
+    return Array.isArray(parsed)
+      ? sortThreadsByUpdatedAt(parsed.filter(isLocalThread))
+      : [];
   } catch {
     return [];
   }
@@ -58,7 +72,7 @@ export function saveThreads(
   threads: LocalThread[],
   storage: Storage = window.localStorage,
 ): void {
-  storage.setItem(STORAGE_KEY, JSON.stringify(threads));
+  storage.setItem(STORAGE_KEY, JSON.stringify(sortThreadsByUpdatedAt(threads)));
 }
 
 export function sanitizeThreads(
@@ -67,7 +81,9 @@ export function sanitizeThreads(
 ): LocalThread[] {
   const availablePresetIds = new Set(presets.map((preset) => preset.id));
 
-  return threads.filter((thread) => availablePresetIds.has(thread.presetId));
+  return sortThreadsByUpdatedAt(
+    threads.filter((thread) => availablePresetIds.has(thread.presetId)),
+  );
 }
 
 export function createLocalThread(presetId: AgentPresetId): LocalThread {
@@ -106,4 +122,16 @@ export function renameThread(
     title,
     updatedAt: Date.now(),
   };
+}
+
+export function resolveNextThreadIdAfterDelete({
+  deletedThreadId,
+  activeThreadId,
+  remainingThreads,
+}: ResolveNextThreadIdAfterDeleteInput): string | null {
+  if (activeThreadId !== deletedThreadId) {
+    return activeThreadId;
+  }
+
+  return sortThreadsByUpdatedAt(remainingThreads)[0]?.id ?? null;
 }

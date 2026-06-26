@@ -20,6 +20,7 @@
 - `V14` 已补齐 coordinator starter flow 的浏览器回归，并把 timeline 状态文案改为更适合新手理解的形式。
 - `V15` 已把 runtime 配置收口到同源 `/api/runtime-config`，并让新手可在 Settings 中直接查看和切换 workspace root。
 - `V16` 已补齐 coordinator 完成线程在页面刷新后的健康恢复浏览器回归，证明 restored chat 与本地 workbench 面板可以连续对齐。
+- `V17` 已把线程管理产品化：支持直接重命名/删除线程，并在删除当前线程后自动回退到下一个可用线程或 starter gate。
 
 ---
 
@@ -63,9 +64,9 @@ CopilotRuntime (Next.js route handler)
 | 套件 | 数量 | 状态 |
 |------|------|------|
 | 后端 pytest | **61** | ✅ 全通过 |
-| 前端 vitest | **72** | ✅ 全通过 |
+| 前端 vitest | **74** | ✅ 全通过 |
 | Next.js build | — | ✅ 无错误 |
-| E2E (playwright) | **15** | ✅ 全通过 |
+| E2E (playwright) | **16** | ✅ 全通过 |
 | Docker Compose 配置校验 | — | ⚠️ 当前机器未安装 `docker`，未执行命令级验证 |
 
 ---
@@ -135,6 +136,7 @@ FileBrowser         — 工作区树浏览
 ThreadList          — 会话历史
 SettingsDialog      — 多 provider 密钥配置
                     — 支持同源 runtime-config 读写与 workspace root 热更新
+ThreadList          — 支持线程重命名、删除与最近更新排序
 FileViewDialog      — 文件内容预览
 DiffViewer          — 内联 diff 查看器
 ThemeToggle         — 明暗主题切换
@@ -214,8 +216,8 @@ Python FastAPI:
 | 标准 | 当前 | 达标 |
 |------|------|------|
 | 后端测试 ≥ 50 | 61 ✅ | 已达标 |
-| 前端测试 ≥ 20 | 72 ✅ | 已达标 |
-| E2E ≥ 5 条 | 15 ✅ | 已达标 |
+| 前端测试 ≥ 20 | 74 ✅ | 已达标 |
+| E2E ≥ 5 条 | 16 ✅ | 已达标 |
 | 0 个 Console Error | 有 Inspector 警告 | SDK 升级 |
 | Docker 部署 | ❌ | Dockerfile + compose |
 | Windows 桌面壳 | ❌ | Electron wrapper |
@@ -253,6 +255,7 @@ V13 基线提交: `898172a` — runtime catalog fallback baseline
 V14 基线提交: `见最新提交` — coordinator workbench regression baseline
 V15 基线提交: `见最新提交` — runtime config workspace-root baseline
 V16 基线提交: `见最新提交` — coordinator restored-thread continuity baseline
+V17 基线提交: `见最新提交` — thread management baseline
 
 日志：
 ```
