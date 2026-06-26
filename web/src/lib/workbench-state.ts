@@ -97,3 +97,12 @@ export function replaceWorkbenchArtifacts(
     updatedAt: Date.now(),
   };
 }
+
+export function resetWorkbenchStateForTaskKind(
+  taskKind: WorkbenchTaskKind,
+): ThreadWorkbenchState {
+  return {
+    ...createEmptyWorkbenchState(),
+    taskKind,
+  };
+}

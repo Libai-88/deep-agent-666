@@ -96,3 +96,14 @@ export function deriveThreadTitle(message: string): string {
 
   return `${wordSafe || truncated}...`;
 }
+
+export function renameThread(
+  thread: LocalThread,
+  title: string,
+): LocalThread {
+  return {
+    ...thread,
+    title,
+    updatedAt: Date.now(),
+  };
+}
