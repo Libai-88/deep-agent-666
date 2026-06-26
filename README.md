@@ -82,8 +82,8 @@ Open `http://127.0.0.1:3000`.
 ## Current limits
 
 - The CopilotKit runtime now uses a local SQLite thread store by default (`COPILOTKIT_THREADS_DB_PATH`, default `./data/threads.db`), but deeper restart-and-resume coverage still needs broader end-to-end validation.
-- Provider configuration is now expected to activate presets live without backend restart; remaining work is broader end-to-end proof of first-run configure -> launch -> response.
-- `npm run e2e` currently validates the local shell and preset/thread boot flow. It is not a full frontend-to-backend chat round-trip test.
+- Provider configuration now re-bootstraps the root runtime in the same session, so a beginner can save a key and launch the first guided task without a manual reload.
+- `npm run e2e` now covers the first-run configure -> launch -> first assistant response path with a deterministic AG-UI stream fixture. The largest remaining runtime risk is SDK protocol compatibility against real external providers.
 
 ## Test
 

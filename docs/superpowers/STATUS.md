@@ -1,22 +1,22 @@
 # Deep Agent 666 — 当前状态
 
-> 最后更新：2026-06-27 (V1 完成，V2 release hardening 完成，V3 首用引导完成，V4 本地持久化线程运行时完成，V5 live provider activation 完成)
+> 最后更新：2026-06-27 (V1 完成，V2 release hardening 完成，V3 首用引导完成，V4 本地持久化线程运行时完成，V5 live provider activation 完成，V6 first response roundtrip 完成)
 
 ## 当前结论
 
 - V1 不再是“未完成”状态，已在 `6a33da3` 完成 coordinator workbench runtime。
 - V2 发布加固已在 `69d6d96` 完成，分支 `feat/deepagents-foundation` 已推送到 `origin`。
 - V3 首用引导已在 `380b84c` 完成并推送远端。
-- 当前产品基线是：一个本地工作区、一个 Web、一个 FastAPI/Deep Agents 服务，支持工程和研究混合场景，并已补齐“首次配置后即时可启动”的配置闭环。
+- 当前产品基线是：一个本地工作区、一个 Web、一个 FastAPI/Deep Agents 服务，支持工程和研究混合场景，并已补齐“同页配置后即可启动首条任务并收到首条响应”的首用闭环。
 
 ## 测试状态
 
 | 套件 | 数量 | 状态 |
 |------|------|------|
-| 后端 (pytest) | 52 | ✅ 全通过 |
-| 前端 (vitest) | 30 | ✅ 全通过 |
+| 后端 (pytest) | 55 | ✅ 全通过 |
+| 前端 (vitest) | 45 | ✅ 全通过 |
 | Build (next build) | — | ✅ |
-| E2E (playwright) | 6 | ✅ 全通过 |
+| E2E (playwright) | 9 | ✅ 全通过 |
 | Docker Compose 配置校验 | — | ⚠️ 当前机器未安装 `docker`，未执行命令级验证 |
 
 ## 已完成
@@ -53,6 +53,11 @@
 - 后端已切到 live runtime registry，统一 `/presets`、`/health`、`/copilotkit` 和直连 AG-UI 路由的 agent surface
 - 前端启动路径已增加 runtime 可用性闸门，避免“preset 已显示但 runtime 尚不可用”时直接白屏
 
+### V6: First Response Roundtrip ✅
+- Root `Providers` 在 Settings 保存成功后会同页重新 bootstrap `CopilotKit`
+- 首用路径已覆盖：未配置 -> 保存 provider -> starter -> assistant 首条响应
+- 浏览器回归使用确定性的 AG-UI text-response fixture，不依赖外部模型可用性
+
 ## 关键提交
 
 | Commit | 说明 |
@@ -62,9 +67,10 @@
 | `69d6d96` | `feat(v2): add release hardening baseline` |
 | `380b84c` | `test(v3): cover onboarding launch path` |
 | `6788bd5` | `feat(v4): add durable local thread runtime` |
+| `c1217ee` | `feat(v5): activate providers live without restart` |
 
 ## 下一步
 
-- 下一阶段已经不是“补完 V1”，而是证明首次配置后的真实聊天闭环。
-- 完成标准是：浏览器级验证 `configure -> launch -> 首条真实响应`，而不是只验证 shell 和路由可达。
-- 文档中若仍出现旧的 “配置后需要重启后端才生效 / preset 可见即代表 runtime 必可用” 表述，应以本页和最新提交为准。
+- 下一阶段已经不是“补完 V1”，而是解决真实外部 provider 下的 SDK 协议兼容。
+- 完成标准是：去掉 `INCOMPLETE_STREAM` 特判后，真实模型对话也能稳定结束且无额外 console/runtime 错误。
+- 文档中若仍出现旧的 “同页配置后仍需手动刷新 / 首用路径只验证到 shell” 表述，应以本页和最新提交为准。

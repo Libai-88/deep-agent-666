@@ -82,6 +82,7 @@ import {
   fetchCatalogStateFromUrl,
   type CatalogState,
 } from "@/lib/preset-catalog";
+import { requestRuntimeBootstrapRefresh } from "@/lib/runtime-bootstrap";
 import {
   STARTER_TEMPLATES,
   createStarterThread,
@@ -1148,7 +1149,7 @@ function SettingsDialog({
   onOpenChange: (open: boolean) => void;
   currentPreset: AgentPresetDefinition;
   onSwitchPreset: (id: AgentPresetId) => void;
-  onSaved: () => void;
+  onSaved: () => void | Promise<void>;
   onSaveFailed: (code: RecoverableErrorCode) => void;
 }) {
   const [apiKeys, setApiKeys] = useState<Record<string, string>>({});
@@ -1179,7 +1180,8 @@ function SettingsDialog({
       const data = await res.json();
       if (res.ok) {
         setMessage({ type: "ok", text: `Configured — ${data.preset_count} presets available` });
-        onSaved();
+        await requestRuntimeBootstrapRefresh();
+        await onSaved();
       } else {
         setMessage({ type: "error", text: "Failed to save configuration" });
         onSaveFailed("configuration_failed");

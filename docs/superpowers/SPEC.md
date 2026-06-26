@@ -42,6 +42,7 @@
 - `agents__unsafe_dev_only` → `runtimeUrl` — 用 CopilotKit Runtime 代理，保留扩展性
 - 本地默认 runner 使用 `SqliteAgentRunner` — 线程运行时状态写入 `./data/threads.db`
 - Provider 配置应 live 生效 — Settings 保存后无需重启后端即可激活对应 preset / coordinator
+- Root runtime bootstrap 需同页可重入 — 首次配置后必须在当前 tab 内挂起 `CopilotKit` 并允许首条任务直接返回响应
 - CORS middleware (Python) — 开发模式需要（已不再需要，因为不走浏览器直连）
 
 ## 已知技术债
@@ -49,6 +50,5 @@
 | 问题 | P级 | 说明 |
 |------|-----|------|
 | Chat 全链路不通 (INCOMPLETE_STREAM) | P0 | Python SDK (0.1.x) 与 JS SDK (1.61.x) 协议不匹配。仍需继续盯住事件终结与客户端 SSE 协议兼容性 |
-| 首次配置后首条真实消息验证不足 | P0 | 新手路径最关键的 configure -> launch -> response 还缺完整浏览器级回归验证 |
 | DataChart 组件 | P1 | V2 spec 可选组件，未实现 |
 | 更深层对话恢复验证 | P1 | 已启用 `SqliteAgentRunner`，但仍需要更完整的对话恢复与重启回归验证 |

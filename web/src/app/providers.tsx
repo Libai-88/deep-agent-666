@@ -11,6 +11,10 @@ import {
   resolveDefaultPresetId,
 } from "@/lib/agent-presets";
 import { fetchCatalogStateFromUrl } from "@/lib/preset-catalog";
+import {
+  RUNTIME_BOOTSTRAP_READY_EVENT,
+  RUNTIME_BOOTSTRAP_REFRESH_EVENT,
+} from "@/lib/runtime-bootstrap";
 import { resolveThreadAgentId } from "@/lib/thread-agent";
 import { loadThreads } from "@/lib/thread-registry";
 
@@ -49,55 +53,57 @@ export function Providers({ children }: { children: ReactNode }) {
   });
 
   useEffect(() => {
-    let cancelled = false;
+    let active = true;
 
     const load = async () => {
       try {
         const state = await fetchCatalogStateFromUrl("/api/preset-state", {
           cache: "no-store",
         });
-        if (!cancelled) {
-          if (state.catalog.presets.length === 0) {
-            setBootstrapState({
-              agentId: undefined,
-              threadId: undefined,
-            });
-            setCopilotReady(false);
-            return;
-          }
-
-          const threads = loadThreads();
-          const selectedThreadId =
-            typeof window === "undefined"
-              ? null
-              : new URLSearchParams(window.location.search).get("threadId");
-          const activeThread = selectedThreadId
-            ? threads.find((thread) => thread.id === selectedThreadId) ?? null
-            : threads[0] ?? null;
-          const defaultPresetId = resolveDefaultPresetId(state.catalog);
-          const bootstrapPreset =
-            (activeThread
-              ? findPresetById(state.catalog.presets, activeThread.presetId) ??
-                findPresetById(ALL_AGENT_PRESETS, activeThread.presetId)
-              : null) ??
-            (defaultPresetId
-              ? findPresetById(state.catalog.presets, defaultPresetId) ??
-                findPresetById(ALL_AGENT_PRESETS, defaultPresetId)
-              : null);
-
-          setBootstrapState({
-            agentId: bootstrapPreset
-              ? resolveThreadAgentId(
-                  bootstrapPreset.id,
-                  bootstrapPreset.permissionMode,
-                )
-              : undefined,
-            threadId: activeThread?.id,
-          });
-          setCopilotReady(await hasRuntimeAgents());
+        if (!active) {
+          return;
         }
+
+        if (state.catalog.presets.length === 0) {
+          setBootstrapState({
+            agentId: undefined,
+            threadId: undefined,
+          });
+          setCopilotReady(false);
+          return;
+        }
+
+        const threads = loadThreads();
+        const selectedThreadId =
+          typeof window === "undefined"
+            ? null
+            : new URLSearchParams(window.location.search).get("threadId");
+        const activeThread = selectedThreadId
+          ? threads.find((thread) => thread.id === selectedThreadId) ?? null
+          : threads[0] ?? null;
+        const defaultPresetId = resolveDefaultPresetId(state.catalog);
+        const bootstrapPreset =
+          (activeThread
+            ? findPresetById(state.catalog.presets, activeThread.presetId) ??
+              findPresetById(ALL_AGENT_PRESETS, activeThread.presetId)
+            : null) ??
+          (defaultPresetId
+            ? findPresetById(state.catalog.presets, defaultPresetId) ??
+              findPresetById(ALL_AGENT_PRESETS, defaultPresetId)
+            : null);
+
+        setBootstrapState({
+          agentId: bootstrapPreset
+            ? resolveThreadAgentId(
+                bootstrapPreset.id,
+                bootstrapPreset.permissionMode,
+              )
+            : undefined,
+          threadId: activeThread?.id,
+        });
+        setCopilotReady(await hasRuntimeAgents());
       } catch {
-        if (!cancelled) {
+        if (active) {
           setBootstrapState({
             agentId: undefined,
             threadId: undefined,
@@ -107,9 +113,22 @@ export function Providers({ children }: { children: ReactNode }) {
       }
     };
 
+    const handleRefresh = () => {
+      void load().finally(() => {
+        if (typeof window !== "undefined") {
+          window.dispatchEvent(new Event(RUNTIME_BOOTSTRAP_READY_EVENT));
+        }
+      });
+    };
+
     void load();
+    window.addEventListener(RUNTIME_BOOTSTRAP_REFRESH_EVENT, handleRefresh);
     return () => {
-      cancelled = true;
+      active = false;
+      window.removeEventListener(
+        RUNTIME_BOOTSTRAP_REFRESH_EVENT,
+        handleRefresh,
+      );
     };
   }, []);
 
