@@ -17,7 +17,8 @@ from app.config import AgentSettings, load_settings
 from app.permissions import PermissionMode, mutable_tool_names
 from app.presets import ALL_PRESETS, AgentPreset
 from app.state import CoordinatorState, Delegation
-from app.tools.documents import read_document
+from app.task_profile import infer_task_kind, task_prompt_fragment
+from app.tools.documents import inspect_document, read_document
 from app.tools.workspace import (
     list_workspace,
     read_text_file,
@@ -32,6 +33,10 @@ SYSTEM_PROMPT = """You are the primary local work agent.
 Use the workspace tools to inspect, edit, and summarize files.
 When a tool call is interrupted for approval, wait for the human decision and continue.
 Prefer concise, execution-focused responses."""
+
+
+def _compose_task_prompt(base_prompt: str, task_kind: str) -> str:
+    return f"{base_prompt}\n\nTask profile:\n{task_prompt_fragment(task_kind)}"
 
 
 def _preset_provider(preset: AgentPreset) -> str:
@@ -117,11 +122,17 @@ def _toolset_for_preset(workspace_root: Path, permission_mode: PermissionMode) -
         """Read a local text, markdown, DOCX, or PDF document from the workspace."""
         return read_document(workspace_root, path)
 
+    @tool
+    def inspect_document_tool(path: str) -> str:
+        """Inspect a local document and return metadata plus a bounded excerpt."""
+        return inspect_document(workspace_root, path)
+
     toolset: list[object] = [
         list_workspace_tool,
         search_workspace_tool,
         read_text_file_tool,
         read_document_tool,
+        inspect_document_tool,
     ]
 
     if "write_text_file" in mutable_tool_names(permission_mode):
@@ -227,7 +238,8 @@ def build_v2_coordinator(
         system_prompt=(
             "You are the planner sub-agent. Given a task, produce a "
             "numbered step-by-step plan. Identify files to read or modify. "
-            "Be concrete and specific. No preamble."
+            "Be concrete and specific. No preamble.\n\n"
+            "Respect the task profile passed inside the task text."
         ),
     )
 
@@ -237,7 +249,8 @@ def build_v2_coordinator(
         system_prompt=(
             "You are the executor sub-agent. Given a plan, execute the "
             "steps using file and command tools. Read files before editing. "
-            "Report what you did. No preamble."
+            "Report what you did. No preamble.\n\n"
+            "Respect the task profile passed inside the task text."
         ),
     )
 
@@ -248,7 +261,8 @@ def build_v2_coordinator(
             "You are the reviewer sub-agent. Given a plan and execution "
             "results, verify correctness. Check: (1) all planned files "
             "were modified, (2) changes are correct, (3) no errors. "
-            "Provide a pass/fail verdict with evidence. No preamble."
+            "Provide a pass/fail verdict with evidence. No preamble.\n\n"
+            "Respect the task profile passed inside the task text."
         ),
     )
 
@@ -264,6 +278,7 @@ def build_v2_coordinator(
         sub_agent: str,
         task: str,
         tool_call_id: str,
+        task_kind: str,
     ) -> Command:
         """Emit a 'running' delegation entry so the frontend shows the pulse
         indicator before the sub-agent completes."""
@@ -277,6 +292,7 @@ def build_v2_coordinator(
         return Command(
             update={
                 "delegations": [entry],
+                "task_kind": task_kind,
                 "messages": [
                     ToolMessage(content="starting...", tool_call_id=tool_call_id)
                 ],
@@ -289,6 +305,7 @@ def build_v2_coordinator(
         status: Literal["running", "completed", "failed"],
         result: str,
         tool_call_id: str,
+        task_kind: str,
     ) -> Command:
         entry: Delegation = {
             "id": str(uuid.uuid4()),
@@ -300,6 +317,8 @@ def build_v2_coordinator(
         return Command(
             update={
                 "delegations": [entry],
+                "task_kind": task_kind,
+                "final_summary": result if status == "completed" else "",
                 "messages": [
                     ToolMessage(content=result, tool_call_id=tool_call_id)
                 ],
@@ -312,13 +331,29 @@ def build_v2_coordinator(
         task: str,
         tool_call_id: str,
     ) -> Command:
+        task_kind = infer_task_kind(task)
+        enriched_task = (
+            f"Task kind: {task_kind}\n"
+            f"Task profile: {task_prompt_fragment(task_kind)}\n\n"
+            f"Original task:\n{task}"
+        )
         try:
             # First emit running status
-            running_cmd = _running_command(sub_agent_name, task, tool_call_id)
-            result = _invoke_sub_agent(agent, task)
+            running_cmd = _running_command(
+                sub_agent_name,
+                task,
+                tool_call_id,
+                task_kind,
+            )
+            result = _invoke_sub_agent(agent, enriched_task)
             # Then emit completed
             return _delegation_command(
-                sub_agent_name, task, "completed", result, tool_call_id
+                sub_agent_name,
+                task,
+                "completed",
+                result,
+                tool_call_id,
+                task_kind,
             )
         except Exception as exc:
             message = (
@@ -326,7 +361,12 @@ def build_v2_coordinator(
                 f"(see server logs for details)"
             )
             return _delegation_command(
-                sub_agent_name, task, "failed", message, tool_call_id
+                sub_agent_name,
+                task,
+                "failed",
+                message,
+                tool_call_id,
+                task_kind,
             )
 
     # ── Supervisor tools ──────────────────────────────────────────────
@@ -366,7 +406,10 @@ def build_v2_coordinator(
             "plan -> execute -> review. "
             "Pass relevant context through the `task` argument of each tool. "
             "Keep your own messages short. "
-            "The UI shows the user a live log of every delegation."
+            "The UI shows the user a live log of every delegation.\n\n"
+            "Infer whether the task is engineering, research, or general work. "
+            "Bias file/document summarization requests toward research behavior, "
+            "and code/test/change requests toward engineering behavior."
         ),
     )
     return coordinator

@@ -70,9 +70,22 @@ def test_genui_middleware_delegations():
         "delegations": [
             {"id": "1", "sub_agent": "planner", "task": "plan", "status": "running", "result": ""},
         ],
+        "task_kind": "research",
+        "final_summary": "Research complete",
     }
     asyncio.run(genui_middleware(state, {}))
     assert True
+
+
+def test_coordinator_state_tracks_task_kind_and_final_summary():
+    state = {
+        "messages": [],
+        "delegations": [],
+        "task_kind": "research",
+        "final_summary": "Research complete",
+    }
+    assert state["task_kind"] == "research"
+    assert state["final_summary"] == "Research complete"
 
 
 def test_genui_middleware_is_agent_middleware():

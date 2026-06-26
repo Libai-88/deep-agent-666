@@ -6,6 +6,8 @@ from typing import Annotated, Literal
 
 from langchain.agents import AgentState as BaseAgentState
 
+from app.task_profile import TaskKind
+
 
 # ── Subagent Coordinator State ──────────────────────────────────────────
 # Reference: showcase/integrations/langgraph-fastapi/src/agents/src/subagents.py
@@ -30,3 +32,5 @@ class CoordinatorState(BaseAgentState):
     """
 
     delegations: Annotated[list[Delegation], add]
+    task_kind: TaskKind
+    final_summary: str

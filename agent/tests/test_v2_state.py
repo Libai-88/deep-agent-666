@@ -16,13 +16,23 @@ def test_delegation_typeddict():
 
 def test_coordinator_state_defaults():
     """CoordinatorState accepts delegation entries."""
-    state: CoordinatorState = {"delegations": []}
+    state: CoordinatorState = {
+        "delegations": [],
+        "task_kind": "general",
+        "final_summary": "",
+    }
     assert "delegations" in state
     assert state["delegations"] == []
+    assert state["task_kind"] == "general"
+    assert state["final_summary"] == ""
 
 
 def test_coordinator_state_appends_delegations():
-    state: CoordinatorState = {"delegations": []}
+    state: CoordinatorState = {
+        "delegations": [],
+        "task_kind": "engineering",
+        "final_summary": "",
+    }
     d1: Delegation = {
         "id": "1",
         "sub_agent": "planner",
@@ -42,3 +52,4 @@ def test_coordinator_state_appends_delegations():
     assert len(state["delegations"]) == 2
     assert state["delegations"][0]["sub_agent"] == "planner"
     assert state["delegations"][1]["sub_agent"] == "executor"
+    assert state["task_kind"] == "engineering"

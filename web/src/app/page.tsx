@@ -9,7 +9,6 @@ import {
   useConfigureSuggestions,
   useAgentContext,
   useAgent,
-  UseAgentUpdate,
 } from "@copilotkit/react-core/v2";
 import { useQueryState } from "nuqs";
 import {
@@ -23,8 +22,6 @@ import {
   Settings,
   SquarePen,
   Bot,
-  ClipboardList,
-  FileText,
 } from "lucide-react";
 import { ThreadList } from "@/components/ThreadList";
 import { SubAgentActivityCard } from "@/components/SubAgentActivityCard";
@@ -35,6 +32,20 @@ import {
   type LocalThread,
 } from "@/lib/thread-registry";
 import {
+  createEmptyWorkbenchState,
+  appendWorkbenchArtifacts,
+  loadWorkbenchState,
+  replaceWorkbenchTodos,
+  saveWorkbenchState,
+  type ThreadWorkbenchState,
+} from "@/lib/workbench-state";
+import {
+  extractFinalSummary,
+  inferTaskKindFromMessage,
+  normalizeToolCallToArtifacts,
+  normalizeToolCallToTodos,
+} from "@/lib/tool-result-normalizer";
+import {
   ALL_AGENT_PRESETS,
   type AgentPresetDefinition,
   type AgentPresetId,
@@ -42,7 +53,6 @@ import {
   resolveDefaultPresetId,
 } from "@/lib/agent-presets";
 import {
-  TasksFilesSidebar,
   type TodoItem,
   type FileItem,
 } from "@/components/TasksFilesSidebar";
@@ -52,6 +62,8 @@ import { DelegationLog } from "@/components/DelegationLog";
 import { SupervisorActivityBanner } from "@/components/SupervisorActivityBanner";
 import { FileBrowser } from "@/components/FileBrowser";
 import { FileViewDialog } from "@/components/FileViewDialog";
+import { TaskTimelinePanel } from "@/components/TaskTimelinePanel";
+import { ArtifactResultsPanel } from "@/components/ArtifactResultsPanel";
 
 function seedThreads(): LocalThread[] {
   const stored = loadThreads();
@@ -73,13 +85,10 @@ export default function HomePage() {
 
 function HomePageContent() {
   const [sidebar, setSidebar] = useQueryState("sidebar");
-  const [filesPanel, setFilesPanel] = useQueryState("files");
   const [threadId, setThreadId] = useQueryState("threadId");
-  const [tasksOpen, setTasksOpen] = useState(false);
 
   const [todos, setTodos] = useState<TodoItem[]>([]);
   const [files, setFiles] = useState<FileItem[]>([]);
-  const [activeTab, setActiveTab] = useState<"tasks" | "workspace">("tasks");
   const [previewFile, setPreviewFile] = useState<string | null>(null);
   const [previewOpen, setPreviewOpen] = useState(false);
   const [previewContent, setPreviewContent] = useState("");
@@ -146,6 +155,41 @@ function HomePageContent() {
   useRenderTool({
     name: "*",
     render: ({ name, status, args, result }) => {
+      const normalizedTodos = normalizeToolCallToTodos({
+        name,
+        status,
+        args,
+        result,
+      });
+      const normalizedArtifacts = normalizeToolCallToArtifacts({
+        name,
+        status,
+        args,
+        result,
+      });
+
+      if (normalizedTodos.length > 0 || normalizedArtifacts.length > 0) {
+        queueMicrotask(() => {
+          setWorkbenchState((previous) => {
+            const withTodos =
+              normalizedTodos.length > 0
+                ? replaceWorkbenchTodos(previous, normalizedTodos)
+                : previous;
+            const withArtifacts = normalizedArtifacts.length > 0
+              ? appendWorkbenchArtifacts(withTodos, normalizedArtifacts)
+              : withTodos;
+            const summary = extractFinalSummary(result);
+            return summary
+              ? {
+                  ...withArtifacts,
+                  finalSummary: summary,
+                  updatedAt: Date.now(),
+                }
+              : withArtifacts;
+          });
+        });
+      }
+
       // Track write_todos tool calls
       if (name === "write_todos" && status === "complete" && args?.todos) {
         const newTodos = (args.todos as Array<{ content: string; status?: string }>).map(
@@ -157,7 +201,6 @@ function HomePageContent() {
         );
         queueMicrotask(() => {
           setTodos((prev) => [...prev, ...newTodos]);
-          setTasksOpen(true);
         });
       }
 
@@ -234,6 +277,10 @@ function HomePageContent() {
 
   const [threads, setThreads] = useState<LocalThread[]>(seedThreads);
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [workbenchState, setWorkbenchState] = useState<ThreadWorkbenchState>(
+    () => createEmptyWorkbenchState(),
+  );
+  const [loadedWorkbenchThreadId, setLoadedWorkbenchThreadId] = useState<string | null>(null);
 
   // Persist threads to localStorage on change
   useEffect(() => {
@@ -255,6 +302,48 @@ function HomePageContent() {
       null
     );
   }, [activeThread]);
+  const { agent } = useAgent({
+    agentId: activeThread?.presetId,
+  });
+
+  useEffect(() => {
+    if (!activeThread) return;
+    setLoadedWorkbenchThreadId(null);
+    setWorkbenchState(loadWorkbenchState(activeThread.id));
+    setLoadedWorkbenchThreadId(activeThread.id);
+  }, [activeThread]);
+
+  useEffect(() => {
+    if (!activeThread) return;
+    if (loadedWorkbenchThreadId !== activeThread.id) return;
+    saveWorkbenchState(activeThread.id, workbenchState);
+  }, [activeThread, loadedWorkbenchThreadId, workbenchState]);
+
+  useEffect(() => {
+    if (!agent) return;
+
+    const latestUserMessage = [...agent.messages]
+      .reverse()
+      .find((message) => message.role === "user");
+
+    if (!latestUserMessage) return;
+
+    const content = Array.isArray(latestUserMessage.content)
+      ? latestUserMessage.content.join(" ")
+      : String(latestUserMessage.content ?? "");
+    const taskKind = inferTaskKindFromMessage(content);
+
+    setWorkbenchState((previous) => {
+      if (previous.taskKind === taskKind) {
+        return previous;
+      }
+      return {
+        ...previous,
+        taskKind,
+        updatedAt: Date.now(),
+      };
+    });
+  }, [agent, agent?.messages]);
 
   // Share workspace context with the agent
   const workspaceContext = useMemo(
@@ -336,17 +425,6 @@ function HomePageContent() {
               Threads
             </Button>
           )}
-          {!filesPanel && (todos.length > 0 || files.length > 0) && (
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => setFilesPanel("1")}
-              className="gap-2 text-xs text-muted-foreground"
-            >
-              <ClipboardList className="h-4 w-4" />
-              Tasks ({todos.length})
-            </Button>
-          )}
         </div>
         <div className="flex items-center gap-2">
           <ThemeToggle />
@@ -396,7 +474,16 @@ function HomePageContent() {
           </ResizablePanel>
           {sidebar && <ResizableHandle />}
 
-          <ResizablePanel id="chat" order={2}>
+          <ResizablePanel id="timeline" order={2} defaultSize={22} minSize={18}>
+            <TaskTimelinePanel
+              taskKind={workbenchState.taskKind}
+              todos={workbenchState.todos}
+            />
+          </ResizablePanel>
+
+          <ResizableHandle />
+
+          <ResizablePanel id="chat" order={3}>
             <div className="flex h-full flex-col">
               {/* Model / Permission bar */}
               <div className="flex items-center gap-2 border-b border-border px-4 py-2">
@@ -436,62 +523,20 @@ function HomePageContent() {
             </div>
           </ResizablePanel>
 
-          {filesPanel && (todos.length > 0 || files.length > 0) && (
-            <>
-              <ResizableHandle />
-              <ResizablePanel
-                id="tasks-files"
-                order={3}
-                defaultSize={20}
-                minSize={15}
-                className="min-w-[240px]"
-              >
-                <div className="flex h-full flex-col">
-                  <div className="flex items-center justify-between border-b border-border px-3 py-2">
-                    <div className="flex gap-2">
-                      <button
-                        onClick={() => setActiveTab("tasks")}
-                        className={`text-xs px-2 py-1 rounded transition-colors ${
-                          activeTab === "tasks"
-                            ? "bg-primary/10 text-primary font-medium"
-                            : "text-muted-foreground hover:text-foreground"
-                        }`}
-                      >
-                        Tasks ({todos.length})
-                      </button>
-                      <button
-                        onClick={() => setActiveTab("workspace")}
-                        className={`text-xs px-2 py-1 rounded transition-colors ${
-                          activeTab === "workspace"
-                            ? "bg-primary/10 text-primary font-medium"
-                            : "text-muted-foreground hover:text-foreground"
-                        }`}
-                      >
-                        Workspace
-                      </button>
-                    </div>
-                    <button
-                      onClick={() => setFilesPanel(null)}
-                      className="text-xs text-muted-foreground hover:text-foreground"
-                    >
-                      Close
-                    </button>
-                  </div>
-                  <div className="flex-1 overflow-y-auto scrollbar-pretty">
-                    {activeTab === "tasks" ? (
-                      <TasksFilesSidebar todos={todos} files={files} />
-                    ) : (
-                      <FileBrowser
-                        onOpenFile={handleOpenWorkspaceFile}
-                        changedPaths={new Set(files.map((f) => f.path))}
-                        className="py-2"
-                      />
-                    )}
-                  </div>
-                </div>
-              </ResizablePanel>
-            </>
-          )}
+          <ResizableHandle />
+          <ResizablePanel
+            id="results"
+            order={4}
+            defaultSize={28}
+            minSize={20}
+            className="min-w-[280px]"
+          >
+            <ArtifactResultsPanel
+              artifacts={workbenchState.artifacts}
+              finalSummary={workbenchState.finalSummary}
+              onOpenFile={handleOpenWorkspaceFile}
+            />
+          </ResizablePanel>
         </ResizablePanelGroup>
       </div>
 

@@ -47,4 +47,97 @@ test.describe("Page loads correctly", () => {
     expect(text).toContain('"name":"openai-balanced"');
     expect(text).not.toContain('HTTP 404');
   });
+
+  test("engineering workbench state restores into the timeline panel", async ({ page }) => {
+    const threadId = "e2e-engineering-thread";
+
+    await page.addInitScript(([storedThreadId]) => {
+      window.localStorage.setItem(
+        "deep-agent-666.threads",
+        JSON.stringify([
+          {
+            id: storedThreadId,
+            title: "Engineering thread",
+            presetId: "openai-balanced",
+            updatedAt: Date.now(),
+          },
+        ]),
+      );
+      window.localStorage.setItem(
+        `deep-agent-666.workbench.${storedThreadId}`,
+        JSON.stringify({
+          taskKind: "engineering",
+          todos: [
+            {
+              id: "todo-1",
+              content: "Inspect the repo",
+              status: "in_progress",
+              source: "agent",
+            },
+          ],
+          artifacts: [],
+          finalSummary: null,
+          updatedAt: Date.now(),
+        }),
+      );
+    }, [threadId]);
+
+    await page.goto("/?threadId=e2e-engineering-thread");
+
+    await expect(
+      page.getByRole("heading", { name: "Engineering" }),
+    ).toBeVisible();
+    await expect(page.getByText("Inspect the repo")).toBeVisible();
+  });
+
+  test("research workbench state restores findings into the results panel", async ({ page }) => {
+    const threadId = "e2e-research-thread";
+
+    await page.addInitScript(([storedThreadId]) => {
+      window.localStorage.setItem(
+        "deep-agent-666.threads",
+        JSON.stringify([
+          {
+            id: storedThreadId,
+            title: "Research thread",
+            presetId: "openai-balanced",
+            updatedAt: Date.now(),
+          },
+        ]),
+      );
+      window.localStorage.setItem(
+        `deep-agent-666.workbench.${storedThreadId}`,
+        JSON.stringify({
+          taskKind: "research",
+          todos: [
+            {
+              id: "todo-1",
+              content: "Read SUMMARY.md",
+              status: "completed",
+              source: "agent",
+            },
+          ],
+          artifacts: [
+            {
+              id: "artifact-1",
+              kind: "finding",
+              title: "SUMMARY.md",
+              content: "Key finding",
+              createdAt: Date.now(),
+            },
+          ],
+          finalSummary: "Research complete",
+          updatedAt: Date.now(),
+        }),
+      );
+    }, [threadId]);
+
+    await page.goto("/?threadId=e2e-research-thread");
+
+    await expect(
+      page.getByRole("heading", { name: "Results" }),
+    ).toBeVisible();
+    await expect(page.getByText("Research complete")).toBeVisible();
+    await expect(page.getByText("SUMMARY.md", { exact: true })).toBeVisible();
+  });
 });

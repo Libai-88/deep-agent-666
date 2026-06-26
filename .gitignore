@@ -10,6 +10,7 @@
 /web/data/
 /agent/.venv/
 /agent/uv.lock
+/node_modules/
 /web/.next/
 /web/node_modules/
 /web/playwright-report/
