@@ -96,6 +96,7 @@ import {
 } from "@/lib/retry-run";
 import {
   hasRestorableThreadContext,
+  restoredMessagesIncludePrompt,
   shouldFlagThreadHistoryGap,
 } from "@/lib/thread-history-gap";
 
@@ -927,10 +928,16 @@ function ThreadHistoryGapMonitor({
     }
 
     const messageCount = Array.isArray(agent?.messages) ? agent.messages.length : 0;
+    const restoredPromptPresent = restoredMessagesIncludePrompt(
+      Array.isArray(agent?.messages) ? agent.messages : [],
+      workbenchState.lastUserPrompt,
+    );
     if (!shouldFlagThreadHistoryGap({
       runtimeAvailability,
       hasRestorableContext: restorableContext,
       messageCount,
+      lastUserPrompt: workbenchState.lastUserPrompt,
+      restoredPromptPresent,
     })) {
       setRecoverableError((previous) =>
         previous === "thread_history_unavailable" ? null : previous,
@@ -942,11 +949,17 @@ function ThreadHistoryGapMonitor({
       const nextMessageCount = Array.isArray(agent?.messages)
         ? agent.messages.length
         : 0;
+      const nextRestoredPromptPresent = restoredMessagesIncludePrompt(
+        Array.isArray(agent?.messages) ? agent.messages : [],
+        workbenchState.lastUserPrompt,
+      );
       if (
         shouldFlagThreadHistoryGap({
           runtimeAvailability,
           hasRestorableContext: restorableContext,
           messageCount: nextMessageCount,
+          lastUserPrompt: workbenchState.lastUserPrompt,
+          restoredPromptPresent: nextRestoredPromptPresent,
         })
       ) {
         setRecoverableError((previous) =>
@@ -968,6 +981,7 @@ function ThreadHistoryGapMonitor({
     restorableContext,
     runtimeAvailability,
     setRecoverableError,
+    workbenchState.lastUserPrompt,
   ]);
 
   return null;

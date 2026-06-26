@@ -1,6 +1,6 @@
 # Deep Agent 666 — 当前状态
 
-> 最后更新：2026-06-27 (V1 完成，V2 release hardening 完成，V3 首用引导完成，V4 本地持久化线程运行时完成，V5 live provider activation 完成，V6 first response roundtrip 完成，V7 provider alignment/runtime recovery 完成，V8 runtime failure normalization 完成，V9 retry replay recovery 完成，V10 thread history gap recovery 完成)
+> 最后更新：2026-06-27 (V1 完成，V2 release hardening 完成，V3 首用引导完成，V4 本地持久化线程运行时完成，V5 live provider activation 完成，V6 first response roundtrip 完成，V7 provider alignment/runtime recovery 完成，V8 runtime failure normalization 完成，V9 retry replay recovery 完成，V10 thread history gap recovery 完成，V11 thread history drift recovery 完成)
 
 ## 当前结论
 
@@ -14,9 +14,9 @@
 | 套件 | 数量 | 状态 |
 |------|------|------|
 | 后端 (pytest) | 59 | ✅ 全通过 |
-| 前端 (vitest) | 61 | ✅ 全通过 |
+| 前端 (vitest) | 63 | ✅ 全通过 |
 | Build (next build) | — | ✅ |
-| E2E (playwright) | 11 | ✅ 全通过 |
+| E2E (playwright) | 12 | ✅ 全通过 |
 | Docker Compose 配置校验 | — | ⚠️ 当前机器未安装 `docker`，未执行命令级验证 |
 
 ## 已完成
@@ -78,6 +78,11 @@
 - 产品不再把这类场景静默渲染成“像是空线程”，而是明确提示这通常来自 backend restart 或线程数据库重置
 - 浏览器回归已证明：用户可直接从该状态点击 `Retry last task` 或新建线程继续工作
 
+### V11: Thread History Drift Recovery ✅
+- 如果 runtime 只恢复出部分旧消息、但缺少本地持久化的最后一条任务，页面现在也会识别为 `thread_history_unavailable`
+- 产品不再把“恢复出一些旧消息”误判为线程已经健康，而是继续提示这是一个可恢复的历史漂移场景
+- 浏览器回归已证明：用户可从部分历史漂移状态直接重放最后一条任务
+
 ## 关键提交
 
 | Commit | 说明 |
@@ -92,6 +97,6 @@
 
 ## 下一步
 
-- 下一阶段重点不再是恢复线程的产品层提示，而是把真实 backend restart/resume、线程消息恢复验证、以及更深层 runtime path 的一致性继续补齐。
+- 下一阶段重点不再是恢复线程的产品层提示，而是把真实 backend restart/resume、完整线程消息恢复验证、以及更深层 runtime path 的一致性继续补齐。
 - 完成标准是：真实模型失败与成功路径在所有主要入口都能稳定结束，并且新手能基于产品内提示完成恢复而不是靠猜。
 - 文档中若仍出现旧的 `openrouter/free`、或把 OpenAI 默认路径与 OpenRouter 混写的表述，应以本页和最新提交为准。
