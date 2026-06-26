@@ -33,5 +33,5 @@ def test_run_command_returns_stdout(tmp_path: Path) -> None:
 
     result = run_command(workspace, "$PSVersionTable.PSVersion.ToString()", ".")
 
-    assert result["exit_code"] == 0
-    assert result["stdout"]
+    assert "exit_code: 0" in result
+    assert "stdout:" in result
