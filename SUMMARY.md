@@ -19,6 +19,7 @@
 - `V13` 已为主 `[[...slug]]` 路由补齐 preset catalog 本地缓存回退，`/presets` 临时不可达时仍可恢复已持久化线程。
 - `V14` 已补齐 coordinator starter flow 的浏览器回归，并把 timeline 状态文案改为更适合新手理解的形式。
 - `V15` 已把 runtime 配置收口到同源 `/api/runtime-config`，并让新手可在 Settings 中直接查看和切换 workspace root。
+- `V16` 已补齐 coordinator 完成线程在页面刷新后的健康恢复浏览器回归，证明 restored chat 与本地 workbench 面板可以连续对齐。
 
 ---
 
@@ -64,7 +65,7 @@ CopilotRuntime (Next.js route handler)
 | 后端 pytest | **61** | ✅ 全通过 |
 | 前端 vitest | **72** | ✅ 全通过 |
 | Next.js build | — | ✅ 无错误 |
-| E2E (playwright) | **14** | ✅ 全通过 |
+| E2E (playwright) | **15** | ✅ 全通过 |
 | Docker Compose 配置校验 | — | ⚠️ 当前机器未安装 `docker`，未执行命令级验证 |
 
 ---
@@ -214,7 +215,7 @@ Python FastAPI:
 |------|------|------|
 | 后端测试 ≥ 50 | 61 ✅ | 已达标 |
 | 前端测试 ≥ 20 | 72 ✅ | 已达标 |
-| E2E ≥ 5 条 | 14 ✅ | 已达标 |
+| E2E ≥ 5 条 | 15 ✅ | 已达标 |
 | 0 个 Console Error | 有 Inspector 警告 | SDK 升级 |
 | Docker 部署 | ❌ | Dockerfile + compose |
 | Windows 桌面壳 | ❌ | Electron wrapper |
@@ -251,6 +252,7 @@ V12 基线提交: `d5b5508` — runtime persistence proof baseline
 V13 基线提交: `898172a` — runtime catalog fallback baseline
 V14 基线提交: `见最新提交` — coordinator workbench regression baseline
 V15 基线提交: `见最新提交` — runtime config workspace-root baseline
+V16 基线提交: `见最新提交` — coordinator restored-thread continuity baseline
 
 日志：
 ```

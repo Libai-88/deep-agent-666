@@ -1,6 +1,6 @@
 # Deep Agent 666 — 当前状态
 
-> 最后更新：2026-06-27 (V1 完成，V2 release hardening 完成，V3 首用引导完成，V4 本地持久化线程运行时完成，V5 live provider activation 完成，V6 first response roundtrip 完成，V7 provider alignment/runtime recovery 完成，V8 runtime failure normalization 完成，V9 retry replay recovery 完成，V10 thread history gap recovery 完成，V11 thread history drift recovery 完成，V12 runtime persistence proof 完成，V13 runtime catalog fallback 完成，V14 coordinator workbench regression 完成，V15 runtime-config workspace root 完成)
+> 最后更新：2026-06-27 (V1 完成，V2 release hardening 完成，V3 首用引导完成，V4 本地持久化线程运行时完成，V5 live provider activation 完成，V6 first response roundtrip 完成，V7 provider alignment/runtime recovery 完成，V8 runtime failure normalization 完成，V9 retry replay recovery 完成，V10 thread history gap recovery 完成，V11 thread history drift recovery 完成，V12 runtime persistence proof 完成，V13 runtime catalog fallback 完成，V14 coordinator workbench regression 完成，V15 runtime-config workspace root 完成，V16 coordinator restored-thread continuity 完成)
 
 ## 当前结论
 
@@ -16,7 +16,7 @@
 | 后端 (pytest) | 61 | ✅ 全通过 |
 | 前端 (vitest) | 72 | ✅ 全通过 |
 | Build (next build) | — | ✅ |
-| E2E (playwright) | 14 | ✅ 全通过 |
+| E2E (playwright) | 15 | ✅ 全通过 |
 | Docker Compose 配置校验 | — | ⚠️ 当前机器未安装 `docker`，未执行命令级验证 |
 
 ## 已完成
@@ -102,6 +102,11 @@
 - 产品层新增同源 `/api/runtime-config` 路由，设置读写不再让浏览器直接调用 `127.0.0.1:8123/configure`
 - Settings 现在会加载当前 runtime 配置，并允许新手直接查看和切换 active workspace root
 - FastAPI runtime 现已支持 `GET /config` 快照和 `agent_workspace_root` 热更新校验，非法路径会返回专用错误码
+
+### V16: Coordinator Restored Thread Continuity ✅
+- 浏览器回归现已覆盖 coordinator 完成线程的健康恢复路径，而不只覆盖缺历史时的恢复告警
+- 新增场景证明：同一线程在刷新后可以同时恢复 chat 历史、timeline 任务和 results summary
+- 页面不会把“最新 prompt 已恢复”的健康线程误判成 `thread_history_unavailable`
 
 ## 关键提交
 
