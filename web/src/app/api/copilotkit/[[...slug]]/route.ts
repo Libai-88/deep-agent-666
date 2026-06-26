@@ -34,6 +34,8 @@ function buildAgents(catalog: AgentPresetCatalog) {
 const runtime = new CopilotRuntime({
   agents: buildAgents(STATIC_AGENT_PRESET_CATALOG),
   runner: new InMemoryAgentRunner(),
+  a2ui: {},
+  openGenerativeUI: true,
 });
 
 const handler = createCopilotRuntimeHandler({
