@@ -17,8 +17,8 @@ def test_provider_integrations_exist_for_advertised_presets() -> None:
 
 def test_build_model_kwargs_openai(monkeypatch) -> None:
     """_build_model_kwargs returns correct kwargs for OpenAI provider."""
-    monkeypatch.delenv("OPENAI_BASE_URL", raising=False)
-    settings = AgentSettings.model_validate({"OPENAI_API_KEY": "sk-test"})
+    monkeypatch.setenv("OPENAI_BASE_URL", "")
+    settings = AgentSettings.model_validate({"OPENAI_API_KEY": "sk-test", "OPENAI_BASE_URL": ""})
     kwargs = _build_model_kwargs("openai", "sk-test", settings)
     assert kwargs["api_key"] == "sk-test"
     assert "base_url" not in kwargs  # no custom base URL
