@@ -103,7 +103,7 @@ test("first run configure launches and renders the first assistant response", as
   });
 
   await page.route(
-    "**/api/copilotkit/agent/coordinator-openai-balanced/run",
+    "**/api/copilotkit/agent/**/run",
     async (route) => {
       const requestBody = route.request().postDataJSON() as {
         threadId?: string;
@@ -119,6 +119,14 @@ test("first run configure launches and renders the first assistant response", as
       });
     },
   );
+
+  await page.route("**/api/copilotkit/agent/**/connect", async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: "text/event-stream",
+      body: ": connected\n\n",
+    });
+  });
 
   await page.goto("/");
   await page.waitForLoadState("networkidle");

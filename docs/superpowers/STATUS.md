@@ -1,6 +1,6 @@
 # Deep Agent 666 — 当前状态
 
-> 最后更新：2026-06-27 (V1 完成，V2 release hardening 完成，V3 首用引导完成，V4 本地持久化线程运行时完成，V5 live provider activation 完成，V6 first response roundtrip 完成)
+> 最后更新：2026-06-27 (V1 完成，V2 release hardening 完成，V3 首用引导完成，V4 本地持久化线程运行时完成，V5 live provider activation 完成，V6 first response roundtrip 完成，V7 provider alignment/runtime recovery 完成)
 
 ## 当前结论
 
@@ -13,8 +13,8 @@
 
 | 套件 | 数量 | 状态 |
 |------|------|------|
-| 后端 (pytest) | 55 | ✅ 全通过 |
-| 前端 (vitest) | 45 | ✅ 全通过 |
+| 后端 (pytest) | 56 | ✅ 全通过 |
+| 前端 (vitest) | 49 | ✅ 全通过 |
 | Build (next build) | — | ✅ |
 | E2E (playwright) | 9 | ✅ 全通过 |
 | Docker Compose 配置校验 | — | ⚠️ 当前机器未安装 `docker`，未执行命令级验证 |
@@ -58,6 +58,11 @@
 - 首用路径已覆盖：未配置 -> 保存 provider -> starter -> assistant 首条响应
 - 浏览器回归使用确定性的 AG-UI text-response fixture，不依赖外部模型可用性
 
+### V7: Provider Alignment And Runtime Recovery ✅
+- OpenAI 预设不再指向 `openrouter/free`，改为真实 OpenAI 模型 `gpt-4.1-mini`
+- 运行时错误从单一 `runtime_request_failed` 扩展为配额受限 / 模型不匹配 / 鉴权失败等可恢复状态
+- 首个真实 provider run 的错误诊断不再与 provider 文案自相矛盾
+
 ## 关键提交
 
 | Commit | 说明 |
@@ -68,9 +73,10 @@
 | `380b84c` | `test(v3): cover onboarding launch path` |
 | `6788bd5` | `feat(v4): add durable local thread runtime` |
 | `c1217ee` | `feat(v5): activate providers live without restart` |
+| `03171bc` | `feat(v6): prove first-run response roundtrip` |
 
 ## 下一步
 
-- 下一阶段已经不是“补完 V1”，而是解决真实外部 provider 下的 SDK 协议兼容。
-- 完成标准是：去掉 `INCOMPLETE_STREAM` 特判后，真实模型对话也能稳定结束且无额外 console/runtime 错误。
-- 文档中若仍出现旧的 “同页配置后仍需手动刷新 / 首用路径只验证到 shell” 表述，应以本页和最新提交为准。
+- 下一阶段重点不再是 preset/provider 一致性，而是把真实上游 provider 失败进一步收敛为更稳定的 AG-UI 结束语义。
+- 完成标准是：真实模型失败与成功路径都能稳定结束，且浏览器端不再依赖泛化流错误兜底。
+- 文档中若仍出现旧的 `openrouter/free`、或把 OpenAI 默认路径与 OpenRouter 混写的表述，应以本页和最新提交为准。

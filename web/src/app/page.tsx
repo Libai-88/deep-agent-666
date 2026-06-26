@@ -75,6 +75,7 @@ import {
 } from "@/lib/first-run-state";
 import {
   resolveRecoverableActions,
+  resolveRecoverableErrorCode,
   type RecoverableAction,
   type RecoverableErrorCode,
 } from "@/lib/runtime-errors";
@@ -211,9 +212,9 @@ function HomePageContent() {
     }
 
     const handleRuntimeError = (event: Event) => {
-      const detail = (event as CustomEvent<{ source?: string }>).detail;
+      const detail = (event as CustomEvent<{ source?: string; event?: unknown }>).detail;
       if (detail?.source === "copilotkit") {
-        setRecoverableError("runtime_request_failed");
+        setRecoverableError(resolveRecoverableErrorCode(detail.event ?? detail));
       }
     };
 
@@ -561,7 +562,9 @@ function HomePageContent() {
                       key={pendingThreadRun.id}
                       run={pendingThreadRun}
                       onComplete={() => setPendingThreadRun(null)}
-                      onError={() => setRecoverableError("runtime_request_failed")}
+                      onError={(error) =>
+                        setRecoverableError(resolveRecoverableErrorCode(error))
+                      }
                     />
                   ) : null}
                   <ActiveThreadChat
@@ -660,7 +663,7 @@ function PendingThreadRunController({
 }: {
   run: PendingThreadRun;
   onComplete: () => void;
-  onError: () => void;
+  onError: (error: unknown) => void;
 }) {
   const launchedRef = useRef(false);
   const { agent } = useAgent({
@@ -686,8 +689,8 @@ function PendingThreadRunController({
 
     void copilotkit
       .runAgent({ agent })
-      .catch(() => {
-        onError();
+      .catch((error: unknown) => {
+        onError(error);
       })
       .finally(() => {
         onComplete();
@@ -1071,6 +1074,24 @@ function resolveRecoverablePresentation(
         title: "Thread unavailable",
         description:
           "The selected thread is missing or no longer matches an available preset. Create a fresh thread to continue.",
+      };
+    case "provider_rate_limited":
+      return {
+        title: "Provider limit reached",
+        description:
+          "The current provider key hit a quota or rate limit. Retry later or open settings and switch credentials.",
+      };
+    case "provider_model_unavailable":
+      return {
+        title: "Provider model mismatch",
+        description:
+          "The selected provider rejected the configured model. Reopen settings and verify the provider key and base URL match the preset.",
+      };
+    case "provider_auth_failed":
+      return {
+        title: "Provider authentication failed",
+        description:
+          "The upstream provider rejected the current API key. Reopen settings and verify the active credentials.",
       };
     case "runtime_request_failed":
       return {

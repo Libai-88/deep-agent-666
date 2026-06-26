@@ -25,8 +25,17 @@ def test_all_model_permission_pairs_exist() -> None:
 
 def test_get_preset_returns_metadata() -> None:
     preset = get_preset("openai-balanced")
-    assert preset.model == "openai:openrouter/free"
+    assert preset.model == "openai:gpt-4.1-mini"
     assert preset.permission_mode == "balanced"
+
+
+def test_openai_presets_use_openai_models() -> None:
+    for preset_id, preset in ALL_PRESETS.items():
+        if not preset_id.startswith("openai-"):
+            continue
+
+        assert preset.model.startswith("openai:")
+        assert "openrouter/" not in preset.model
 
 
 def test_agent_settings_reads_expected_environment_variables(monkeypatch) -> None:

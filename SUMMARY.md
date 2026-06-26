@@ -9,7 +9,8 @@
 - `V3` 已在 `380b84c test(v3): cover onboarding launch path` 收口并推送远端。
 - `V4` 已在 `6788bd5 feat(v4): add durable local thread runtime` 完成并推送远端。
 - `V5` 已完成 live provider activation，当前主分支状态不应再解读为 “V1 未完成”。
-- `V6` 已补齐同页配置后的首条响应闭环，当前重点已转到真实 provider 下的 SDK 协议兼容。
+- `V6` 已补齐同页配置后的首条响应闭环。
+- `V7` 已修正 OpenAI preset/provider 不一致，并补齐基础运行时错误分型。
 
 ---
 
@@ -52,8 +53,8 @@ CopilotRuntime (Next.js route handler)
 
 | 套件 | 数量 | 状态 |
 |------|------|------|
-| 后端 pytest | **55** | ✅ 全通过 |
-| 前端 vitest | **45** | ✅ 全通过 |
+| 后端 pytest | **56** | ✅ 全通过 |
+| 前端 vitest | **49** | ✅ 全通过 |
 | Next.js build | — | ✅ 无错误 |
 | E2E (playwright) | **9** | ✅ 全通过 |
 | Docker Compose 配置校验 | — | ⚠️ 当前机器未安装 `docker`，未执行命令级验证 |
@@ -183,7 +184,7 @@ Python FastAPI:
 
 | 问题 | 优先级 | 说明 | 必须修？ |
 |------|--------|------|---------|
-| SDK 版本不匹配 (0.1.x / 1.61.x) | 🔴 P0 | Python SDK 0.1.x 与 JS SDK 1.61.x 协议差异 | 是 — 升级 SDK 后修复 |
+| 真实 provider 失败未完全结构化 | 🔴 P0 | V7 已解决 preset/provider 错配，但上游失败仍可能以流中断而不是完整 AG-UI 结束语义暴露 | 是 — 下一阶段继续收敛 |
 | #4 同步 invoke 阻塞事件循环 | 🟡 P2 | LangGraph 工具同步设计，长命令影响性能 | 否 — LangGraph 设计特性 |
 | #6 预设双端维护 | 🟡 P3 | 新增预设需改 Python + TS 两处 | 否 — 有注释指引 |
 | A2UI 未与 Python 工具对接 | 🟡 P3 | 前端 catalog 就绪，coordinator 工具未调用 `a2ui.render()` | 否 — 阶段 B 未完成部分 |
@@ -191,7 +192,7 @@ Python FastAPI:
 | interrupt_on 已禁用 | 🟡 P3 | 去掉后才无 Console Error | 建议修 — 需审批流程时恢复 |
 | Inspector `{}` 解析警告 | 🟢 P4 | `[CopilotKit Inspector] Failed to parse tool-call result content {}` | 否 — SDK 升级后解决 |
 | 运行时恢复回归覆盖不足 | 🟡 P2 | 已切到 SQLite，但还缺“重启后继续线程”的更深 E2E | 建议补 — 属于 V4 后续验证 |
-| 真实 provider 对话仍可能触发 `INCOMPLETE_STREAM` | 🔴 P0 | 浏览器级首用闭环已补齐，但真实外部模型链路仍受 Python 0.1.x / JS 1.61.x 协议差异影响 | 必须修 — 属于下一阶段 |
+| 真实 provider 对话失败的流语义仍不够稳定 | 🔴 P0 | 浏览器端现在能把配额 / 模型 / 鉴权错误分型提示给用户，但底层仍需更稳定的结束事件语义 | 必须修 — 属于下一阶段 |
 
 ---
 
@@ -211,7 +212,7 @@ Python FastAPI:
 ### 建议优先级
 
 ```
-P0: 升级 SDK 统一协议版本（解决 INCOMPLETE_STREAM + Inspector 警告）
+P0: 继续收敛真实 provider 失败的 AG-UI 结束语义（必要时再评估 SDK 升级）
 P1: CI 打通 E2E 测试（让 smoke/chat round-trip 自动运行）
 P2: 补 Docker 部署方案
 P3: 恢复 interrupt_on + 修复空结果

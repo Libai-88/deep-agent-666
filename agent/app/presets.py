@@ -17,19 +17,19 @@ ALL_PRESETS: dict[str, AgentPreset] = {
     "openai-read-only": AgentPreset(
         id="openai-read-only",
         label="OpenAI / Read-only",
-        model="openai:openrouter/free",
+        model="openai:gpt-4.1-mini",
         permission_mode=PermissionMode.READ_ONLY,
     ),
     "openai-balanced": AgentPreset(
         id="openai-balanced",
         label="OpenAI / Balanced",
-        model="openai:openrouter/free",
+        model="openai:gpt-4.1-mini",
         permission_mode=PermissionMode.BALANCED,
     ),
     "openai-full-access": AgentPreset(
         id="openai-full-access",
         label="OpenAI / Full access",
-        model="openai:openrouter/free",
+        model="openai:gpt-4.1-mini",
         permission_mode=PermissionMode.FULL_ACCESS,
     ),
     "anthropic-read-only": AgentPreset(
