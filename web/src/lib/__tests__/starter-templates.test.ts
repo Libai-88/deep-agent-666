@@ -25,11 +25,17 @@ describe("starter-templates", () => {
   });
 
   it("seeds a clean workbench state for the selected task kind", () => {
-    const state = seedWorkbenchForStarterTemplate("research");
+    const state = seedWorkbenchForStarterTemplate(
+      "research",
+      "Read the workspace docs and summarize them.",
+    );
 
     expect(state.taskKind).toBe("research");
     expect(state.todos).toEqual([]);
     expect(state.artifacts).toEqual([]);
     expect(state.finalSummary).toBeNull();
+    expect(state.lastUserPrompt).toBe(
+      "Read the workspace docs and summarize them.",
+    );
   });
 });

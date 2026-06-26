@@ -85,9 +85,11 @@ export function createStarterThread(
 
 export function seedWorkbenchForStarterTemplate(
   taskKind: WorkbenchTaskKind,
+  lastUserPrompt: string | null = null,
 ): ThreadWorkbenchState {
   return {
     ...createEmptyWorkbenchState(),
     taskKind,
+    lastUserPrompt,
   };
 }

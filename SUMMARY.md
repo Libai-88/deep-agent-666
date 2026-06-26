@@ -12,6 +12,7 @@
 - `V6` 已补齐同页配置后的首条响应闭环。
 - `V7` 已修正 OpenAI preset/provider 不一致，并补齐基础运行时错误分型。
 - `V8` 已把真实 provider 异常收敛为协议合法的 `RUN_ERROR` 终止流。
+- `V9` 已把 `Retry last task` 做成可持久化重放，恢复线程在刷新后也能重试上一个任务。
 
 ---
 
@@ -55,9 +56,9 @@ CopilotRuntime (Next.js route handler)
 | 套件 | 数量 | 状态 |
 |------|------|------|
 | 后端 pytest | **59** | ✅ 全通过 |
-| 前端 vitest | **51** | ✅ 全通过 |
+| 前端 vitest | **56** | ✅ 全通过 |
 | Next.js build | — | ✅ 无错误 |
-| E2E (playwright) | **9** | ✅ 全通过 |
+| E2E (playwright) | **10** | ✅ 全通过 |
 | Docker Compose 配置校验 | — | ⚠️ 当前机器未安装 `docker`，未执行命令级验证 |
 
 ---
@@ -185,7 +186,7 @@ Python FastAPI:
 
 | 问题 | 优先级 | 说明 | 必须修？ |
 |------|--------|------|---------|
-| 更深层 runtime path 恢复体验仍待统一 | 🔴 P0 | V8 已解决直连 Python AG-UI 路由的崩流问题，但跨入口恢复 UX、resume/restart 证明仍可继续加强 | 是 — 下一阶段继续收敛 |
+| 更深层 runtime path 恢复体验仍待统一 | 🔴 P0 | V9 已让 `Retry last task` 可持久化重放，但跨入口真实 backend restart/resume 证明仍可继续加强 | 是 — 下一阶段继续收敛 |
 | #4 同步 invoke 阻塞事件循环 | 🟡 P2 | LangGraph 工具同步设计，长命令影响性能 | 否 — LangGraph 设计特性 |
 | #6 预设双端维护 | 🟡 P3 | 新增预设需改 Python + TS 两处 | 否 — 有注释指引 |
 | A2UI 未与 Python 工具对接 | 🟡 P3 | 前端 catalog 就绪，coordinator 工具未调用 `a2ui.render()` | 否 — 阶段 B 未完成部分 |
@@ -193,7 +194,7 @@ Python FastAPI:
 | interrupt_on 已禁用 | 🟡 P3 | 去掉后才无 Console Error | 建议修 — 需审批流程时恢复 |
 | Inspector `{}` 解析警告 | 🟢 P4 | `[CopilotKit Inspector] Failed to parse tool-call result content {}` | 否 — SDK 升级后解决 |
 | 运行时恢复回归覆盖不足 | 🟡 P2 | 已切到 SQLite，但还缺“重启后继续线程”的更深 E2E | 建议补 — 属于 V4 后续验证 |
-| 线程恢复与更深层入口回归覆盖仍不足 | 🔴 P0 | 当前已证明直连路由错误能以 `RUN_ERROR` 终止，但更深层 runtime path 和重启后恢复还缺更强证明 | 必须修 — 属于下一阶段 |
+| 线程恢复与更深层入口回归覆盖仍不足 | 🔴 P0 | 当前已证明恢复线程可以重放上一个任务，但真实 backend 重启后的消息恢复与跨入口一致性还缺更强证明 | 必须修 — 属于下一阶段 |
 
 ---
 
@@ -213,7 +214,7 @@ Python FastAPI:
 ### 建议优先级
 
 ```
-P0: 继续补齐恢复 UX、线程恢复与更深层 runtime path 的一致性验证
+P0: 继续补齐真实 backend restart/resume 与更深层 runtime path 的一致性验证
 P1: CI 打通 E2E 测试（让 smoke/chat round-trip 自动运行）
 P2: 补 Docker 部署方案
 P3: 恢复 interrupt_on + 修复空结果
@@ -237,7 +238,7 @@ v1-complete    — 全部基础功能就绪
 gaps-complete  — 差距补齐 + 代码审计修复完成
 ```
 
-最新提交: `69d6d96` — V2 release hardening baseline
+最新提交: `e0da41e` — V8 runtime failure normalization baseline
 
 日志：
 ```

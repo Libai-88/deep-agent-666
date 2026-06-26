@@ -22,6 +22,7 @@ describe("workbench-state", () => {
       {
         ...first,
         finalSummary: "engineering summary",
+        lastUserPrompt: "Inspect the repository",
       },
       storage,
     );
@@ -30,6 +31,7 @@ describe("workbench-state", () => {
       {
         ...second,
         finalSummary: "research summary",
+        lastUserPrompt: "Summarize the docs",
       },
       storage,
     );
@@ -37,9 +39,33 @@ describe("workbench-state", () => {
     expect(loadWorkbenchState("thread-a", storage).finalSummary).toBe(
       "engineering summary",
     );
+    expect(loadWorkbenchState("thread-a", storage).lastUserPrompt).toBe(
+      "Inspect the repository",
+    );
     expect(loadWorkbenchState("thread-b", storage).finalSummary).toBe(
       "research summary",
     );
+    expect(loadWorkbenchState("thread-b", storage).lastUserPrompt).toBe(
+      "Summarize the docs",
+    );
+  });
+
+  it("backfills the retry prompt field when older local state is restored", () => {
+    const storage = window.localStorage;
+    storage.clear();
+
+    storage.setItem(
+      "deep-agent-666.workbench.thread-legacy",
+      JSON.stringify({
+        taskKind: "general",
+        todos: [],
+        artifacts: [],
+        finalSummary: "legacy summary",
+        updatedAt: 1,
+      }),
+    );
+
+    expect(loadWorkbenchState("thread-legacy", storage).lastUserPrompt).toBeNull();
   });
 
   it("replaces todos and appends artifacts without mutating the original state", () => {

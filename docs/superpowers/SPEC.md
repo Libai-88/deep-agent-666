@@ -34,7 +34,7 @@
 | 前端 | Next.js 16 + React 19 + @copilotkit/react-core v2 |
 | 代理层 | @ag-ui/client HttpAgent + createCopilotRuntimeHandler |
 | UI | shadcn/ui + Tailwind v4 + lucide-react |
-| 测试 | pytest (59) + vitest (51) |
+| 测试 | pytest (59) + vitest (56) + playwright (10) |
 
 ## 关键决策
 
@@ -50,6 +50,6 @@
 
 | 问题 | P级 | 说明 |
 |------|-----|------|
-| 更深层 runtime path 仍待统一恢复体验 | P0 | V8 已修正直连 Python AG-UI 路由的失败终止语义，但更深层入口的恢复 UX 与 restart/resume 仍可继续硬化 |
+| 更深层 runtime path 仍待统一恢复体验 | P0 | V9 已让 `Retry last task` 具备持久化重放能力，但更深层入口的真实 backend restart/resume 与消息恢复仍可继续硬化 |
 | DataChart 组件 | P1 | V2 spec 可选组件，未实现 |
-| 更深层对话恢复验证 | P1 | 已启用 `SqliteAgentRunner`，但仍需要更完整的对话恢复与重启回归验证 |
+| 更深层对话恢复验证 | P1 | 已启用 `SqliteAgentRunner`，并覆盖了恢复线程的 prompt 重放，但仍需要更完整的对话恢复与重启回归验证 |

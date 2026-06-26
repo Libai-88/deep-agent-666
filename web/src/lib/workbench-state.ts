@@ -22,6 +22,7 @@ export type ThreadWorkbenchState = {
   todos: WorkbenchTodo[];
   artifacts: WorkbenchArtifact[];
   finalSummary: string | null;
+  lastUserPrompt: string | null;
   updatedAt: number;
 };
 
@@ -33,6 +34,7 @@ export function createEmptyWorkbenchState(): ThreadWorkbenchState {
     todos: [],
     artifacts: [],
     finalSummary: null,
+    lastUserPrompt: null,
     updatedAt: Date.now(),
   };
 }
@@ -47,7 +49,13 @@ export function loadWorkbenchState(
   }
 
   try {
-    return JSON.parse(raw) as ThreadWorkbenchState;
+    const parsed = JSON.parse(raw) as Partial<ThreadWorkbenchState>;
+    return {
+      ...createEmptyWorkbenchState(),
+      ...parsed,
+      lastUserPrompt:
+        typeof parsed.lastUserPrompt === "string" ? parsed.lastUserPrompt : null,
+    };
   } catch {
     return createEmptyWorkbenchState();
   }

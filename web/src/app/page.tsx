@@ -90,6 +90,10 @@ import {
   type StarterTemplate,
   seedWorkbenchForStarterTemplate,
 } from "@/lib/starter-templates";
+import {
+  extractLatestUserPrompt,
+  resolvePendingRunPrompt,
+} from "@/lib/retry-run";
 
 export default function HomePage() {
   return (
@@ -329,7 +333,10 @@ function HomePageContent() {
       }
 
       const thread = createStarterThread(presetId, template);
-      const seededWorkbench = seedWorkbenchForStarterTemplate(template.category);
+      const seededWorkbench = seedWorkbenchForStarterTemplate(
+        template.category,
+        template.prompt,
+      );
 
       saveWorkbenchState(thread.id, seededWorkbench);
       setThreads((previous) => [thread, ...previous]);
@@ -371,11 +378,18 @@ function HomePageContent() {
             id: crypto.randomUUID(),
             threadId: activeThread.id,
             agentId: activeAgentId,
+            prompt: workbenchState.lastUserPrompt ?? undefined,
           });
           return;
       }
     },
-    [activeAgentId, activeThread, handleNewThread, reloadCatalogState],
+    [
+      activeAgentId,
+      activeThread,
+      handleNewThread,
+      reloadCatalogState,
+      workbenchState.lastUserPrompt,
+    ],
   );
 
   const settingsPreset =
@@ -678,11 +692,16 @@ function PendingThreadRunController({
 
     launchedRef.current = true;
 
-    if (run.prompt) {
+    const promptToInject = resolvePendingRunPrompt({
+      requestedPrompt: run.prompt,
+      latestUserPrompt: extractLatestUserPrompt(agent.messages ?? []),
+    });
+
+    if (promptToInject) {
       const message: Message = {
         id: crypto.randomUUID(),
         role: "user",
-        content: run.prompt,
+        content: promptToInject,
       };
       agent.addMessage(message);
     }
@@ -890,24 +909,22 @@ function ActiveThreadChat({
   useEffect(() => {
     if (!agent || !Array.isArray(agent.messages)) return;
 
-    const latestUserMessage = [...agent.messages]
-      .reverse()
-      .find((message) => message.role === "user");
+    const latestUserPrompt = extractLatestUserPrompt(agent.messages);
+    if (!latestUserPrompt) return;
 
-    if (!latestUserMessage) return;
-
-    const content = Array.isArray(latestUserMessage.content)
-      ? latestUserMessage.content.join(" ")
-      : String(latestUserMessage.content ?? "");
-    const taskKind = inferTaskKindFromMessage(content);
+    const taskKind = inferTaskKindFromMessage(latestUserPrompt);
 
     setWorkbenchState((previous) => {
-      if (previous.taskKind === taskKind) {
+      if (
+        previous.taskKind === taskKind &&
+        previous.lastUserPrompt === latestUserPrompt
+      ) {
         return previous;
       }
       return {
         ...previous,
         taskKind,
+        lastUserPrompt: latestUserPrompt,
         updatedAt: Date.now(),
       };
     });
@@ -916,16 +933,10 @@ function ActiveThreadChat({
   useEffect(() => {
     if (!agent || !Array.isArray(agent.messages)) return;
 
-    const latestUserMessage = [...agent.messages]
-      .reverse()
-      .find((message) => message.role === "user");
+    const latestUserPrompt = extractLatestUserPrompt(agent.messages);
+    if (!latestUserPrompt) return;
 
-    if (!latestUserMessage) return;
-
-    const content = Array.isArray(latestUserMessage.content)
-      ? latestUserMessage.content.join(" ")
-      : String(latestUserMessage.content ?? "");
-    const nextTitle = deriveThreadTitle(content);
+    const nextTitle = deriveThreadTitle(latestUserPrompt);
 
     setThreads((previous) => {
       const current = previous.find((thread) => thread.id === activeThread.id);

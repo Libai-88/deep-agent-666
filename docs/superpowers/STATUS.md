@@ -1,6 +1,6 @@
 # Deep Agent 666 — 当前状态
 
-> 最后更新：2026-06-27 (V1 完成，V2 release hardening 完成，V3 首用引导完成，V4 本地持久化线程运行时完成，V5 live provider activation 完成，V6 first response roundtrip 完成，V7 provider alignment/runtime recovery 完成，V8 runtime failure normalization 完成)
+> 最后更新：2026-06-27 (V1 完成，V2 release hardening 完成，V3 首用引导完成，V4 本地持久化线程运行时完成，V5 live provider activation 完成，V6 first response roundtrip 完成，V7 provider alignment/runtime recovery 完成，V8 runtime failure normalization 完成，V9 retry replay recovery 完成)
 
 ## 当前结论
 
@@ -14,9 +14,9 @@
 | 套件 | 数量 | 状态 |
 |------|------|------|
 | 后端 (pytest) | 59 | ✅ 全通过 |
-| 前端 (vitest) | 51 | ✅ 全通过 |
+| 前端 (vitest) | 56 | ✅ 全通过 |
 | Build (next build) | — | ✅ |
-| E2E (playwright) | 9 | ✅ 全通过 |
+| E2E (playwright) | 10 | ✅ 全通过 |
 | Docker Compose 配置校验 | — | ⚠️ 当前机器未安装 `docker`，未执行命令级验证 |
 
 ## 已完成
@@ -68,6 +68,11 @@
 - 路由会在异常时补齐未关闭的 text/tool/reasoning frame，再发终止事件，满足 AG-UI 生命周期要求
 - 当前环境下真实 `403` 区域/访问拒绝错误已验证会落成 `RUN_ERROR(code=provider_access_denied)`
 
+### V9: Retry Replay Recovery ✅
+- `Retry last task` 不再依赖易失的运行时内存状态，而是把最后一条可重放用户任务持久化到 thread workbench state
+- starter template 首次启动时会先种下重放 prompt，因此首条任务即使早期失败也能直接恢复
+- 浏览器回归已证明：恢复线程在刷新后收到可恢复错误时，可以点击 `Retry last task` 重放存储的 prompt 并收到新响应
+
 ## 关键提交
 
 | Commit | 说明 |
@@ -82,6 +87,6 @@
 
 ## 下一步
 
-- 下一阶段重点不再是直连 AG-UI 失败终止语义，而是把恢复 UX、线程恢复验证、以及更深层 runtime path 的一致性继续补齐。
+- 下一阶段重点不再是 `Retry last task` 的持久化重放，而是把真实 backend restart/resume、线程消息恢复验证、以及更深层 runtime path 的一致性继续补齐。
 - 完成标准是：真实模型失败与成功路径在所有主要入口都能稳定结束，并且新手能基于产品内提示完成恢复而不是靠猜。
 - 文档中若仍出现旧的 `openrouter/free`、或把 OpenAI 默认路径与 OpenRouter 混写的表述，应以本页和最新提交为准。
