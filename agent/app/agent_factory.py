@@ -14,7 +14,6 @@ from langgraph.checkpoint.memory import MemorySaver
 from langgraph.types import Command
 
 from app.config import AgentSettings, load_settings
-from app.middleware.genui import GenUIMiddleware
 from app.permissions import PermissionMode, mutable_tool_names
 from app.presets import ALL_PRESETS, AgentPreset
 from app.state import CoordinatorState, Delegation

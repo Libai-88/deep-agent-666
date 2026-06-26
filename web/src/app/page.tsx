@@ -50,7 +50,6 @@ import { ToolCallCard } from "@/components/ToolCallCard";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { DelegationLog } from "@/components/DelegationLog";
 import { SupervisorActivityBanner } from "@/components/SupervisorActivityBanner";
-import { DiffViewer } from "@/components/DiffViewer";
 import { FileBrowser } from "@/components/FileBrowser";
 import { FileViewDialog } from "@/components/FileViewDialog";
 
@@ -503,7 +502,6 @@ function HomePageContent() {
         currentPreset={currentPreset}
         onSwitchPreset={handleSwitchPreset}
       />
-      <GenUIRenderer agentId={`coordinator-${activeThread?.presetId ?? "openai-balanced"}`} />
       {previewOpen && previewFile && (
         <FileViewDialog
           file={{ path: previewFile, content: previewLoading ? "// Loading..." : previewContent }}
@@ -511,41 +509,6 @@ function HomePageContent() {
         />
       )}
     </div>
-  );
-}
-
-// ── GenUI Renderer: subscribes to coordinator state for diffs/charts ──
-
-function GenUIRenderer({ agentId }: { agentId: string }) {
-  const { agent } = useAgent({ agentId });
-  const [diffs, setDiffs] = useState<Array<{ filePath: string; before: string; after: string }>>([]);
-
-  useEffect(() => {
-    if (!agent) return;
-    const sub = agent.subscribe({
-      onStateChanged: () => {
-        const s = agent.state as Record<string, unknown>;
-        const diff = s?.genui_diff as { file_path?: string; before?: string; after?: string } | undefined;
-        if (diff?.file_path && diff.before !== undefined && diff.after !== undefined) {
-          setDiffs((prev) => {
-            const exists = prev.some((d) => d.filePath === diff!.file_path);
-            if (exists) return prev;
-            return [...prev, { filePath: diff!.file_path!, before: diff!.before!, after: diff!.after! }];
-          });
-        }
-      },
-    });
-    return () => { try { sub.unsubscribe(); } catch {} };
-  }, [agent]);
-
-  if (diffs.length === 0) return null;
-
-  return (
-    <>
-      {diffs.map((d) => (
-        <DiffViewer key={d.filePath} filePath={d.filePath} before={d.before} after={d.after} />
-      ))}
-    </>
   );
 }
 
