@@ -1,10 +1,19 @@
 from pathlib import Path
+import logging
 
 from fastapi import FastAPI, HTTPException, Query, Request
 from fastapi.responses import JSONResponse, StreamingResponse
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
+from ag_ui.core.events import (
+    EventType,
+    ReasoningMessageEndEvent,
+    RunErrorEvent,
+    RunStartedEvent,
+    TextMessageEndEvent,
+    ToolCallEndEvent,
+)
 from ag_ui.core.types import RunAgentInput
 from ag_ui.encoder import EventEncoder
 from copilotkit import CopilotKitRemoteEndpoint
@@ -23,6 +32,7 @@ from app.tools.workspace import resolve_workspace_path
 settings = load_settings()
 store = ConfigStore(settings)
 app = FastAPI(title="deep-agent-666-agent")
+logger = logging.getLogger(__name__)
 
 # CORS: allow browser-side @ag-ui/client HttpAgent to connect directly
 app.add_middleware(
@@ -65,6 +75,51 @@ def _resolve_route_agent(agent_name: str):
     if agent is None:
         raise HTTPException(status_code=404, detail="agent not found")
     return agent
+
+
+def _safe_exception_message(exc: Exception) -> str:
+    candidate = getattr(exc, "message", None)
+    if isinstance(candidate, str) and candidate.strip():
+        return candidate
+    return str(exc)
+
+
+def _classify_route_exception(exc: Exception) -> tuple[str | None, str]:
+    message = _safe_exception_message(exc).lower()
+    status_code = getattr(exc, "status_code", None)
+
+    if (
+        status_code == 429
+        or "rate limit" in message
+        or "quota" in message
+        or "free-models-per-day" in message
+    ):
+        return "provider_rate_limited", "provider request failed: rate limited"
+
+    if (
+        status_code == 401
+        or "invalid api key" in message
+        or "incorrect api key" in message
+        or "unauthorized" in message
+    ):
+        return "provider_auth_failed", "provider request failed: authentication failed"
+
+    if (
+        status_code == 403
+        or "not available in your region" in message
+        or "access denied" in message
+        or "forbidden" in message
+    ):
+        return "provider_access_denied", "provider request failed: access denied"
+
+    if (
+        "model not found" in message
+        or "invalid model" in message
+        or "not a valid model" in message
+    ):
+        return "provider_model_unavailable", "provider request failed: model unavailable"
+
+    return None, f"agent run failed: {exc.__class__.__name__} (see server logs)"
 
 
 @app.get("/health")
@@ -189,8 +244,64 @@ async def run_agent(agent_name: str, input_data: RunAgentInput, request: Request
     encoder = EventEncoder(accept=request.headers.get("accept"))
 
     async def event_generator():
-        async for event in agent.run(input_data):
-            yield encoder.encode(event)
+        saw_run_started = False
+        open_text_messages: list[str] = []
+        open_reasoning_messages: list[str] = []
+        open_tool_calls: list[str] = []
+
+        def _remember(items: list[str], value: str) -> None:
+            if value not in items:
+                items.append(value)
+
+        def _forget(items: list[str], value: str) -> None:
+            if value in items:
+                items.remove(value)
+
+        try:
+            async for event in agent.run(input_data):
+                if event.type == EventType.RUN_STARTED:
+                    saw_run_started = True
+                elif event.type == EventType.TEXT_MESSAGE_START:
+                    _remember(open_text_messages, event.message_id)
+                elif event.type == EventType.TEXT_MESSAGE_END:
+                    _forget(open_text_messages, event.message_id)
+                elif event.type == EventType.REASONING_MESSAGE_START:
+                    _remember(open_reasoning_messages, event.message_id)
+                elif event.type == EventType.REASONING_MESSAGE_END:
+                    _forget(open_reasoning_messages, event.message_id)
+                elif event.type == EventType.TOOL_CALL_START:
+                    _remember(open_tool_calls, event.tool_call_id)
+                elif event.type == EventType.TOOL_CALL_END:
+                    _forget(open_tool_calls, event.tool_call_id)
+
+                yield encoder.encode(event)
+        except Exception as exc:  # noqa: BLE001
+            logger.exception("Direct AG-UI route '%s' failed", agent_name)
+
+            if not saw_run_started:
+                yield encoder.encode(
+                    RunStartedEvent(
+                        thread_id=input_data.thread_id,
+                        run_id=input_data.run_id,
+                    )
+                )
+
+            for message_id in list(open_text_messages):
+                yield encoder.encode(TextMessageEndEvent(message_id=message_id))
+            for message_id in list(open_reasoning_messages):
+                yield encoder.encode(
+                    ReasoningMessageEndEvent(message_id=message_id)
+                )
+            for tool_call_id in list(open_tool_calls):
+                yield encoder.encode(ToolCallEndEvent(tool_call_id=tool_call_id))
+
+            code, message = _classify_route_exception(exc)
+            yield encoder.encode(
+                RunErrorEvent(
+                    message=message,
+                    code=code,
+                )
+            )
 
     return StreamingResponse(
         event_generator(),

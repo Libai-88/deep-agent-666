@@ -40,6 +40,25 @@ describe("runtime-errors", () => {
     ]);
   });
 
+  it("classifies provider access-denied codes as recoverable access failures", () => {
+    expect(
+      resolveRecoverableErrorCode({
+        code: "provider_access_denied",
+        error: new Error("agent run failed: access denied"),
+      }),
+    ).toBe("provider_access_denied");
+  });
+
+  it("classifies 403 region restrictions as provider access failures", () => {
+    expect(
+      resolveRecoverableErrorCode({
+        error: new Error(
+          "Error code: 403 - {'error': {'message': 'This model is not available in your region.', 'code': 403}}",
+        ),
+      }),
+    ).toBe("provider_access_denied");
+  });
+
   it("does not misclassify missing agent errors as provider model failures", () => {
     expect(
       resolveRecoverableErrorCode({

@@ -1081,6 +1081,12 @@ function resolveRecoverablePresentation(
         description:
           "The current provider key hit a quota or rate limit. Retry later or open settings and switch credentials.",
       };
+    case "provider_access_denied":
+      return {
+        title: "Provider access denied",
+        description:
+          "The upstream provider rejected this model for the current account or region. Reopen settings and switch provider, credentials, or base URL.",
+      };
     case "provider_model_unavailable":
       return {
         title: "Provider model mismatch",

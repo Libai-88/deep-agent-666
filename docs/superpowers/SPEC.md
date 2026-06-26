@@ -34,7 +34,7 @@
 | 前端 | Next.js 16 + React 19 + @copilotkit/react-core v2 |
 | 代理层 | @ag-ui/client HttpAgent + createCopilotRuntimeHandler |
 | UI | shadcn/ui + Tailwind v4 + lucide-react |
-| 测试 | pytest (56) + vitest (49) |
+| 测试 | pytest (59) + vitest (51) |
 
 ## 关键决策
 
@@ -50,6 +50,6 @@
 
 | 问题 | P级 | 说明 |
 |------|-----|------|
-| 真实 provider 失败仍未完全结构化 | P0 | V7 已修正 preset/provider 不一致并补了前端可恢复分类，但上游失败还未全部收敛成结构化 AG-UI 结束语义 |
+| 更深层 runtime path 仍待统一恢复体验 | P0 | V8 已修正直连 Python AG-UI 路由的失败终止语义，但更深层入口的恢复 UX 与 restart/resume 仍可继续硬化 |
 | DataChart 组件 | P1 | V2 spec 可选组件，未实现 |
 | 更深层对话恢复验证 | P1 | 已启用 `SqliteAgentRunner`，但仍需要更完整的对话恢复与重启回归验证 |

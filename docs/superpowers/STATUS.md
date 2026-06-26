@@ -1,6 +1,6 @@
 # Deep Agent 666 — 当前状态
 
-> 最后更新：2026-06-27 (V1 完成，V2 release hardening 完成，V3 首用引导完成，V4 本地持久化线程运行时完成，V5 live provider activation 完成，V6 first response roundtrip 完成，V7 provider alignment/runtime recovery 完成)
+> 最后更新：2026-06-27 (V1 完成，V2 release hardening 完成，V3 首用引导完成，V4 本地持久化线程运行时完成，V5 live provider activation 完成，V6 first response roundtrip 完成，V7 provider alignment/runtime recovery 完成，V8 runtime failure normalization 完成)
 
 ## 当前结论
 
@@ -13,8 +13,8 @@
 
 | 套件 | 数量 | 状态 |
 |------|------|------|
-| 后端 (pytest) | 56 | ✅ 全通过 |
-| 前端 (vitest) | 49 | ✅ 全通过 |
+| 后端 (pytest) | 59 | ✅ 全通过 |
+| 前端 (vitest) | 51 | ✅ 全通过 |
 | Build (next build) | — | ✅ |
 | E2E (playwright) | 9 | ✅ 全通过 |
 | Docker Compose 配置校验 | — | ⚠️ 当前机器未安装 `docker`，未执行命令级验证 |
@@ -63,6 +63,11 @@
 - 运行时错误从单一 `runtime_request_failed` 扩展为配额受限 / 模型不匹配 / 鉴权失败等可恢复状态
 - 首个真实 provider run 的错误诊断不再与 provider 文案自相矛盾
 
+### V8: Runtime Failure Normalization ✅
+- 真实 provider 异常不再让 Python 直连 AG-UI 路由直接崩流，而是规范地以 `RUN_ERROR` 结束
+- 路由会在异常时补齐未关闭的 text/tool/reasoning frame，再发终止事件，满足 AG-UI 生命周期要求
+- 当前环境下真实 `403` 区域/访问拒绝错误已验证会落成 `RUN_ERROR(code=provider_access_denied)`
+
 ## 关键提交
 
 | Commit | 说明 |
@@ -77,6 +82,6 @@
 
 ## 下一步
 
-- 下一阶段重点不再是 preset/provider 一致性，而是把真实上游 provider 失败进一步收敛为更稳定的 AG-UI 结束语义。
-- 完成标准是：真实模型失败与成功路径都能稳定结束，且浏览器端不再依赖泛化流错误兜底。
+- 下一阶段重点不再是直连 AG-UI 失败终止语义，而是把恢复 UX、线程恢复验证、以及更深层 runtime path 的一致性继续补齐。
+- 完成标准是：真实模型失败与成功路径在所有主要入口都能稳定结束，并且新手能基于产品内提示完成恢复而不是靠猜。
 - 文档中若仍出现旧的 `openrouter/free`、或把 OpenAI 默认路径与 OpenRouter 混写的表述，应以本页和最新提交为准。

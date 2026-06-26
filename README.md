@@ -84,7 +84,8 @@ Open `http://127.0.0.1:3000`.
 - The CopilotKit runtime now uses a local SQLite thread store by default (`COPILOTKIT_THREADS_DB_PATH`, default `./data/threads.db`), but deeper restart-and-resume coverage still needs broader end-to-end validation.
 - Provider configuration now re-bootstraps the root runtime in the same session, so a beginner can save a key and launch the first guided task without a manual reload.
 - OpenAI presets now align with the OpenAI default base URL and use `gpt-4.1-mini` instead of an OpenRouter-specific model id.
-- `npm run e2e` now covers the first-run configure -> launch -> first assistant response path with a deterministic AG-UI stream fixture. The main remaining runtime hardening task is deeper stream-level normalization for real upstream provider failures.
+- Real upstream provider failures on the direct Python AG-UI route now terminate with protocol-valid `RUN_ERROR` events, including structured codes such as `provider_access_denied`.
+- `npm run e2e` now covers the first-run configure -> launch -> first assistant response path with a deterministic AG-UI stream fixture. The main remaining runtime hardening task is broader recovery UX and restart/resume validation beyond the direct route boundary.
 
 ## Test
 

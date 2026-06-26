@@ -5,6 +5,7 @@ export type RecoverableErrorCode =
   | "thread_missing_or_invalid"
   | "provider_rate_limited"
   | "provider_model_unavailable"
+  | "provider_access_denied"
   | "provider_auth_failed"
   | "runtime_request_failed";
 
@@ -48,6 +49,7 @@ export function resolveRecoverableActions(
         { label: "Open settings", action: "open_settings" },
         { label: "Retry last task", action: "retry_last_task" },
       ];
+    case "provider_access_denied":
     case "provider_model_unavailable":
     case "provider_auth_failed":
       return [
@@ -77,6 +79,7 @@ function extractRuntimeErrorMessage(value: unknown): string {
   }
 
   const candidate = value as {
+    code?: unknown;
     error?: unknown;
     message?: unknown;
     detail?: unknown;
@@ -91,8 +94,46 @@ function extractRuntimeErrorMessage(value: unknown): string {
   );
 }
 
+function extractRuntimeErrorCode(value: unknown): string {
+  if (!value || typeof value !== "object") {
+    return "";
+  }
+
+  const candidate = value as {
+    code?: unknown;
+    error?: unknown;
+    cause?: unknown;
+  };
+
+  if (typeof candidate.code === "string") {
+    return candidate.code;
+  }
+
+  return (
+    extractRuntimeErrorCode(candidate.error) ||
+    extractRuntimeErrorCode(candidate.cause)
+  );
+}
+
 export function resolveRecoverableErrorCode(value: unknown): RecoverableErrorCode {
+  const code = extractRuntimeErrorCode(value);
   const message = extractRuntimeErrorMessage(value).toLowerCase();
+
+  if (code === "provider_rate_limited") {
+    return "provider_rate_limited";
+  }
+
+  if (code === "provider_model_unavailable") {
+    return "provider_model_unavailable";
+  }
+
+  if (code === "provider_access_denied") {
+    return "provider_access_denied";
+  }
+
+  if (code === "provider_auth_failed") {
+    return "provider_auth_failed";
+  }
 
   if (
     message.includes("rate limit") ||
@@ -109,6 +150,15 @@ export function resolveRecoverableErrorCode(value: unknown): RecoverableErrorCod
     message.includes("not a valid model")
   ) {
     return "provider_model_unavailable";
+  }
+
+  if (
+    message.includes("not available in your region") ||
+    message.includes("access denied") ||
+    message.includes("forbidden") ||
+    message.includes("error code: 403")
+  ) {
+    return "provider_access_denied";
   }
 
   if (
