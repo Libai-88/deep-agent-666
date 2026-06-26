@@ -397,7 +397,7 @@ function HomePageContent() {
               {/* Chat area */}
               <div className="flex-1 min-h-0">
                 <CopilotChat
-                  className="h-full [&_[data-slot=copilot-chat-message]]:prose-sm [&_[data-slot=copilot-chat-message]]:prose-pre:bg-muted [&_[data-slot=copilot-chat-message]]:prose-code:before:hidden [&_[data-slot=copilot-chat-message]]:prose-code:after:hidden"
+                  className="h-full"
                   agentId={activeThread.presetId}
                   threadId={activeThread.id}
                   labels={{
