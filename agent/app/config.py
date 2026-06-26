@@ -26,6 +26,9 @@ class ConfigStore:
     def __init__(self, settings: AgentSettings) -> None:
         self._settings = settings
 
+    def snapshot(self) -> AgentSettings:
+        return self._settings.model_copy(deep=True)
+
     @property
     def openai_api_key(self) -> str | None:
         return self._settings.openai_api_key

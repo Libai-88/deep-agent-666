@@ -1,23 +1,27 @@
 from pathlib import Path
-from fastapi import FastAPI, HTTPException, Query
-from fastapi.responses import JSONResponse
+
+from fastapi import FastAPI, HTTPException, Query, Request
+from fastapi.responses import JSONResponse, StreamingResponse
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
-from ag_ui_langgraph import add_langgraph_fastapi_endpoint
-from copilotkit import CopilotKitRemoteEndpoint, LangGraphAGUIAgent
+from ag_ui.core.types import RunAgentInput
+from ag_ui.encoder import EventEncoder
+from copilotkit import CopilotKitRemoteEndpoint
 from copilotkit.integrations.fastapi import add_fastapi_endpoint
 
-from app.agent_factory import available_presets, build_langgraph_agents, build_v2_coordinator
 from app.config import ConfigStore, load_settings
-from app.permissions import PermissionMode
 from app.presets import DEFAULT_PRESET_ID
+from app.runtime_registry import (
+    LiveAgentAccessor,
+    RuntimeAgentRegistry,
+    build_runtime_registry,
+)
 from app.tools.workspace import resolve_workspace_path
 
 
 settings = load_settings()
 store = ConfigStore(settings)
-presets_by_id = available_presets(settings)
 app = FastAPI(title="deep-agent-666-agent")
 
 # CORS: allow browser-side @ag-ui/client HttpAgent to connect directly
@@ -39,57 +43,39 @@ class ConfigureRequest(BaseModel):
     google_base_url: str | None = None
 
 
-# Build V1 agents (wrapped in LangGraphAGUIAgent)
-v1_agents = build_langgraph_agents(settings)
+runtime_registry: RuntimeAgentRegistry = build_runtime_registry(settings)
 
-# Register V1 agents with direct paths for frontend LangGraphHttpAgent compatibility
-for preset_id, agent in v1_agents.items():
-    add_langgraph_fastapi_endpoint(app=app, agent=agent, path=f"/{preset_id}")
 
-# Build and register coordinator agents with direct AG-UI endpoints
-coordinator_agents: list[LangGraphAGUIAgent] = []
-for preset_id, preset in presets_by_id.items():
-    if preset.permission_mode not in (PermissionMode.BALANCED, PermissionMode.FULL_ACCESS):
-        continue
-    v2_model = preset.model.replace(":", "/", 1)
-    try:
-        coord_graph = build_v2_coordinator(
-            model=v2_model,
-            permission_mode=preset.permission_mode.value,
-        )
-        coord_agent = LangGraphAGUIAgent(
-            name=f"coordinator-{preset_id}",
-            description=f"Coordinator ({preset.label})",
-            graph=coord_graph,
-        )
-        add_langgraph_fastapi_endpoint(app=app, agent=coord_agent, path=f"/coordinator-{preset_id}")
-        coordinator_agents.append(coord_agent)
-    except ValueError:
-        continue
+def _current_registry() -> RuntimeAgentRegistry:
+    return runtime_registry
 
-# All agents aggregated for CopilotKitRemoteEndpoint SDK compatibility
-all_agents = list(v1_agents.values()) + coordinator_agents
-sdk = CopilotKitRemoteEndpoint(agents=all_agents)
+
+sdk = CopilotKitRemoteEndpoint(agents=LiveAgentAccessor(_current_registry))
 add_fastapi_endpoint(app, sdk, "/copilotkit")
 
 
 def _reload_agents() -> None:
-    """Reload V1 presets after /configure.
+    """Rebuild the live runtime registry after /configure."""
+    global runtime_registry
+    runtime_registry = build_runtime_registry(store.snapshot())
 
-    Note: CopilotKitRemoteEndpoint routes cannot be removed at runtime.
-    A server restart is required for coordinator endpoint changes to take full effect.
-    """
-    global presets_by_id
-    presets_by_id = available_presets(settings)
+
+def _resolve_route_agent(agent_name: str):
+    agent = _current_registry().route_agents.get(agent_name)
+    if agent is None:
+        raise HTTPException(status_code=404, detail="agent not found")
+    return agent
 
 
 @app.get("/health")
 async def health() -> JSONResponse:
-    return JSONResponse({"status": "ok", "preset_count": len(all_agents), "agents": [a.name for a in all_agents]})
+    agents = _current_registry().all_agents
+    return JSONResponse({"status": "ok", "preset_count": len(agents), "agents": [a.name for a in agents]})
 
 
 @app.get("/presets")
 async def presets() -> JSONResponse:
+    presets_by_id = _current_registry().presets_by_id
     default_preset_id = (
         DEFAULT_PRESET_ID
         if DEFAULT_PRESET_ID in presets_by_id
@@ -132,8 +118,8 @@ async def configure(body: ConfigureRequest) -> JSONResponse:
     return JSONResponse(
         {
             "status": "ok",
-            "preset_count": len(presets_by_id),
-            "preset_ids": list(presets_by_id.keys()),
+            "preset_count": len(_current_registry().presets_by_id),
+            "preset_ids": list(_current_registry().presets_by_id.keys()),
         }
     )
 
@@ -184,3 +170,29 @@ async def read_file(path: str = Query(..., description="Relative path to file un
         raise HTTPException(status_code=500, detail="failed to read file")
 
     return {"path": path, "content": content}
+
+
+@app.get("/{agent_name}/health")
+async def agent_health(agent_name: str):
+    agent = _resolve_route_agent(agent_name)
+    return {
+        "status": "ok",
+        "agent": {
+            "name": agent.name,
+        },
+    }
+
+
+@app.post("/{agent_name}")
+async def run_agent(agent_name: str, input_data: RunAgentInput, request: Request):
+    agent = _resolve_route_agent(agent_name).clone()
+    encoder = EventEncoder(accept=request.headers.get("accept"))
+
+    async def event_generator():
+        async for event in agent.run(input_data):
+            yield encoder.encode(event)
+
+    return StreamingResponse(
+        event_generator(),
+        media_type=encoder.get_content_type(),
+    )

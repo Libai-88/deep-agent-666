@@ -200,6 +200,7 @@ def build_langgraph_agents(settings: AgentSettings) -> dict[str, LangGraphAGUIAg
 def build_v2_coordinator(
     model: str,
     permission_mode: str = "balanced",
+    settings: AgentSettings | None = None,
 ):
     """Build a supervisor coordinator that delegates to planner/executor/reviewer sub-agents.
 
@@ -211,7 +212,7 @@ def build_v2_coordinator(
     provider = parts[0]
     model_name = parts[1]
 
-    settings = load_settings()
+    settings = settings or load_settings()
 
     model_provider = "google_genai" if provider == "google" else provider
     api_key = _provider_api_key(settings, provider)

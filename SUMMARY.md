@@ -7,7 +7,9 @@
 - `V1` 已在 `6a33da3 feat(v1): complete coordinator workbench runtime` 完成。
 - `V2` 已在 `69d6d96 feat(v2): add release hardening baseline` 完成并推送远端。
 - `V3` 已在 `380b84c test(v3): cover onboarding launch path` 收口并推送远端。
-- 当前主分支状态不应再解读为 “V1 未完成”；当前重点已转到 V4 本地持久化线程运行时。
+- `V4` 已在 `6788bd5 feat(v4): add durable local thread runtime` 完成并推送远端。
+- `V5` 已完成 live provider activation，当前主分支状态不应再解读为 “V1 未完成”。
+- 当前重点已转到首次配置后的真实聊天闭环验证。
 
 ---
 
@@ -189,6 +191,7 @@ Python FastAPI:
 | interrupt_on 已禁用 | 🟡 P3 | 去掉后才无 Console Error | 建议修 — 需审批流程时恢复 |
 | Inspector `{}` 解析警告 | 🟢 P4 | `[CopilotKit Inspector] Failed to parse tool-call result content {}` | 否 — SDK 升级后解决 |
 | 运行时恢复回归覆盖不足 | 🟡 P2 | 已切到 SQLite，但还缺“重启后继续线程”的更深 E2E | 建议补 — 属于 V4 后续验证 |
+| 首次配置后的全链路聊天闭环尚未有完整 E2E | 🟡 P1 | `/configure` 已开始切 live activation，但还缺“配置后立即发起首条真实消息”的浏览器级验证 | 建议补 — 属于 V5 后续验证 |
 
 ---
 
@@ -208,11 +211,11 @@ Python FastAPI:
 ### 建议优先级
 
 ```
-P0: 升级 SDK 统一协议版本（解决 INCOMPLETE_STREAM + Inspector 警告）
-P1: CI 打通 E2E 测试（让 3 个 Smoke 脚本自动运行）
-P2: 补 Docker 部署方案
-P3: 恢复 interrupt_on + 修复空结果
-P4: 前端组件测试（5 个）
+P0: 证明首次配置后的真实聊天闭环（配置 -> 启动 -> 响应）
+P1: 升级 SDK 统一协议版本（解决 INCOMPLETE_STREAM + Inspector 警告）
+P2: CI 打通 E2E 测试（让 smoke/chat round-trip 自动运行）
+P3: 补 Docker 部署方案
+P4: 恢复 interrupt_on + 修复空结果
 P5: Windows 桌面壳（Electron）
 ```
 

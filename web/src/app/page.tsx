@@ -97,6 +97,31 @@ export default function HomePage() {
   );
 }
 
+type RuntimeAvailability = "ready" | "empty" | "unreachable";
+
+async function fetchRuntimeAvailability(): Promise<RuntimeAvailability> {
+  try {
+    const response = await fetch("/api/copilotkit/info", {
+      cache: "no-store",
+    });
+    if (!response.ok) {
+      return "unreachable";
+    }
+
+    const payload = (await response.json()) as {
+      agents?: unknown;
+    };
+    const agents =
+      payload.agents && typeof payload.agents === "object"
+        ? Object.keys(payload.agents as Record<string, unknown>)
+        : [];
+
+    return agents.length > 0 ? "ready" : "empty";
+  } catch {
+    return "unreachable";
+  }
+}
+
 function HomePageContent() {
   const [sidebar, setSidebar] = useQueryParamState("sidebar");
   const [threadId, setThreadId] = useQueryParamState("threadId");
@@ -130,144 +155,6 @@ function HomePageContent() {
     }
   }, []);
 
-  // ── Precise sub-agent tool renderers ──
-  // Reference: showcase/integrations/langgraph-fastapi/demos/subagents/page.tsx
-  useRenderTool({
-    name: "planner_tool",
-    parameters: z.object({ task: z.string().optional() }),
-    render: ({ parameters, status, result }) => (
-      <SubAgentActivityCard
-        subAgent="planner"
-        task={typeof parameters?.task === "string" ? parameters.task : undefined}
-        status={status === "complete" ? "complete" : status === "executing" ? "executing" : "inProgress"}
-        result={typeof result === "string" ? result : undefined}
-      />
-    ),
-  });
-
-  useRenderTool({
-    name: "executor_tool",
-    parameters: z.object({ task: z.string().optional() }),
-    render: ({ parameters, status, result }) => (
-      <SubAgentActivityCard
-        subAgent="executor"
-        task={typeof parameters?.task === "string" ? parameters.task : undefined}
-        status={status === "complete" ? "complete" : status === "executing" ? "executing" : "inProgress"}
-        result={typeof result === "string" ? result : undefined}
-      />
-    ),
-  });
-
-  useRenderTool({
-    name: "reviewer_tool",
-    parameters: z.object({ task: z.string().optional() }),
-    render: ({ parameters, status, result }) => (
-      <SubAgentActivityCard
-        subAgent="reviewer"
-        task={typeof parameters?.task === "string" ? parameters.task : undefined}
-        status={status === "complete" ? "complete" : status === "executing" ? "executing" : "inProgress"}
-        result={typeof result === "string" ? result : undefined}
-      />
-    ),
-  });
-
-  // ── Generic tool monitor for all other tools ──
-  useRenderTool({
-    name: "*",
-    render: ({ name, status, args, result }) => {
-      const normalizedTodos = normalizeToolCallToTodos({
-        name,
-        status,
-        args,
-        result,
-      });
-      const normalizedArtifacts = normalizeToolCallToArtifacts({
-        name,
-        status,
-        args,
-        result,
-      });
-
-      if (normalizedTodos.length > 0 || normalizedArtifacts.length > 0) {
-        queueMicrotask(() => {
-          setWorkbenchState((previous) => {
-            const withTodos =
-              normalizedTodos.length > 0
-                ? replaceWorkbenchTodos(previous, normalizedTodos)
-                : previous;
-            const withArtifacts = normalizedArtifacts.length > 0
-              ? appendWorkbenchArtifacts(withTodos, normalizedArtifacts)
-              : withTodos;
-            const summary = extractFinalSummary(result);
-            return summary
-              ? {
-                  ...withArtifacts,
-                  finalSummary: summary,
-                  updatedAt: Date.now(),
-                }
-              : withArtifacts;
-          });
-        });
-      }
-
-      return <ToolCallCard name={name} status={status} args={args} result={result} />;
-    },
-  });
-
-  // HITL: Agent interrupt handler for approval flows
-  useInterrupt({
-    render: ({ event, resolve }) => {
-      const question =
-        (event.value as { question?: string })?.question ??
-        event.value?.toString() ??
-        "Approve this action?";
-      return (
-        <div className="mx-4 my-2 rounded-lg border border-border bg-card p-4 shadow-sm">
-          <p className="mb-3 text-sm font-medium text-card-foreground">
-            {question}
-          </p>
-          <div className="flex gap-2">
-            <button
-              onClick={() => resolve({ approved: true })}
-              className="rounded-md bg-primary px-3 py-1.5 text-xs font-medium text-primary-foreground hover:bg-primary/90 transition-colors"
-            >
-              Approve
-            </button>
-            <button
-              onClick={() => resolve({ approved: false })}
-              className="rounded-md border border-border bg-background px-3 py-1.5 text-xs font-medium text-foreground hover:bg-muted transition-colors"
-            >
-              Reject
-            </button>
-          </div>
-        </div>
-      );
-    },
-  });
-
-  // Welcome suggestions for new conversations
-  useConfigureSuggestions({
-    suggestions: [
-      {
-        title: "📋 Research",
-        message: "Research the latest trends in AI agents and summarize them",
-      },
-      {
-        title: "📝 Write",
-        message: "Write a summary of my workspace files and their purposes",
-      },
-      {
-        title: "🔍 Find",
-        message: "Search for files containing TODO in my workspace",
-      },
-      {
-        title: "📊 Analyze",
-        message: "Analyze the project structure and suggest improvements",
-      },
-    ],
-    available: "always",
-  });
-
   const [threads, setThreads] = useState<LocalThread[]>(() => loadThreads());
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [workbenchState, setWorkbenchState] = useState<ThreadWorkbenchState>(
@@ -290,13 +177,28 @@ function HomePageContent() {
       setThreads((previous) =>
         sanitizeThreads(previous, nextState.catalog.presets),
       );
-      setRecoverableError(null);
+      if (nextState.catalog.presets.length === 0 || threads.length === 0) {
+        setRecoverableError(null);
+        return;
+      }
+
+      const runtimeAvailability = await fetchRuntimeAvailability();
+      if (runtimeAvailability === "ready") {
+        setRecoverableError(null);
+        return;
+      }
+
+      setRecoverableError(
+        runtimeAvailability === "unreachable"
+          ? "backend_unreachable"
+          : "runtime_request_failed",
+      );
     } catch {
       setRecoverableError("backend_unreachable");
     } finally {
       setCatalogChecking(false);
     }
-  }, []);
+  }, [threads.length]);
 
   useEffect(() => {
     void reloadCatalogState();
@@ -645,28 +547,32 @@ function HomePageContent() {
 
               {/* Chat area */}
               <div className="flex-1 min-h-0 flex flex-col">
-                {pendingThreadRun && pendingThreadRun.threadId === activeThread.id ? (
-                  <CopilotChatConfigurationProvider
-                    agentId={activeAgentId}
-                    threadId={activeThread.id}
-                  >
+                <CopilotChatConfigurationProvider
+                  agentId={activeAgentId}
+                  threadId={activeThread.id}
+                >
+                  <WorkbenchRuntimeHooks
+                    activeAgentId={activeAgentId}
+                    setWorkbenchState={setWorkbenchState}
+                  />
+                  {pendingThreadRun && pendingThreadRun.threadId === activeThread.id ? (
                     <PendingThreadRunController
                       key={pendingThreadRun.id}
                       run={pendingThreadRun}
                       onComplete={() => setPendingThreadRun(null)}
                       onError={() => setRecoverableError("runtime_request_failed")}
                     />
-                  </CopilotChatConfigurationProvider>
-                ) : null}
-                <ActiveThreadChat
-                  activeAgentId={activeAgentId}
-                  activeThread={activeThread}
-                  currentPreset={currentPreset}
-                  threadId={threadId}
-                  pendingThreadRun={pendingThreadRun}
-                  setThreads={setThreads}
-                  setWorkbenchState={setWorkbenchState}
-                />
+                  ) : null}
+                  <ActiveThreadChat
+                    activeAgentId={activeAgentId}
+                    activeThread={activeThread}
+                    currentPreset={currentPreset}
+                    threadId={threadId}
+                    pendingThreadRun={pendingThreadRun}
+                    setThreads={setThreads}
+                    setWorkbenchState={setWorkbenchState}
+                  />
+                </CopilotChatConfigurationProvider>
               </div>
             </div>
           </ResizablePanel>
@@ -786,6 +692,155 @@ function PendingThreadRunController({
         onComplete();
       });
   }, [agent, copilotkit, onComplete, onError, run]);
+
+  return null;
+}
+
+function WorkbenchRuntimeHooks({
+  activeAgentId,
+  setWorkbenchState,
+}: {
+  activeAgentId: string;
+  setWorkbenchState: React.Dispatch<React.SetStateAction<ThreadWorkbenchState>>;
+}) {
+  useRenderTool({
+    agentId: activeAgentId,
+    name: "planner_tool",
+    parameters: z.object({ task: z.string().optional() }),
+    render: ({ parameters, status, result }) => (
+      <SubAgentActivityCard
+        subAgent="planner"
+        task={typeof parameters?.task === "string" ? parameters.task : undefined}
+        status={status === "complete" ? "complete" : status === "executing" ? "executing" : "inProgress"}
+        result={typeof result === "string" ? result : undefined}
+      />
+    ),
+  });
+
+  useRenderTool({
+    agentId: activeAgentId,
+    name: "executor_tool",
+    parameters: z.object({ task: z.string().optional() }),
+    render: ({ parameters, status, result }) => (
+      <SubAgentActivityCard
+        subAgent="executor"
+        task={typeof parameters?.task === "string" ? parameters.task : undefined}
+        status={status === "complete" ? "complete" : status === "executing" ? "executing" : "inProgress"}
+        result={typeof result === "string" ? result : undefined}
+      />
+    ),
+  });
+
+  useRenderTool({
+    agentId: activeAgentId,
+    name: "reviewer_tool",
+    parameters: z.object({ task: z.string().optional() }),
+    render: ({ parameters, status, result }) => (
+      <SubAgentActivityCard
+        subAgent="reviewer"
+        task={typeof parameters?.task === "string" ? parameters.task : undefined}
+        status={status === "complete" ? "complete" : status === "executing" ? "executing" : "inProgress"}
+        result={typeof result === "string" ? result : undefined}
+      />
+    ),
+  });
+
+  useRenderTool({
+    agentId: activeAgentId,
+    name: "*",
+    render: ({ name, status, args, result }) => {
+      const normalizedTodos = normalizeToolCallToTodos({
+        name,
+        status,
+        args,
+        result,
+      });
+      const normalizedArtifacts = normalizeToolCallToArtifacts({
+        name,
+        status,
+        args,
+        result,
+      });
+
+      if (normalizedTodos.length > 0 || normalizedArtifacts.length > 0) {
+        queueMicrotask(() => {
+          setWorkbenchState((previous) => {
+            const withTodos =
+              normalizedTodos.length > 0
+                ? replaceWorkbenchTodos(previous, normalizedTodos)
+                : previous;
+            const withArtifacts = normalizedArtifacts.length > 0
+              ? appendWorkbenchArtifacts(withTodos, normalizedArtifacts)
+              : withTodos;
+            const summary = extractFinalSummary(result);
+            return summary
+              ? {
+                  ...withArtifacts,
+                  finalSummary: summary,
+                  updatedAt: Date.now(),
+                }
+              : withArtifacts;
+          });
+        });
+      }
+
+      return <ToolCallCard name={name} status={status} args={args} result={result} />;
+    },
+  });
+
+  useInterrupt({
+    agentId: activeAgentId,
+    render: ({ event, resolve }) => {
+      const question =
+        (event.value as { question?: string })?.question ??
+        event.value?.toString() ??
+        "Approve this action?";
+      return (
+        <div className="mx-4 my-2 rounded-lg border border-border bg-card p-4 shadow-sm">
+          <p className="mb-3 text-sm font-medium text-card-foreground">
+            {question}
+          </p>
+          <div className="flex gap-2">
+            <button
+              onClick={() => resolve({ approved: true })}
+              className="rounded-md bg-primary px-3 py-1.5 text-xs font-medium text-primary-foreground hover:bg-primary/90 transition-colors"
+            >
+              Approve
+            </button>
+            <button
+              onClick={() => resolve({ approved: false })}
+              className="rounded-md border border-border bg-background px-3 py-1.5 text-xs font-medium text-foreground hover:bg-muted transition-colors"
+            >
+              Reject
+            </button>
+          </div>
+        </div>
+      );
+    },
+  });
+
+  useConfigureSuggestions({
+    consumerAgentId: activeAgentId,
+    suggestions: [
+      {
+        title: "📋 Research",
+        message: "Research the latest trends in AI agents and summarize them",
+      },
+      {
+        title: "📝 Write",
+        message: "Write a summary of my workspace files and their purposes",
+      },
+      {
+        title: "🔍 Find",
+        message: "Search for files containing TODO in my workspace",
+      },
+      {
+        title: "📊 Analyze",
+        message: "Analyze the project structure and suggest improvements",
+      },
+    ],
+    available: "always",
+  });
 
   return null;
 }
@@ -939,19 +994,6 @@ function ActiveThreadChat({
 
   return (
     <>
-      {pendingThreadRun && pendingThreadRun.threadId === activeThread.id ? (
-        <CopilotChatConfigurationProvider
-          agentId={activeAgentId}
-          threadId={activeThread.id}
-        >
-          <PendingThreadRunController
-            key={pendingThreadRun.id}
-            run={pendingThreadRun}
-            onComplete={() => {}}
-            onError={() => {}}
-          />
-        </CopilotChatConfigurationProvider>
-      ) : null}
       <CopilotChat
         className="h-full"
         agentId={activeAgentId}
