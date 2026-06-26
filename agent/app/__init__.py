@@ -1,9 +1,10 @@
-from .state import V2AgentState
+from .state import CoordinatorState, Delegation
 
 __all__ = [
     "config",
     "permissions",
     "presets",
     "state",
-    "V2AgentState",
+    "CoordinatorState",
+    "Delegation",
 ]

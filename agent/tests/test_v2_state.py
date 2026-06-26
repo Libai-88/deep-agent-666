@@ -1,45 +1,44 @@
-from typing import Any
-
-from pydantic import BaseModel
-
-from app.state import V2AgentState
+from app.state import CoordinatorState, Delegation
 
 
-def test_v2_state_defaults():
-    state = V2AgentState()
-    assert state.phase == "idle"
-    assert state.plan_steps == []
-    assert state.completed_steps == []
-    assert state.file_changes == []
-    assert state.review_result is None
+def test_delegation_typeddict():
+    d: Delegation = {
+        "id": "test-id",
+        "sub_agent": "planner",
+        "task": "analyze the codebase",
+        "status": "running",
+        "result": "",
+    }
+    assert d["id"] == "test-id"
+    assert d["sub_agent"] == "planner"
+    assert d["status"] == "running"
 
 
-def test_v2_state_phase_transition():
-    state = V2AgentState(phase="planning", plan_steps=[{"step": "analyze"}])
-    assert state.phase == "planning"
-    assert state.plan_steps[0]["step"] == "analyze"
+def test_coordinator_state_defaults():
+    """CoordinatorState accepts delegation entries."""
+    state: CoordinatorState = {"delegations": []}
+    assert "delegations" in state
+    assert state["delegations"] == []
 
 
-def test_v2_state_is_pydantic_model():
-    """V2AgentState uses pydantic BaseModel (not TypedDict inheritance from CopilotKitState).
-
-    CopilotKitState is a TypedDict (conflicts with BaseModel metaclass), so V2AgentState
-    is a standalone BaseModel. It maintains structural compatibility by having all
-    required fields with proper defaults.
-    """
-    from copilotkit import CopilotKitState
-
-    # V2AgentState is a pydantic BaseModel
-    assert issubclass(V2AgentState, BaseModel)
-    assert isinstance(V2AgentState(), BaseModel)
-
-    # Verify structural compatibility: V2AgentState fields cover what CopilotKitState needs
-    state = V2AgentState()
-    assert hasattr(state, "phase")
-    assert hasattr(state, "plan_steps")
-    assert hasattr(state, "completed_steps")
-    assert hasattr(state, "file_changes")
-    assert hasattr(state, "review_result")
-
-    # Confirm CopilotKitState is indeed a TypedDict (not BaseModel-compatible)
-    assert not issubclass(CopilotKitState, BaseModel)
+def test_coordinator_state_appends_delegations():
+    state: CoordinatorState = {"delegations": []}
+    d1: Delegation = {
+        "id": "1",
+        "sub_agent": "planner",
+        "task": "plan",
+        "status": "running",
+        "result": "",
+    }
+    d2: Delegation = {
+        "id": "2",
+        "sub_agent": "executor",
+        "task": "execute",
+        "status": "running",
+        "result": "",
+    }
+    state["delegations"] = state["delegations"] + [d1]
+    state["delegations"] = state["delegations"] + [d2]
+    assert len(state["delegations"]) == 2
+    assert state["delegations"][0]["sub_agent"] == "planner"
+    assert state["delegations"][1]["sub_agent"] == "executor"
