@@ -13,14 +13,13 @@ import type { AgentPresetCatalog } from "@/lib/agent-presets";
 
 const BACKEND_URL = process.env.AGENT_BASE_URL ?? "http://127.0.0.1:8123";
 
-/** Build agents mapping for the CopilotRuntime. */
+/** Build all agents for the CopilotRuntime. */
 function buildAgents(catalog: AgentPresetCatalog): Record<string, AbstractAgent> {
   const agents: Record<string, AbstractAgent> = {};
 
+  // V1 + V2 coordinator agents via LangGraphHttpAgent
   for (const preset of catalog.presets) {
-    agents[preset.id] = new LangGraphHttpAgent({
-      url: `${BACKEND_URL}/${preset.id}`,
-    });
+    agents[preset.id] = new LangGraphHttpAgent({ url: `${BACKEND_URL}/${preset.id}` });
     agents[`coordinator-${preset.id}`] = new LangGraphHttpAgent({
       url: `${BACKEND_URL}/coordinator-${preset.id}`,
     });
@@ -32,51 +31,36 @@ function buildAgents(catalog: AgentPresetCatalog): Record<string, AbstractAgent>
     agents.default = agents[defaultId];
   }
 
-  // A2A multi-agent research coordinator
+  // A2A multi-agent coordinator (reference: examples/integrations/a2a-middleware)
   agents["a2a-research"] = new A2AMiddlewareAgent({
     agentId: "a2a-research",
-    description: "Multi-agent research: delegates to plan/execute/review sub-agents",
-    agentUrls: [
-      `${BACKEND_URL}/coordinator-openai-balanced`,
-    ],
+    description: "Multi-agent research via A2A protocol",
+    agentUrls: [`${BACKEND_URL}/coordinator-openai-balanced`],
     instructions: `
       You are a multi-agent research coordinator.
       Delegate work to available specialized agents and synthesize results.
       Call agents ONE AT A TIME. Never make parallel calls.
     `,
-    orchestrationAgent: new HttpAgent({
-      url: `${BACKEND_URL}/openai-balanced`,
-    }),
+    orchestrationAgent: new HttpAgent({ url: `${BACKEND_URL}/openai-balanced` }),
   });
 
   return agents;
 }
 
-const agents = buildAgents(STATIC_AGENT_PRESET_CATALOG);
-
-// Register A2A multi-agent coordinator that delegates to sub-agents
-// running in separate Python processes (reference: examples/integrations/a2a-middleware)
-agents["a2a-research"] = new A2AMiddlewareAgent({
-  agentId: "a2a-research",
-  description: "Multi-agent research: delegates to plan/execute/review sub-agents",
-  agentUrls: [
-    `${BACKEND_URL}/coordinator-openai-balanced`,
-  ],
-  instructions: `
-    You are a multi-agent research coordinator.
-    Delegate work to available specialized agents and synthesize results.
-    Call agents ONE AT A TIME. Never make parallel calls.
-  `,
-  orchestrationAgent: new HttpAgent({
-    url: `${BACKEND_URL}/openai-balanced`,
-  }),
-});
-
 const runtime = new CopilotRuntime({
-  agents,
+  agents: buildAgents(STATIC_AGENT_PRESET_CATALOG),
   runner: new InMemoryAgentRunner(),
   a2ui: {},
   openGenerativeUI: true,
+  mcpApps: {
+    servers: [
+      {
+        type: "http" as const,
+        url: process.env.MCP_SERVER_URL || "http://localhost:3108/mcp",
+        serverId: "workspace-tools",
+      },
+    ],
+  },
 });
 
 const handler = createCopilotRuntimeHandler({
