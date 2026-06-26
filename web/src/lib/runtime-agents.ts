@@ -41,6 +41,7 @@ export function buildRuntimeAgents(
   }
 
   if (
+    process.env.ENABLE_A2A_RESEARCH === "true" &&
     agents["openai-balanced"] &&
     agents["coordinator-openai-balanced"]
   ) {

@@ -78,3 +78,21 @@ export function createLocalThread(presetId: AgentPresetId): LocalThread {
     updatedAt: Date.now(),
   };
 }
+
+export function deriveThreadTitle(message: string): string {
+  const normalized = message.replace(/\s+/g, " ").trim();
+  if (!normalized) {
+    return "New thread";
+  }
+
+  if (normalized.length <= 48) {
+    return normalized;
+  }
+
+  const truncated = normalized.slice(0, 48).trimEnd();
+  const wordSafe = truncated.includes(" ")
+    ? truncated.slice(0, truncated.lastIndexOf(" ")).trimEnd()
+    : truncated;
+
+  return `${wordSafe || truncated}...`;
+}

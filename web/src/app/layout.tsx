@@ -1,7 +1,6 @@
 import type { Metadata } from "next";
 import type { ReactNode } from "react";
 
-import { NuqsAdapter } from "nuqs/adapters/next/app";
 import { Toaster } from "sonner";
 
 import { Providers } from "./providers";
@@ -23,10 +22,8 @@ export default function RootLayout({ children }: { children: ReactNode }) {
         />
       </head>
       <body className="antialiased scrollbar-pretty">
-        <NuqsAdapter>
-          <Providers>{children}</Providers>
-          <Toaster />
-        </NuqsAdapter>
+        <Providers>{children}</Providers>
+        <Toaster />
       </body>
     </html>
   );

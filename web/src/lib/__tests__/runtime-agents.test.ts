@@ -5,10 +5,11 @@ import type { AgentPresetCatalog } from "../agent-presets";
 afterEach(() => {
   vi.resetModules();
   vi.restoreAllMocks();
+  delete process.env.ENABLE_A2A_RESEARCH;
 });
 
 describe("buildRuntimeAgents", () => {
-  it("registers only the agents present in the runtime catalog", async () => {
+  it("registers only the configured preset agents by default", async () => {
     const langGraphAgentInstances: Array<{ options: Record<string, unknown> }> = [];
     const httpAgentInstances: Array<{ options: Record<string, unknown> }> = [];
     const a2aAgentInstances: Array<{ options: Record<string, unknown> }> = [];
@@ -53,16 +54,61 @@ describe("buildRuntimeAgents", () => {
       "openai-balanced",
       "coordinator-openai-balanced",
       "default",
-      "a2a-research",
     ]);
     expect(langGraphAgentInstances).toHaveLength(2);
-    expect(httpAgentInstances).toHaveLength(1);
-    expect(a2aAgentInstances).toHaveLength(1);
+    expect(httpAgentInstances).toHaveLength(0);
+    expect(a2aAgentInstances).toHaveLength(0);
     expect(agents["anthropic-balanced"]).toBeUndefined();
     expect(agents["google-balanced"]).toBeUndefined();
+    expect(agents["a2a-research"]).toBeUndefined();
   });
 
-  it("omits the A2A agent when the balanced OpenAI coordinator is unavailable", async () => {
+  it("adds the optional A2A research agent only when enabled", async () => {
+    process.env.ENABLE_A2A_RESEARCH = "true";
+    const catalog: AgentPresetCatalog = {
+      defaultPresetId: "openai-balanced",
+      presets: [
+        {
+          id: "openai-balanced",
+          label: "OpenAI / Balanced",
+          provider: "openai",
+          permissionMode: "balanced",
+        },
+      ],
+    };
+
+    const httpAgentInstances: Array<{ options: Record<string, unknown> }> = [];
+    const a2aAgentInstances: Array<{ options: Record<string, unknown> }> = [];
+
+    vi.doMock("@copilotkit/runtime/langgraph", () => ({
+      LangGraphHttpAgent: class {
+        constructor(public options: Record<string, unknown>) {}
+      },
+    }));
+    vi.doMock("@ag-ui/client", () => ({
+      HttpAgent: class {
+        constructor(public options: Record<string, unknown>) {
+          httpAgentInstances.push(this);
+        }
+      },
+    }));
+    vi.doMock("@ag-ui/a2a-middleware", () => ({
+      A2AMiddlewareAgent: class {
+        constructor(public options: Record<string, unknown>) {
+          a2aAgentInstances.push(this);
+        }
+      },
+    }));
+
+    const { buildRuntimeAgents } = await import("../runtime-agents");
+    const agents = buildRuntimeAgents(catalog, "http://127.0.0.1:8123");
+
+    expect(agents["a2a-research"]).toBeDefined();
+    expect(httpAgentInstances).toHaveLength(1);
+    expect(a2aAgentInstances).toHaveLength(1);
+  });
+
+  it("omits the coordinator and A2A agent when the balanced OpenAI coordinator is unavailable", async () => {
     const catalog: AgentPresetCatalog = {
       defaultPresetId: "openai-read-only",
       presets: [

@@ -1,7 +1,7 @@
 import { mkdirSync } from "node:fs";
 import { dirname } from "node:path";
 
-import { CopilotRuntime } from "@copilotkit/runtime/v2";
+import { CopilotRuntime } from "@/lib/copilotkit-runtime-v2";
 import { SqliteAgentRunner } from "@copilotkit/sqlite-runner";
 import { HttpAgent } from "@ag-ui/client";
 

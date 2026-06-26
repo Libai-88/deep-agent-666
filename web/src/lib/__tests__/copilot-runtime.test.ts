@@ -30,6 +30,7 @@ describe("next 16 lint setup", () => {
     const eslintConfigPath = path.join(webRoot, "eslint.config.mjs");
     const tsconfigPath = path.join(webRoot, "tsconfig.json");
     const nextEnvPath = path.join(webRoot, "next-env.d.ts");
+    const nextConfigPath = path.join(webRoot, "next.config.ts");
 
     expect(packageJson.scripts?.lint).toBe("eslint .");
     expect(packageJson.scripts?.typecheck).toBe("next typegen && tsc --noEmit");
@@ -42,6 +43,11 @@ describe("next 16 lint setup", () => {
     const tsconfig = readFileSync(tsconfigPath, "utf8");
     expect(tsconfig).toContain("\"next-env.d.ts\"");
     expect(tsconfig).toContain(".next/types/**/*.ts");
+
+    const nextConfig = readFileSync(nextConfigPath, "utf8");
+    expect(nextConfig).toContain("turbopack");
+    expect(nextConfig).toContain("root");
+    expect(nextConfig).toContain("transpilePackages");
 
     const nextEnv = readFileSync(nextEnvPath, "utf8");
     expect(nextEnv).toContain("reference types=\"next\"");
@@ -79,7 +85,7 @@ describe("createRuntimeFromCatalog", () => {
       ],
     };
 
-    vi.doMock("@copilotkit/runtime/v2", () => ({
+    vi.doMock("../copilotkit-runtime-v2", () => ({
       CopilotRuntime: class {
         constructor(public options: Record<string, unknown>) {
           runtimeInstances.push(this);

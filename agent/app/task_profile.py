@@ -8,12 +8,33 @@ def infer_task_kind(message: str) -> TaskKind:
     lower = message.lower()
     if any(
         word in lower
-        for word in ("research", "report", "brief", "summarize", "summary", "document")
+        for word in (
+            "research",
+            "report",
+            "brief",
+            "summarize",
+            "summary",
+            "document",
+            "调研",
+            "简报",
+            "总结",
+            "文档",
+        )
     ):
         return "research"
     if any(
         word in lower
-        for word in ("fix", "implement", "refactor", "test", "bug", "code")
+        for word in (
+            "fix",
+            "implement",
+            "refactor",
+            "test",
+            "bug",
+            "code",
+            "修复",
+            "测试",
+            "代码",
+        )
     ):
         return "engineering"
     return "general"

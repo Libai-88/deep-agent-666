@@ -2,8 +2,9 @@ import {
   CopilotRuntime,
   InMemoryAgentRunner,
   createCopilotRuntimeHandler,
-} from "@copilotkit/runtime/v2";
+} from "@/lib/copilotkit-runtime-v2";
 
+import { resolveMcpAppsConfig } from "@/lib/runtime-config";
 import { buildRuntimeAgents, loadRuntimeCatalog } from "@/lib/runtime-agents";
 
 const BACKEND_URL = process.env.AGENT_BASE_URL ?? "http://127.0.0.1:8123";
@@ -12,7 +13,10 @@ const runner = new InMemoryAgentRunner();
 let cachedHandler: ReturnType<typeof createCopilotRuntimeHandler> | null = null;
 let cachedCatalogKey = "";
 
-function createRuntimeHandler(catalogKey: string, runtime: CopilotRuntime) {
+function createRuntimeHandler(
+  catalogKey: string,
+  runtime: InstanceType<typeof CopilotRuntime>,
+) {
   cachedCatalogKey = catalogKey;
   cachedHandler = createCopilotRuntimeHandler({
     runtime,
@@ -37,15 +41,7 @@ async function getHandler() {
     runner,
     a2ui: {},
     openGenerativeUI: true,
-    mcpApps: {
-      servers: [
-        {
-          type: "http" as const,
-          url: process.env.MCP_SERVER_URL || "http://localhost:3108/mcp",
-          serverId: "workspace-tools",
-        },
-      ],
-    },
+    mcpApps: resolveMcpAppsConfig(process.env.MCP_SERVER_URL),
   });
 
   return createRuntimeHandler(catalogKey, runtime);

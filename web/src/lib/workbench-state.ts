@@ -14,6 +14,7 @@ export type WorkbenchArtifact = {
   path?: string;
   content: string;
   createdAt: number;
+  source?: "tool" | "delegation";
 };
 
 export type ThreadWorkbenchState = {
@@ -78,6 +79,21 @@ export function appendWorkbenchArtifacts(
   return {
     ...state,
     artifacts: [...state.artifacts, ...artifacts],
+    updatedAt: Date.now(),
+  };
+}
+
+export function replaceWorkbenchArtifacts(
+  state: ThreadWorkbenchState,
+  artifacts: WorkbenchArtifact[],
+  source: NonNullable<WorkbenchArtifact["source"]>,
+): ThreadWorkbenchState {
+  return {
+    ...state,
+    artifacts: [
+      ...state.artifacts.filter((artifact) => artifact.source !== source),
+      ...artifacts,
+    ],
     updatedAt: Date.now(),
   };
 }

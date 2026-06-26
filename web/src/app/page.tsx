@@ -3,6 +3,11 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { z } from "zod";
 import {
+  usePathname,
+  useRouter,
+  useSearchParams,
+} from "next/navigation";
+import {
   CopilotChat,
   useRenderTool,
   useInterrupt,
@@ -10,7 +15,6 @@ import {
   useAgentContext,
   useAgent,
 } from "@copilotkit/react-core/v2";
-import { useQueryState } from "nuqs";
 import {
   ResizableHandle,
   ResizablePanel,
@@ -27,6 +31,7 @@ import { ThreadList } from "@/components/ThreadList";
 import { SubAgentActivityCard } from "@/components/SubAgentActivityCard";
 import {
   createLocalThread,
+  deriveThreadTitle,
   loadThreads,
   saveThreads,
   type LocalThread,
@@ -35,6 +40,7 @@ import {
   createEmptyWorkbenchState,
   appendWorkbenchArtifacts,
   loadWorkbenchState,
+  replaceWorkbenchArtifacts,
   replaceWorkbenchTodos,
   saveWorkbenchState,
   type ThreadWorkbenchState,
@@ -42,9 +48,12 @@ import {
 import {
   extractFinalSummary,
   inferTaskKindFromMessage,
+  normalizeDelegationArtifacts,
+  normalizeDelegationsToTodos,
   normalizeToolCallToArtifacts,
   normalizeToolCallToTodos,
 } from "@/lib/tool-result-normalizer";
+import { resolveThreadAgentId } from "@/lib/thread-agent";
 import {
   ALL_AGENT_PRESETS,
   type AgentPresetDefinition,
@@ -52,10 +61,6 @@ import {
   findPresetById,
   resolveDefaultPresetId,
 } from "@/lib/agent-presets";
-import {
-  type TodoItem,
-  type FileItem,
-} from "@/components/TasksFilesSidebar";
 import { ToolCallCard } from "@/components/ToolCallCard";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { DelegationLog } from "@/components/DelegationLog";
@@ -84,11 +89,8 @@ export default function HomePage() {
 }
 
 function HomePageContent() {
-  const [sidebar, setSidebar] = useQueryState("sidebar");
-  const [threadId, setThreadId] = useQueryState("threadId");
-
-  const [todos, setTodos] = useState<TodoItem[]>([]);
-  const [files, setFiles] = useState<FileItem[]>([]);
+  const [sidebar, setSidebar] = useQueryParamState("sidebar");
+  const [threadId, setThreadId] = useQueryParamState("threadId");
   const [previewFile, setPreviewFile] = useState<string | null>(null);
   const [previewOpen, setPreviewOpen] = useState(false);
   const [previewContent, setPreviewContent] = useState("");
@@ -190,33 +192,6 @@ function HomePageContent() {
         });
       }
 
-      // Track write_todos tool calls
-      if (name === "write_todos" && status === "complete" && args?.todos) {
-        const newTodos = (args.todos as Array<{ content: string; status?: string }>).map(
-          (t, i) => ({
-            id: `todo-${Date.now()}-${i}`,
-            content: t.content,
-            status: (t.status ?? "pending") as TodoItem["status"],
-          }),
-        );
-        queueMicrotask(() => {
-          setTodos((prev) => [...prev, ...newTodos]);
-        });
-      }
-
-      // Track write_file tool calls
-      if (name === "write_file" && status === "complete" && args?.file_path) {
-        queueMicrotask(() => {
-          setFiles((prev) => [
-            ...prev,
-            {
-              path: args.file_path as string,
-              content: (result as string) ?? (args.content as string) ?? "",
-            },
-          ]);
-        });
-      }
-
       return <ToolCallCard name={name} status={status} args={args} result={result} />;
     },
   });
@@ -302,8 +277,12 @@ function HomePageContent() {
       null
     );
   }, [activeThread]);
+  const activeAgentId = useMemo(() => {
+    if (!currentPreset) return undefined;
+    return resolveThreadAgentId(currentPreset.id, currentPreset.permissionMode);
+  }, [currentPreset]);
   const { agent } = useAgent({
-    agentId: activeThread?.presetId,
+    agentId: activeAgentId,
   });
 
   useEffect(() => {
@@ -344,6 +323,89 @@ function HomePageContent() {
       };
     });
   }, [agent, agent?.messages]);
+
+  useEffect(() => {
+    if (!activeThread || !agent) return;
+
+    const latestUserMessage = [...agent.messages]
+      .reverse()
+      .find((message) => message.role === "user");
+
+    if (!latestUserMessage) return;
+
+    const content = Array.isArray(latestUserMessage.content)
+      ? latestUserMessage.content.join(" ")
+      : String(latestUserMessage.content ?? "");
+    const nextTitle = deriveThreadTitle(content);
+
+    setThreads((previous) => {
+      const current = previous.find((thread) => thread.id === activeThread.id);
+      if (!current || current.title === nextTitle) {
+        return previous;
+      }
+
+      return previous.map((thread) =>
+        thread.id === activeThread.id
+          ? {
+              ...thread,
+              title: nextTitle,
+              updatedAt: Date.now(),
+            }
+          : thread,
+      );
+    });
+  }, [activeThread, agent, agent?.messages]);
+
+  useEffect(() => {
+    if (!agent?.state || typeof agent.state !== "object") return;
+
+    const state = agent.state as {
+      delegations?: Array<{
+        id: string;
+        sub_agent: "planner" | "executor" | "reviewer";
+        task: string;
+        status: "running" | "completed" | "failed";
+        result: string;
+      }>;
+      task_kind?: "engineering" | "research" | "general";
+      final_summary?: string;
+    };
+
+    const delegations = Array.isArray(state.delegations) ? state.delegations : [];
+    const taskKind = state.task_kind;
+    const finalSummary = typeof state.final_summary === "string" && state.final_summary.trim()
+      ? state.final_summary
+      : null;
+
+    if (delegations.length === 0 && !taskKind && !finalSummary) {
+      return;
+    }
+
+    setWorkbenchState((previous) => {
+      const nextTodos = delegations.length > 0
+        ? normalizeDelegationsToTodos(delegations)
+        : previous.todos;
+      const nextArtifacts = delegations.length > 0
+        ? normalizeDelegationArtifacts(delegations)
+        : previous.artifacts.filter((artifact) => artifact.source !== "delegation");
+
+      const withTodos = delegations.length > 0
+        ? replaceWorkbenchTodos(previous, nextTodos)
+        : previous;
+      const withArtifacts = replaceWorkbenchArtifacts(
+        withTodos,
+        nextArtifacts,
+        "delegation",
+      );
+
+      return {
+        ...withArtifacts,
+        taskKind: taskKind ?? withArtifacts.taskKind,
+        finalSummary: finalSummary ?? withArtifacts.finalSummary,
+        updatedAt: Date.now(),
+      };
+    });
+  }, [agent, agent?.state]);
 
   // Share workspace context with the agent
   const workspaceContext = useMemo(
@@ -511,7 +573,7 @@ function HomePageContent() {
               <div className="flex-1 min-h-0 flex flex-col">
                 <CopilotChat
                   className="h-full"
-                  agentId={activeThread.presetId}
+                  agentId={activeAgentId}
                   threadId={activeThread.id}
                   labels={{
                     welcomeMessageText: "Hi! I'm your local AI agent. I can help you with code, files, and tasks.",
@@ -555,6 +617,33 @@ function HomePageContent() {
       )}
     </div>
   );
+}
+
+function useQueryParamState(
+  key: string,
+): [string | null, (value: string | null) => void] {
+  const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
+  const value = searchParams.get(key);
+
+  const setValue = useCallback(
+    (nextValue: string | null) => {
+      const params = new URLSearchParams(searchParams.toString());
+      if (nextValue === null || nextValue === "") {
+        params.delete(key);
+      } else {
+        params.set(key, nextValue);
+      }
+
+      const nextSearch = params.toString();
+      const nextUrl = nextSearch ? `${pathname}?${nextSearch}` : pathname;
+      router.replace(nextUrl, { scroll: false });
+    },
+    [key, pathname, router, searchParams],
+  );
+
+  return [value, setValue];
 }
 
 // ── Shared helpers ──
