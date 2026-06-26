@@ -621,11 +621,11 @@ function SettingsDialog({
 
   return (
       <div
-        className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm"
+        className="fixed inset-0 z-50 flex items-center justify-center bg-black/40"
         onClick={() => onOpenChange(false)}
       >
         <div
-          className="w-full max-w-lg rounded-xl border border-border bg-card p-6 shadow-xl"
+          className="w-full max-w-lg rounded-xl border border-border bg-white shadow-lg"
           onClick={(e) => e.stopPropagation()}
         >
         <h2 className="text-lg font-semibold text-card-foreground">Settings</h2>
@@ -648,10 +648,10 @@ function SettingsDialog({
                   <button
                     key={cfg.key}
                     onClick={() => preset && onSwitchPreset(preset.id)}
-                    className={`rounded-lg border px-2.5 py-1 text-xs transition-colors ${
+                    className={`rounded-lg border px-2.5 py-1 text-xs font-medium transition-colors ${
                       currentPreset.provider === cfg.key
-                        ? "border-primary bg-primary/10 text-primary"
-                        : "border-border text-muted-foreground hover:bg-muted"
+                        ? "border-[#7c6fe0] bg-[#7c6fe0]/10 text-[#7c6fe0]"
+                        : "border-[#D0D0D8] text-[#555] hover:bg-[#f5f5f5]"
                     }`}
                   >
                     {cfg.label}
@@ -673,10 +673,10 @@ function SettingsDialog({
                   <button
                     key={perm}
                     onClick={() => preset && onSwitchPreset(preset.id)}
-                    className={`rounded-lg border px-2.5 py-1 text-xs transition-colors ${
+                    className={`rounded-lg border px-2.5 py-1 text-xs font-medium transition-colors ${
                       currentPreset.permissionMode === perm
-                        ? "border-primary bg-primary/10 text-primary"
-                        : "border-border text-muted-foreground hover:bg-muted"
+                        ? "border-[#7c6fe0] bg-[#7c6fe0]/10 text-[#7c6fe0]"
+                        : "border-[#D0D0D8] text-[#555] hover:bg-[#f5f5f5]"
                     }`}
                   >
                     {perm}
@@ -703,7 +703,7 @@ function SettingsDialog({
                 onChange={(e) =>
                   setApiKeys((prev) => ({ ...prev, [cfg.key]: e.target.value }))
                 }
-                className="w-full rounded-md border border-input bg-background px-3 py-1.5 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring"
+                className="w-full rounded-md border border-[#D0D0D8] bg-white px-3 py-1.5 text-sm text-[#1a1a1a] placeholder:text-[#999] focus:outline-none focus:ring-1 focus:ring-[#7c6fe0]"
               />
               <input
                 placeholder={`Base URL (${cfg.defaultBaseUrl})`}
@@ -711,7 +711,7 @@ function SettingsDialog({
                 onChange={(e) =>
                   setBaseUrls((prev) => ({ ...prev, [cfg.key]: e.target.value }))
                 }
-                className="w-full rounded-md border border-input bg-background px-3 py-1.5 text-xs text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring"
+                className="w-full rounded-md border border-[#D0D0D8] bg-white px-3 py-1.5 text-xs text-[#1a1a1a] placeholder:text-[#999] focus:outline-none focus:ring-1 focus:ring-[#7c6fe0]"
               />
             </div>
           ))}
@@ -730,14 +730,14 @@ function SettingsDialog({
         <div className="mt-5 flex items-center justify-end gap-2">
           <button
             onClick={() => onOpenChange(false)}
-            className="rounded-lg border border-border px-4 py-1.5 text-sm text-muted-foreground hover:bg-muted"
+            className="rounded-lg border border-[#D0D0D8] bg-white px-4 py-1.5 text-sm text-[#555] hover:bg-[#f5f5f5]"
           >
             Cancel
           </button>
           <button
             onClick={handleSave}
             disabled={saving}
-            className="rounded-lg bg-primary px-4 py-1.5 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
+            className="rounded-lg bg-[#7c6fe0] px-4 py-1.5 text-sm font-medium text-white hover:bg-[#6a5ed0] disabled:opacity-50"
           >
             {saving ? "Saving..." : "Save & Apply"}
           </button>

@@ -23,23 +23,23 @@
 
 @layer base {
   :root {
-    /* === Maxma 品牌色 — 紫色系，基于 Maxma 品牌规范 === */
-    --background: oklch(0.98 0.005 280);
-    --foreground: oklch(0.15 0.01 280);
+    /* === 提升对比度的浅色主题 === */
+    --background: oklch(0.97 0.008 280);
+    --foreground: oklch(0.12 0.015 280);
     --card: oklch(1 0 0);
-    --card-foreground: oklch(0.15 0.01 280);
+    --card-foreground: oklch(0.12 0.015 280);
     --primary: oklch(0.72 0.12 280);
     --primary-foreground: oklch(0.99 0 0);
-    --secondary: oklch(0.96 0.005 280);
-    --secondary-foreground: oklch(0.20 0.02 280);
-    --muted: oklch(0.96 0.005 280);
-    --muted-foreground: oklch(0.55 0.01 280);
-    --accent: oklch(0.90 0.04 280);
-    --accent-foreground: oklch(0.20 0.02 280);
+    --secondary: oklch(0.94 0.01 280);
+    --secondary-foreground: oklch(0.18 0.02 280);
+    --muted: oklch(0.94 0.01 280);
+    --muted-foreground: oklch(0.50 0.015 280);
+    --accent: oklch(0.88 0.05 280);
+    --accent-foreground: oklch(0.18 0.02 280);
     --destructive: oklch(0.60 0.20 25);
     --destructive-foreground: oklch(0.99 0 0);
-    --border: oklch(0.92 0.008 280);
-    --input: oklch(0.92 0.008 280);
+    --border: oklch(0.88 0.012 280);
+    --input: oklch(0.88 0.012 280);
     --ring: oklch(0.72 0.12 280);
     --radius: 0.75rem;
 
