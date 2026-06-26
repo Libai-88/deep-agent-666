@@ -1,0 +1,97 @@
+name: CI
+
+on:
+  push:
+    branches: [main, feat/**]
+  pull_request:
+    branches: [main]
+
+env:
+  AGENT_BASE_URL: "http://127.0.0.1:8123"
+
+jobs:
+  test-backend:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: agent
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+      - run: uv sync
+      - run: uv run pytest -v --junitxml=report.xml
+      - uses: dorny/test-reporter@v1
+        if: success() || failure()
+        with:
+          name: Backend Tests
+          path: agent/report.xml
+          reporter: java-junit
+
+  test-frontend:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: web
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+          cache-dependency-path: web/package-lock.json
+      - run: npm ci
+      - run: npx vitest run --reporter=junit --outputFile=report.xml
+      - uses: dorny/test-reporter@v1
+        if: success() || failure()
+        with:
+          name: Frontend Tests
+          path: web/report.xml
+          reporter: java-junit
+
+  build:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: web
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+          cache-dependency-path: web/package-lock.json
+      - run: npm ci
+      - run: npx next build
+
+  e2e:
+    runs-on: ubuntu-latest
+    needs: [test-backend, test-frontend, build]
+    defaults:
+      run:
+        working-directory: web
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+          cache-dependency-path: web/package-lock.json
+      - uses: astral-sh/setup-uv@v5
+      - name: Start backend
+        run: |
+          cd agent
+          uv sync
+          uv run uvicorn app.main:app --host 0.0.0.0 --port 8123 &
+          sleep 5
+          curl --retry 5 --retry-connrefused http://127.0.0.1:8123/health
+      - name: Install Playwright
+        run: npx playwright install chromium --with-deps
+      - name: Start frontend
+        run: |
+          npx next dev -p 3000 &
+          sleep 10
+          curl --retry 5 --retry-connrefused http://localhost:3000
+      - name: Run E2E tests
+        run: npx playwright test
