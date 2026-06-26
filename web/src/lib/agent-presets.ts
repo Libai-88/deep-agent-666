@@ -25,7 +25,7 @@ export type AgentPresetCatalog = {
 
 // Static preset definitions (must match agent/app/presets.py)
 // If you add/remove/rename presets in presets.py, update this list too.
-export const ALL_AGENT_PRESETS: AgentPresetDefinition[] = [
+export const ALL_AGENT_PRESETS = [
   {
     id: "openai-read-only",
     provider: "openai",
