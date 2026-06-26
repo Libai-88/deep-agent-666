@@ -342,10 +342,6 @@ function HomePageContent() {
     if (!currentPreset) return undefined;
     return resolveThreadAgentId(currentPreset.id, currentPreset.permissionMode);
   }, [currentPreset]);
-  const { agent } = useAgent({
-    agentId: activeAgentId,
-  });
-
   useEffect(() => {
     if (!activeThread) {
       setLoadedWorkbenchThreadId(null);
@@ -362,133 +358,6 @@ function HomePageContent() {
     if (loadedWorkbenchThreadId !== activeThread.id) return;
     saveWorkbenchState(activeThread.id, workbenchState);
   }, [activeThread, loadedWorkbenchThreadId, workbenchState]);
-
-  useEffect(() => {
-    if (!agent) return;
-
-    const latestUserMessage = [...agent.messages]
-      .reverse()
-      .find((message) => message.role === "user");
-
-    if (!latestUserMessage) return;
-
-    const content = Array.isArray(latestUserMessage.content)
-      ? latestUserMessage.content.join(" ")
-      : String(latestUserMessage.content ?? "");
-    const taskKind = inferTaskKindFromMessage(content);
-
-    setWorkbenchState((previous) => {
-      if (previous.taskKind === taskKind) {
-        return previous;
-      }
-      return {
-        ...previous,
-        taskKind,
-        updatedAt: Date.now(),
-      };
-    });
-  }, [agent, agent?.messages]);
-
-  useEffect(() => {
-    if (!activeThread || !agent) return;
-
-    const latestUserMessage = [...agent.messages]
-      .reverse()
-      .find((message) => message.role === "user");
-
-    if (!latestUserMessage) return;
-
-    const content = Array.isArray(latestUserMessage.content)
-      ? latestUserMessage.content.join(" ")
-      : String(latestUserMessage.content ?? "");
-    const nextTitle = deriveThreadTitle(content);
-
-    setThreads((previous) => {
-      const current = previous.find((thread) => thread.id === activeThread.id);
-      if (!current || current.title === nextTitle) {
-        return previous;
-      }
-
-      return previous.map((thread) =>
-        thread.id === activeThread.id
-          ? {
-              ...thread,
-              title: nextTitle,
-              updatedAt: Date.now(),
-            }
-          : thread,
-      );
-    });
-  }, [activeThread, agent, agent?.messages]);
-
-  useEffect(() => {
-    if (!agent?.state || typeof agent.state !== "object") return;
-
-    const state = agent.state as {
-      delegations?: Array<{
-        id: string;
-        sub_agent: "planner" | "executor" | "reviewer";
-        task: string;
-        status: "running" | "completed" | "failed";
-        result: string;
-      }>;
-      task_kind?: "engineering" | "research" | "general";
-      final_summary?: string;
-    };
-
-    const delegations = Array.isArray(state.delegations) ? state.delegations : [];
-    const taskKind = state.task_kind;
-    const finalSummary = typeof state.final_summary === "string" && state.final_summary.trim()
-      ? state.final_summary
-      : null;
-
-    if (delegations.length === 0 && !taskKind && !finalSummary) {
-      return;
-    }
-
-    setWorkbenchState((previous) => {
-      const nextTodos = delegations.length > 0
-        ? normalizeDelegationsToTodos(delegations)
-        : previous.todos;
-      const nextArtifacts = delegations.length > 0
-        ? normalizeDelegationArtifacts(delegations)
-        : previous.artifacts.filter((artifact) => artifact.source !== "delegation");
-
-      const withTodos = delegations.length > 0
-        ? replaceWorkbenchTodos(previous, nextTodos)
-        : previous;
-      const withArtifacts = replaceWorkbenchArtifacts(
-        withTodos,
-        nextArtifacts,
-        "delegation",
-      );
-
-      return {
-        ...withArtifacts,
-        taskKind: taskKind ?? withArtifacts.taskKind,
-        finalSummary: finalSummary ?? withArtifacts.finalSummary,
-        updatedAt: Date.now(),
-      };
-    });
-  }, [agent, agent?.state]);
-
-  // Share workspace context with the agent
-  const workspaceContext = useMemo(
-    () => ({
-      workspaceRoot: process.env.AGENT_WORKSPACE_ROOT ?? "D:\\AgentBuild",
-      projectName: "deep-agent-666",
-      platform: "windows",
-      shell: "powershell",
-      currentThreadId: threadId ?? null,
-      currentPresetId: currentPreset?.id ?? null,
-    }),
-    [threadId, currentPreset],
-  );
-
-  useAgentContext({
-    description: "The user's local workspace environment — root path, platform, current thread and model preset",
-    value: workspaceContext,
-  });
 
   const effectiveRecoverableError =
     recoverableError ?? (activeThread && !currentPreset ? "thread_missing_or_invalid" : null);
@@ -789,15 +658,14 @@ function HomePageContent() {
                     />
                   </CopilotChatConfigurationProvider>
                 ) : null}
-                <CopilotChat
-                  className="h-full"
-                  agentId={activeAgentId}
-                  threadId={activeThread.id}
-                  labels={{
-                    welcomeMessageText: "Hi! I'm your local AI agent. I can help you with code, files, and tasks.",
-                    chatInputPlaceholder: "Ask me to research, write files, or manage tasks...",
-                    chatDisclaimerText: "AI responses may be inaccurate. Verify important information.",
-                  }}
+                <ActiveThreadChat
+                  activeAgentId={activeAgentId}
+                  activeThread={activeThread}
+                  currentPreset={currentPreset}
+                  threadId={threadId}
+                  pendingThreadRun={pendingThreadRun}
+                  setThreads={setThreads}
+                  setWorkbenchState={setWorkbenchState}
                 />
               </div>
             </div>
@@ -920,6 +788,182 @@ function PendingThreadRunController({
   }, [agent, copilotkit, onComplete, onError, run]);
 
   return null;
+}
+
+function ActiveThreadChat({
+  activeAgentId,
+  activeThread,
+  currentPreset,
+  threadId,
+  pendingThreadRun,
+  setThreads,
+  setWorkbenchState,
+}: {
+  activeAgentId: string;
+  activeThread: LocalThread;
+  currentPreset: AgentPresetDefinition;
+  threadId: string | null;
+  pendingThreadRun: PendingThreadRun | null;
+  setThreads: React.Dispatch<React.SetStateAction<LocalThread[]>>;
+  setWorkbenchState: React.Dispatch<React.SetStateAction<ThreadWorkbenchState>>;
+}) {
+  const { agent } = useAgent({
+    agentId: activeAgentId,
+  });
+
+  const workspaceContext = useMemo(
+    () => ({
+      workspaceRoot: process.env.AGENT_WORKSPACE_ROOT ?? "D:\\AgentBuild",
+      projectName: "deep-agent-666",
+      platform: "windows",
+      shell: "powershell",
+      currentThreadId: threadId ?? null,
+      currentPresetId: currentPreset.id,
+    }),
+    [currentPreset.id, threadId],
+  );
+
+  useAgentContext({
+    description: "The user's local workspace environment — root path, platform, current thread and model preset",
+    value: workspaceContext,
+  });
+
+  useEffect(() => {
+    if (!agent || !Array.isArray(agent.messages)) return;
+
+    const latestUserMessage = [...agent.messages]
+      .reverse()
+      .find((message) => message.role === "user");
+
+    if (!latestUserMessage) return;
+
+    const content = Array.isArray(latestUserMessage.content)
+      ? latestUserMessage.content.join(" ")
+      : String(latestUserMessage.content ?? "");
+    const taskKind = inferTaskKindFromMessage(content);
+
+    setWorkbenchState((previous) => {
+      if (previous.taskKind === taskKind) {
+        return previous;
+      }
+      return {
+        ...previous,
+        taskKind,
+        updatedAt: Date.now(),
+      };
+    });
+  }, [agent, agent?.messages, setWorkbenchState]);
+
+  useEffect(() => {
+    if (!agent || !Array.isArray(agent.messages)) return;
+
+    const latestUserMessage = [...agent.messages]
+      .reverse()
+      .find((message) => message.role === "user");
+
+    if (!latestUserMessage) return;
+
+    const content = Array.isArray(latestUserMessage.content)
+      ? latestUserMessage.content.join(" ")
+      : String(latestUserMessage.content ?? "");
+    const nextTitle = deriveThreadTitle(content);
+
+    setThreads((previous) => {
+      const current = previous.find((thread) => thread.id === activeThread.id);
+      if (!current || current.title === nextTitle) {
+        return previous;
+      }
+
+      return previous.map((thread) =>
+        thread.id === activeThread.id
+          ? {
+              ...thread,
+              title: nextTitle,
+              updatedAt: Date.now(),
+            }
+          : thread,
+      );
+    });
+  }, [activeThread.id, agent, agent?.messages, setThreads]);
+
+  useEffect(() => {
+    if (!agent?.state || typeof agent.state !== "object") return;
+
+    const state = agent.state as {
+      delegations?: Array<{
+        id: string;
+        sub_agent: "planner" | "executor" | "reviewer";
+        task: string;
+        status: "running" | "completed" | "failed";
+        result: string;
+      }>;
+      task_kind?: "engineering" | "research" | "general";
+      final_summary?: string;
+    };
+
+    const delegations = Array.isArray(state.delegations) ? state.delegations : [];
+    const taskKind = state.task_kind;
+    const finalSummary = typeof state.final_summary === "string" && state.final_summary.trim()
+      ? state.final_summary
+      : null;
+
+    if (delegations.length === 0 && !taskKind && !finalSummary) {
+      return;
+    }
+
+    setWorkbenchState((previous) => {
+      const nextTodos = delegations.length > 0
+        ? normalizeDelegationsToTodos(delegations)
+        : previous.todos;
+      const nextArtifacts = delegations.length > 0
+        ? normalizeDelegationArtifacts(delegations)
+        : previous.artifacts.filter((artifact) => artifact.source !== "delegation");
+
+      const withTodos = delegations.length > 0
+        ? replaceWorkbenchTodos(previous, nextTodos)
+        : previous;
+      const withArtifacts = replaceWorkbenchArtifacts(
+        withTodos,
+        nextArtifacts,
+        "delegation",
+      );
+
+      return {
+        ...withArtifacts,
+        taskKind: taskKind ?? withArtifacts.taskKind,
+        finalSummary: finalSummary ?? withArtifacts.finalSummary,
+        updatedAt: Date.now(),
+      };
+    });
+  }, [agent, agent?.state, setWorkbenchState]);
+
+  return (
+    <>
+      {pendingThreadRun && pendingThreadRun.threadId === activeThread.id ? (
+        <CopilotChatConfigurationProvider
+          agentId={activeAgentId}
+          threadId={activeThread.id}
+        >
+          <PendingThreadRunController
+            key={pendingThreadRun.id}
+            run={pendingThreadRun}
+            onComplete={() => {}}
+            onError={() => {}}
+          />
+        </CopilotChatConfigurationProvider>
+      ) : null}
+      <CopilotChat
+        className="h-full"
+        agentId={activeAgentId}
+        threadId={activeThread.id}
+        labels={{
+          welcomeMessageText: "Hi! I'm your local AI agent. I can help you with code, files, and tasks.",
+          chatInputPlaceholder: "Ask me to research, write files, or manage tasks...",
+          chatDisclaimerText: "AI responses may be inaccurate. Verify important information.",
+        }}
+      />
+    </>
+  );
 }
 
 function resolveGatePresentation(

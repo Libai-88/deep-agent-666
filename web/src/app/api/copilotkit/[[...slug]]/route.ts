@@ -1,14 +1,26 @@
+import { mkdirSync } from "node:fs";
+import { dirname } from "node:path";
+
 import {
   CopilotRuntime,
-  InMemoryAgentRunner,
   createCopilotRuntimeHandler,
 } from "@/lib/copilotkit-runtime-v2";
+import { SqliteAgentRunner } from "@copilotkit/sqlite-runner";
 
 import { resolveMcpAppsConfig } from "@/lib/runtime-config";
 import { buildRuntimeAgents, loadRuntimeCatalog } from "@/lib/runtime-agents";
 
 const BACKEND_URL = process.env.AGENT_BASE_URL ?? "http://127.0.0.1:8123";
-const runner = new InMemoryAgentRunner();
+const THREADS_DB_PATH =
+  process.env.COPILOTKIT_THREADS_DB_PATH ?? "./data/threads.db";
+
+if (THREADS_DB_PATH !== ":memory:") {
+  mkdirSync(dirname(THREADS_DB_PATH), { recursive: true });
+}
+
+const runner = new SqliteAgentRunner({
+  dbPath: THREADS_DB_PATH,
+});
 
 let cachedHandler: ReturnType<typeof createCopilotRuntimeHandler> | null = null;
 let cachedCatalogKey = "";

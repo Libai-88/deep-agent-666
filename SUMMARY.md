@@ -6,7 +6,8 @@
 
 - `V1` 已在 `6a33da3 feat(v1): complete coordinator workbench runtime` 完成。
 - `V2` 已在 `69d6d96 feat(v2): add release hardening baseline` 完成并推送远端。
-- 当前主分支状态不应再解读为 “V1 未完成”；后续阶段应从 V3 新手体验和可恢复性继续推进。
+- `V3` 已在 `380b84c test(v3): cover onboarding launch path` 收口并推送远端。
+- 当前主分支状态不应再解读为 “V1 未完成”；当前重点已转到 V4 本地持久化线程运行时。
 
 ---
 
@@ -70,7 +71,7 @@ CopilotRuntime (Next.js route handler)
 | **P3 A2UI** | Runtime `a2ui: {}` | A2UI 需前端目录 + Python render | 配置 runtime 启用，前端 catalog 后补 |
 | **P4 A2A** | `A2AMiddlewareAgent` 注册 | 需独立子 agent 服务 | 注册 a2a-research agent 指向现有 coordinator |
 | **P5 MCP** | `mcpApps` 配置 | — | `CopilotRuntime({ mcpApps: { servers: [...] } })` |
-| **P6 生产就绪** | 路由清理、env 校验 | `InMemoryAgentRunner` 与 `finalizeRunEvents` 冲突 | 清理 route.ts 去重 A2A，env-check 模块 |
+| **P6 生产就绪** | 路由清理、env 校验 | `InMemoryAgentRunner` 与 `finalizeRunEvents` 冲突 | 清理 route.ts 去重 A2A，env-check 模块；后续已继续推进 SQLite 持久化 |
 | **P7 桌面+E2E** | Playwright smoke、git tag | — | Tag `v1-foundation` |
 
 ### 阶段 B：差距补齐（4 个 Phase）
@@ -164,7 +165,7 @@ Endpoints:
 CopilotRuntime (Next.js route handler):
   agents: LangGraphHttpAgent for each preset + coordinator
           A2AMiddlewareAgent for a2a-research
-  runner: InMemoryAgentRunner
+  runner: SqliteAgentRunner (`./data/threads.db` by default)
   a2ui:   {} (enabled)
   mcpApps: servers: [{workspace-tools}]
   openGenerativeUI: true
@@ -187,6 +188,7 @@ Python FastAPI:
 | Coordinator 无自动化端到端测试 | 🟡 P2 | curl 可跑通，但无 CI e2e | 否 — 可接受 |
 | interrupt_on 已禁用 | 🟡 P3 | 去掉后才无 Console Error | 建议修 — 需审批流程时恢复 |
 | Inspector `{}` 解析警告 | 🟢 P4 | `[CopilotKit Inspector] Failed to parse tool-call result content {}` | 否 — SDK 升级后解决 |
+| 运行时恢复回归覆盖不足 | 🟡 P2 | 已切到 SQLite，但还缺“重启后继续线程”的更深 E2E | 建议补 — 属于 V4 后续验证 |
 
 ---
 

@@ -1,6 +1,6 @@
 # Deep Agent 666 — 设计规格
 
-> 最后更新：2026-06-26
+> 最后更新：2026-06-27
 
 ## 产品定位
 
@@ -20,6 +20,8 @@
 ├─ Agent Core (FastAPI + Deep Agents + LangGraph) ───────┤
 │ V1: 单 agent (9 presets × 3 providers × 3 modes)       │
 │ V2: Coordinator (Plan→Do→Review) + GenUI middleware     │
+├─ Runtime Persistence (CopilotKit + SQLite runner) ─────┤
+│ SqliteAgentRunner -> ./data/threads.db (configurable)   │
 └────────────────────────────────────────────────────────┘
 ```
 
@@ -38,13 +40,13 @@
 
 - `HttpAgent` 替代 `LangGraphHttpAgent` — 通用 HTTP AG-UI 客户端，适合自托管后端
 - `agents__unsafe_dev_only` → `runtimeUrl` — 用 CopilotKit Runtime 代理，保留扩展性
-- POST agent run 透传 — 绕过 SqliteAgentRunner 的 `finalizeRunEvents`，避免 INCOMPLETE_STREAM
+- 本地默认 runner 使用 `SqliteAgentRunner` — 线程运行时状态写入 `./data/threads.db`
 - CORS middleware (Python) — 开发模式需要（已不再需要，因为不走浏览器直连）
 
 ## 已知技术债
 
 | 问题 | P级 | 说明 |
 |------|-----|------|
-| Chat 全链路不通 (INCOMPLETE_STREAM) | P0 | Python SDK (0.1.x) 与 JS SDK (1.61.x) 协议不匹配。`finalizeRunEvents` 与 `HttpAgent` SSE 事件处理存在时序/格式冲突。当前 proxy 透传方案绕过此问题，但 Chat 消息客户端仍报 INCOMPLETE_STREAM |
+| Chat 全链路不通 (INCOMPLETE_STREAM) | P0 | Python SDK (0.1.x) 与 JS SDK (1.61.x) 协议不匹配。仍需继续盯住事件终结与客户端 SSE 协议兼容性 |
 | DataChart 组件 | P1 | V2 spec 可选组件，未实现 |
-| SqliteAgentRunner 线程持久化 | P1 | 未启用（agent run 不走 runner） |
+| 更深层对话恢复验证 | P1 | 已启用 `SqliteAgentRunner`，但仍需要更完整的对话恢复与重启回归验证 |
