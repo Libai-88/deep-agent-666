@@ -15,6 +15,7 @@ describe("ProviderRegistryEditor", () => {
             id: "lab-gateway",
             label: "Lab Gateway",
             protocol: "openai-compatible",
+            authScheme: "bearer_token",
             baseUrl: "https://gateway.example.com/v1",
             apiKeyPresent: true,
             enabled: true,
@@ -34,6 +35,14 @@ describe("ProviderRegistryEditor", () => {
             enabled: true,
           },
         ]}
+        probeState={{
+          "lab-gateway": {
+            status: "ready",
+            message: "ok",
+            checkedAt: "2026-06-28T00:00:00.000Z",
+          },
+        }}
+        onProbe={vi.fn()}
         onProviderChange={vi.fn()}
         onModelChange={vi.fn()}
         onApiKeyChange={vi.fn()}
@@ -48,5 +57,10 @@ describe("ProviderRegistryEditor", () => {
     expect(html).toContain("Provider label");
     expect(html).toContain("API key");
     expect(html).toContain("Model name");
+    expect(html).toContain("Authentication");
+    expect(html).toContain("Headers");
+    expect(html).toContain("Default model");
+    expect(html).toContain("Test connection");
+    expect(html).toContain("Ready");
   });
 });

@@ -32,6 +32,19 @@ describe("RuntimeDiagnosticsDialog", () => {
               baseUrl: null,
             },
           },
+          registryProviders: [
+            {
+              id: "lab-gateway",
+              label: "Lab Gateway",
+              protocol: "openai-compatible",
+              authScheme: "bearer_token",
+              baseUrl: "https://gateway.example.com/v1",
+              enabled: true,
+              apiKeyPresent: true,
+              modelCount: 1,
+              defaultModel: "GPT 5.4",
+            },
+          ],
         }}
       />,
     );
@@ -40,6 +53,9 @@ describe("RuntimeDiagnosticsDialog", () => {
     expect(html).toContain("Fallback cache");
     expect(html).toContain("D:\\AgentBuild");
     expect(html).toContain("Configured");
+    expect(html).toContain("Registry Providers");
+    expect(html).toContain("Lab Gateway");
+    expect(html).toContain("Default model: GPT 5.4");
   });
 
   it("renders a clickable status badge label", () => {

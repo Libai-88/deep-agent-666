@@ -10,6 +10,18 @@ export type RuntimeDiagnosticsStatus =
   | "degraded"
   | "offline";
 
+export type RuntimeDiagnosticsRegistryProvider = {
+  id: string;
+  label: string;
+  protocol: string;
+  authScheme: string;
+  baseUrl: string | null;
+  enabled: boolean;
+  apiKeyPresent: boolean;
+  modelCount: number;
+  defaultModel: string | null;
+};
+
 export type RuntimeDiagnostics = {
   status: RuntimeDiagnosticsStatus;
   backendReachable: boolean;
@@ -18,6 +30,7 @@ export type RuntimeDiagnostics = {
   configuredProviderCount: number;
   workspaceRoot: string | null;
   providers: RuntimeSettings["providers"];
+  registryProviders: RuntimeDiagnosticsRegistryProvider[];
   checkedAt: string;
 };
 
@@ -93,6 +106,27 @@ export function buildRuntimeDiagnostics(
   input: RuntimeDiagnosticsInput,
 ): RuntimeDiagnostics {
   const configuredProviderCount = countConfiguredProviders(input.runtimeSettings);
+  const registryProviders = input.runtimeSettings.providerProfiles.map((profile) => {
+    const linkedModels = input.runtimeSettings.modelProfiles.filter(
+      (model) => model.providerId === profile.id,
+    );
+    const defaultModel =
+      linkedModels.find((model) => model.enabled && model.isDefault)?.label ??
+      linkedModels.find((model) => model.enabled)?.label ??
+      null;
+
+    return {
+      id: profile.id,
+      label: profile.label,
+      protocol: profile.protocol,
+      authScheme: profile.authScheme,
+      baseUrl: profile.baseUrl,
+      enabled: profile.enabled,
+      apiKeyPresent: profile.apiKeyPresent,
+      modelCount: linkedModels.length,
+      defaultModel,
+    };
+  });
 
   return {
     status: resolveRuntimeDiagnosticsStatus({
@@ -107,6 +141,7 @@ export function buildRuntimeDiagnostics(
     configuredProviderCount,
     workspaceRoot: input.runtimeSettings.workspaceRoot,
     providers: input.runtimeSettings.providers,
+    registryProviders,
     checkedAt: input.checkedAt ?? new Date().toISOString(),
   };
 }
@@ -126,7 +161,17 @@ export function normalizeRuntimeDiagnostics(
 
   const runtimeSettings = normalizeRuntimeSettings({
     workspaceRoot: payload.workspaceRoot,
+    providerProfiles: payload.providerProfiles,
+    modelProfiles: payload.modelProfiles,
     providers: payload.providers,
+  });
+
+  const fallbackDiagnostics = buildRuntimeDiagnostics({
+    backendReachable: normalizeBoolean(payload.backendReachable),
+    catalogSource: normalizeCatalogSource(payload.catalogSource),
+    launchablePresetCount: normalizeCount(payload.launchablePresetCount),
+    runtimeSettings,
+    checkedAt: normalizeCheckedAt(payload.checkedAt),
   });
 
   return {
@@ -137,6 +182,36 @@ export function normalizeRuntimeDiagnostics(
     configuredProviderCount: normalizeCount(payload.configuredProviderCount),
     workspaceRoot: runtimeSettings.workspaceRoot,
     providers: runtimeSettings.providers,
+    registryProviders: Array.isArray(payload.registryProviders)
+      ? payload.registryProviders.filter(isRecord).map((provider) => ({
+          id: typeof provider.id === "string" ? provider.id : "",
+          label: typeof provider.label === "string" ? provider.label : "",
+          protocol:
+            typeof provider.protocol === "string" ? provider.protocol : "",
+          authScheme:
+            typeof provider.authScheme === "string"
+              ? provider.authScheme
+              : typeof provider.auth_scheme === "string"
+                ? provider.auth_scheme
+                : "api_key",
+          baseUrl:
+            typeof provider.baseUrl === "string"
+              ? provider.baseUrl
+              : typeof provider.base_url === "string"
+                ? provider.base_url
+                : null,
+          enabled: normalizeBoolean(provider.enabled),
+          apiKeyPresent:
+            provider.apiKeyPresent === true || provider.api_key_present === true,
+          modelCount: normalizeCount(provider.modelCount ?? provider.model_count),
+          defaultModel:
+            typeof provider.defaultModel === "string"
+              ? provider.defaultModel
+              : typeof provider.default_model === "string"
+                ? provider.default_model
+                : null,
+        }))
+      : fallbackDiagnostics.registryProviders,
     checkedAt: normalizeCheckedAt(payload.checkedAt),
   };
 }

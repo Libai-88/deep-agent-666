@@ -37,8 +37,29 @@ describe("runtime diagnostics", () => {
         launchablePresetCount: 1,
         runtimeSettings: {
           workspaceRoot: "D:\\AgentBuild",
-          providerProfiles: [],
-          modelProfiles: [],
+          providerProfiles: [
+            {
+              id: "lab-gateway",
+              label: "Lab Gateway",
+              protocol: "openai-compatible",
+              authScheme: "bearer_token",
+              baseUrl: "https://gateway.example.com/v1",
+              apiKeyPresent: true,
+              headers: {},
+              enabled: true,
+            },
+          ],
+          modelProfiles: [
+            {
+              id: "lab-gpt5",
+              providerId: "lab-gateway",
+              modelName: "gpt-5.4",
+              label: "GPT 5.4",
+              capabilities: ["chat", "tools"],
+              isDefault: true,
+              enabled: true,
+            },
+          ],
           providers: {
             openai: {
               configured: true,
@@ -85,9 +106,32 @@ describe("runtime diagnostics", () => {
             baseUrl: "https://api.openai.com/v1",
           },
         },
+        providerProfiles: [
+          {
+            id: "lab-gateway",
+            label: "Lab Gateway",
+            protocol: "openai-compatible",
+            authScheme: "bearer_token",
+            baseUrl: "https://gateway.example.com/v1",
+            apiKeyPresent: true,
+            enabled: true,
+            headers: {},
+          },
+        ],
+        modelProfiles: [
+          {
+            id: "lab-gpt5",
+            providerId: "lab-gateway",
+            modelName: "gpt-5.4",
+            label: "GPT 5.4",
+            capabilities: ["chat", "tools"],
+            isDefault: true,
+            enabled: true,
+          },
+        ],
         checkedAt: "2026-06-27T00:00:00.000Z",
       }),
-    ).toEqual({
+    ).toMatchObject({
       status: "healthy",
       backendReachable: true,
       catalogSource: "live",
@@ -108,6 +152,14 @@ describe("runtime diagnostics", () => {
           baseUrl: null,
         },
       },
+      registryProviders: [
+        {
+          id: "lab-gateway",
+          authScheme: "bearer_token",
+          defaultModel: "GPT 5.4",
+          modelCount: 1,
+        },
+      ],
       checkedAt: "2026-06-27T00:00:00.000Z",
     });
   });

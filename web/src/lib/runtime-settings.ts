@@ -4,6 +4,7 @@ export type RuntimeProviderProtocol =
   | "anthropic"
   | "google"
   | "openai-compatible";
+export type RuntimeProviderAuthScheme = "api_key" | "bearer_token";
 
 export type RuntimeModelCapability =
   | "chat"
@@ -20,6 +21,7 @@ export type RuntimeProviderProfile = {
   id: string;
   label: string;
   protocol: RuntimeProviderProtocol;
+  authScheme: RuntimeProviderAuthScheme;
   baseUrl: string | null;
   apiKeyPresent: boolean;
   headers: Record<string, string>;
@@ -51,6 +53,7 @@ type RuntimeConfigInput = {
     id: string;
     label: string;
     protocol: RuntimeProviderProtocol;
+    authScheme: RuntimeProviderAuthScheme;
     baseUrl: string | null;
     apiKey?: string;
     enabled: boolean;
@@ -103,11 +106,18 @@ function normalizeProviderProfile(value: unknown): RuntimeProviderProfile | null
   if (!id || !label || !protocol) {
     return null;
   }
+  const authScheme =
+    typeof value.authScheme === "string"
+      ? value.authScheme
+      : typeof value.auth_scheme === "string"
+        ? value.auth_scheme
+        : "api_key";
 
   return {
     id,
     label,
     protocol: protocol as RuntimeProviderProtocol,
+    authScheme: authScheme as RuntimeProviderAuthScheme,
     baseUrl:
       typeof value.baseUrl === "string"
         ? value.baseUrl
@@ -228,6 +238,7 @@ export function buildRuntimeConfigRequestBody(
       id: profile.id,
       label: profile.label,
       protocol: profile.protocol,
+      authScheme: profile.authScheme,
       baseUrl: profile.baseUrl,
       apiKey: profile.apiKey?.trim() || undefined,
       enabled: profile.enabled,

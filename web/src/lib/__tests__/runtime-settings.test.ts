@@ -15,6 +15,7 @@ describe("runtime-settings", () => {
             id: "lab-gateway",
             label: "Lab Gateway",
             protocol: "openai-compatible",
+            authScheme: "bearer_token",
             baseUrl: "https://gateway.example.com/v1",
             enabled: true,
             apiKeyPresent: true,
@@ -41,6 +42,7 @@ describe("runtime-settings", () => {
         {
           id: "lab-gateway",
           protocol: "openai-compatible",
+          authScheme: "bearer_token",
           apiKeyPresent: true,
         },
       ],
@@ -176,6 +178,7 @@ describe("runtime-settings", () => {
             id: "lab-gateway",
             label: "Lab Gateway",
             protocol: "openai-compatible",
+            authScheme: "bearer_token",
             baseUrl: "https://gateway.example.com/v1",
             apiKey: "secret",
             enabled: true,
@@ -202,6 +205,7 @@ describe("runtime-settings", () => {
         {
           id: "lab-gateway",
           protocol: "openai-compatible",
+          authScheme: "bearer_token",
           apiKey: "secret",
         },
       ],
@@ -212,6 +216,33 @@ describe("runtime-settings", () => {
           modelName: "gpt-5.4",
         },
       ],
+    });
+  });
+
+  it("normalizes auth scheme from snake_case payloads", () => {
+    expect(
+      normalizeRuntimeSettings({
+        workspaceRoot: "D:\\AgentBuild",
+        providerProfiles: [
+          {
+            id: "lab-gateway",
+            label: "Lab Gateway",
+            protocol: "openai-compatible",
+            auth_scheme: "bearer_token",
+            base_url: "https://gateway.example.com/v1",
+            api_key_present: true,
+            headers: {
+              "X-Team": "chem",
+            },
+            enabled: true,
+          },
+        ],
+      }).providerProfiles[0],
+    ).toMatchObject({
+      id: "lab-gateway",
+      authScheme: "bearer_token",
+      baseUrl: "https://gateway.example.com/v1",
+      apiKeyPresent: true,
     });
   });
 });

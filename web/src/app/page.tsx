@@ -77,7 +77,10 @@ import { TaskTimelinePanel } from "@/components/TaskTimelinePanel";
 import { ArtifactResultsPanel } from "@/components/ArtifactResultsPanel";
 import { HomePageShell } from "@/components/HomePageShell";
 import { PlanEditorPanel } from "@/components/PlanEditorPanel";
-import { ProviderRegistryEditor } from "@/components/ProviderRegistryEditor";
+import {
+  ProviderRegistryEditor,
+  type ProviderProbeState,
+} from "@/components/ProviderRegistryEditor";
 import { RunControlBar } from "@/components/RunControlBar";
 import {
   RuntimeDiagnosticsDialog,
@@ -1945,6 +1948,7 @@ function SettingsDialog({
   const [baseUrls, setBaseUrls] = useState<Record<string, string>>({});
   const [providerProfiles, setProviderProfiles] = useState<RuntimeProviderProfile[]>([]);
   const [modelProfiles, setModelProfiles] = useState<RuntimeModelProfile[]>([]);
+  const [probeState, setProbeState] = useState<ProviderProbeState>({});
   const [workspaceRoot, setWorkspaceRoot] = useState("");
   const [loadingConfig, setLoadingConfig] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -1977,6 +1981,7 @@ function SettingsDialog({
         setProviderProfiles(settings.providerProfiles);
         setModelProfiles(settings.modelProfiles);
         setApiKeys({});
+        setProbeState({});
       } catch {
         if (cancelled) {
           return;
@@ -2022,6 +2027,7 @@ function SettingsDialog({
           id: profile.id,
           label: profile.label,
           protocol: profile.protocol,
+          authScheme: profile.authScheme,
           baseUrl: profile.baseUrl,
           apiKey: apiKeys[profile.id] ?? "",
           enabled: profile.enabled,
@@ -2060,6 +2066,80 @@ function SettingsDialog({
       onSaveFailed("backend_unreachable");
     } finally {
       setSaving(false);
+    }
+  };
+
+  const handleProbe = async (providerId: string) => {
+    const providerProfile = providerProfiles.find((profile) => profile.id === providerId);
+    const modelProfile =
+      modelProfiles.find(
+        (profile) =>
+          profile.providerId === providerId && profile.enabled && profile.isDefault,
+      ) ??
+      modelProfiles.find(
+        (profile) => profile.providerId === providerId && profile.enabled,
+      );
+
+    if (!providerProfile || !modelProfile) {
+      setProbeState((current) => ({
+        ...current,
+        [providerId]: {
+          status: "invalid_config",
+          message: "Choose an enabled default model first.",
+          checkedAt: new Date().toISOString(),
+        },
+      }));
+      return;
+    }
+
+    setProbeState((current) => ({
+      ...current,
+      [providerId]: {
+        status: "pending",
+        message: null,
+        checkedAt: new Date().toISOString(),
+      },
+    }));
+
+    try {
+      const response = await fetch("/api/provider-probe", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          providerProfile: {
+            id: providerProfile.id,
+            label: providerProfile.label,
+            protocol: providerProfile.protocol,
+            authScheme: providerProfile.authScheme,
+            baseUrl: providerProfile.baseUrl,
+            apiKey: apiKeys[providerId]?.trim() || undefined,
+            enabled: providerProfile.enabled,
+            headers: providerProfile.headers,
+          },
+          modelProfile,
+        }),
+      });
+      const payload = (await response.json()) as {
+        status?: ProviderProbeState[string]["status"];
+        message?: string;
+      };
+      setProbeState((current) => ({
+        ...current,
+        [providerId]: {
+          status: payload.status ?? "unreachable",
+          message: payload.message ?? null,
+          checkedAt: new Date().toISOString(),
+        },
+      }));
+    } catch {
+      setProbeState((current) => ({
+        ...current,
+        [providerId]: {
+          status: "unreachable",
+          message: "Backend is not running.",
+          checkedAt: new Date().toISOString(),
+        },
+      }));
     }
   };
 
@@ -2187,6 +2267,8 @@ function SettingsDialog({
             apiKeys={apiKeys}
             providerProfiles={providerProfiles}
             modelProfiles={modelProfiles}
+            probeState={probeState}
+            onProbe={handleProbe}
             onProviderChange={setProviderProfiles}
             onModelChange={setModelProfiles}
             onApiKeyChange={setApiKeys}

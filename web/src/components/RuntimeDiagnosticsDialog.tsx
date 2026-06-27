@@ -143,6 +143,41 @@ export function RuntimeDiagnosticsPanel({
           ))}
         </ul>
       </div>
+
+      {diagnostics.registryProviders.length > 0 ? (
+        <div className="space-y-2">
+          <p className="text-xs uppercase tracking-wide text-muted-foreground">
+            Registry Providers
+          </p>
+          <ul className="grid gap-2">
+            {diagnostics.registryProviders.map((provider) => (
+              <li
+                key={provider.id}
+                className="rounded-md border border-border bg-muted/20 p-3"
+              >
+                <div className="flex items-center justify-between gap-3">
+                  <p className="font-medium">{provider.label}</p>
+                  <span className="text-xs text-muted-foreground">
+                    {provider.protocol}
+                  </span>
+                </div>
+                <p className="mt-1 text-xs text-muted-foreground">
+                  {provider.authScheme} · {provider.apiKeyPresent ? "Stored key" : "Missing key"}
+                </p>
+                <p className="mt-1 text-xs text-muted-foreground">
+                  {provider.defaultModel
+                    ? `Default model: ${provider.defaultModel}`
+                    : "No default model"}
+                </p>
+                <p className="mt-1 text-xs text-muted-foreground">
+                  {provider.modelCount} model{provider.modelCount === 1 ? "" : "s"} ·{" "}
+                  {provider.enabled ? "Enabled" : "Disabled"}
+                </p>
+              </li>
+            ))}
+          </ul>
+        </div>
+      ) : null}
     </div>
   );
 }
