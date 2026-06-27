@@ -164,3 +164,66 @@ def test_configure_rejects_invalid_workspace_root_without_mutating_snapshot(
     after = client.get("/config")
     assert after.status_code == 200
     assert after.json()["workspaceRoot"] == original_workspace_root
+
+
+def test_config_snapshot_returns_provider_and_model_profiles(
+    monkeypatch,
+    tmp_path,
+) -> None:
+    monkeypatch.setenv("OPENAI_API_KEY", "test-openai-key")
+
+    main_module = _reload_main(monkeypatch, tmp_path)
+    client = TestClient(main_module.app)
+
+    response = client.get("/config")
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert "providerProfiles" in payload
+    assert "modelProfiles" in payload
+    assert payload["providerProfiles"][0]["id"] == "openai"
+    assert payload["modelProfiles"][0]["provider_id"] == "openai"
+
+
+def test_configure_custom_openai_compatible_provider_creates_launchable_presets(
+    monkeypatch,
+    tmp_path,
+) -> None:
+    monkeypatch.setenv("OPENAI_API_KEY", "test-openai-key")
+
+    main_module = _reload_main(monkeypatch, tmp_path)
+    client = TestClient(main_module.app)
+
+    response = client.post(
+        "/configure",
+        json={
+            "providerProfiles": [
+                {
+                    "id": "lab-gateway",
+                    "label": "Lab Gateway",
+                    "protocol": "openai-compatible",
+                    "baseUrl": "https://gateway.example.com/v1",
+                    "apiKey": "secret",
+                    "enabled": True,
+                }
+            ],
+            "modelProfiles": [
+                {
+                    "id": "lab-gpt5",
+                    "providerId": "lab-gateway",
+                    "modelName": "gpt-5.4",
+                    "label": "GPT 5.4",
+                    "capabilities": ["chat", "tools"],
+                    "isDefault": True,
+                    "enabled": True,
+                }
+            ],
+        },
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert any(
+        preset_id.startswith("lab-gateway-")
+        for preset_id in payload["preset_ids"]
+    )

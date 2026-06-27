@@ -8,6 +8,7 @@ class AgentPreset(BaseModel):
     label: str
     model: str
     permission_mode: PermissionMode
+    provider_id: str | None = None
 
 
 DEFAULT_PRESET_ID = "openai-balanced"

@@ -9,10 +9,12 @@ from app.agent_factory import available_presets, build_langgraph_agents, build_v
 from app.config import AgentSettings
 from app.permissions import PermissionMode
 from app.presets import AgentPreset
+from app.provider_registry import ProviderRegistrySnapshot, load_provider_registry_from_settings
 
 
 @dataclass(frozen=True)
 class RuntimeAgentRegistry:
+    provider_registry_snapshot: ProviderRegistrySnapshot
     presets_by_id: dict[str, AgentPreset]
     v1_agents: dict[str, LangGraphAGUIAgent]
     coordinator_agents: dict[str, LangGraphAGUIAgent]
@@ -40,9 +42,13 @@ class LiveAgentAccessor:
         return iter(self._getter().all_agents)
 
 
-def build_runtime_registry(settings: AgentSettings) -> RuntimeAgentRegistry:
-    presets_by_id = available_presets(settings)
-    v1_agents = build_langgraph_agents(settings)
+def build_runtime_registry(
+    settings: AgentSettings,
+    provider_registry_snapshot: ProviderRegistrySnapshot | None = None,
+) -> RuntimeAgentRegistry:
+    snapshot = provider_registry_snapshot or load_provider_registry_from_settings(settings)
+    presets_by_id = available_presets(settings, snapshot)
+    v1_agents = build_langgraph_agents(settings, snapshot)
 
     coordinator_agents: dict[str, LangGraphAGUIAgent] = {}
     for preset_id, preset in presets_by_id.items():
@@ -55,6 +61,8 @@ def build_runtime_registry(settings: AgentSettings) -> RuntimeAgentRegistry:
                 model=v2_model,
                 permission_mode=preset.permission_mode.value,
                 settings=settings,
+                provider_id=preset.provider_id or _preset_provider_id(preset),
+                registry_snapshot=snapshot,
             )
             coordinator_agents[f"coordinator-{preset_id}"] = LangGraphAGUIAgent(
                 name=f"coordinator-{preset_id}",
@@ -65,7 +73,12 @@ def build_runtime_registry(settings: AgentSettings) -> RuntimeAgentRegistry:
             continue
 
     return RuntimeAgentRegistry(
+        provider_registry_snapshot=snapshot,
         presets_by_id=presets_by_id,
         v1_agents=v1_agents,
         coordinator_agents=coordinator_agents,
     )
+
+
+def _preset_provider_id(preset: AgentPreset) -> str:
+    return preset.provider_id or preset.model.split(":", maxsplit=1)[0]

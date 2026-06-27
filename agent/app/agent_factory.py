@@ -16,6 +16,12 @@ from langgraph.types import Command
 from app.config import AgentSettings, load_settings
 from app.permissions import PermissionMode, mutable_tool_names
 from app.presets import ALL_PRESETS, AgentPreset
+from app.provider_registry import (
+    ProviderRegistrySnapshot,
+    find_default_model_profile,
+    find_provider_profile,
+    load_provider_registry_from_settings,
+)
 from app.state import CoordinatorState, Delegation, WorkbenchEvent
 from app.task_profile import infer_task_kind, task_prompt_fragment
 from app.tools.documents import inspect_document, read_document
@@ -43,7 +49,18 @@ def _preset_provider(preset: AgentPreset) -> str:
     return preset.model.split(":", maxsplit=1)[0]
 
 
-def _provider_api_key(settings: AgentSettings, provider: str) -> str | None:
+def _provider_api_key(
+    settings: AgentSettings,
+    provider: str,
+    *,
+    provider_id: str | None = None,
+    registry_snapshot: ProviderRegistrySnapshot | None = None,
+) -> str | None:
+    if registry_snapshot is not None:
+        profile = find_provider_profile(registry_snapshot, provider_id or provider)
+        if profile and profile.enabled:
+            return profile.api_key
+
     if provider == "openai":
         return settings.openai_api_key
     if provider == "anthropic":
@@ -53,22 +70,89 @@ def _provider_api_key(settings: AgentSettings, provider: str) -> str | None:
     return None
 
 
-def available_presets(settings: AgentSettings) -> dict[str, AgentPreset]:
-    return {
+def _resolve_registry_snapshot(
+    settings: AgentSettings,
+    registry_snapshot: ProviderRegistrySnapshot | None,
+) -> ProviderRegistrySnapshot:
+    return registry_snapshot or load_provider_registry_from_settings(settings)
+
+
+def _custom_provider_presets(
+    registry_snapshot: ProviderRegistrySnapshot,
+) -> dict[str, AgentPreset]:
+    presets: dict[str, AgentPreset] = {}
+    permission_labels = {
+        PermissionMode.READ_ONLY: "Read-only",
+        PermissionMode.BALANCED: "Balanced",
+        PermissionMode.FULL_ACCESS: "Full access",
+    }
+    for profile in registry_snapshot.provider_profiles:
+        if profile.id in {"openai", "anthropic", "google"}:
+            continue
+        if not profile.enabled or not profile.api_key_present:
+            continue
+        if profile.protocol != "openai-compatible":
+            continue
+
+        model_profile = find_default_model_profile(registry_snapshot, profile.id)
+        if model_profile is None:
+            continue
+
+        for permission_mode in PermissionMode:
+            preset_id = f"{profile.id}-{permission_mode.value}"
+            presets[preset_id] = AgentPreset(
+                id=preset_id,
+                label=f"{profile.label} / {permission_labels[permission_mode]}",
+                model=f"openai:{model_profile.model_name}",
+                permission_mode=permission_mode,
+                provider_id=profile.id,
+            )
+    return presets
+
+
+def available_presets(
+    settings: AgentSettings,
+    registry_snapshot: ProviderRegistrySnapshot | None = None,
+) -> dict[str, AgentPreset]:
+    snapshot = _resolve_registry_snapshot(settings, registry_snapshot)
+    presets = {
         preset_id: preset
         for preset_id, preset in ALL_PRESETS.items()
-        if _provider_api_key(settings, _preset_provider(preset))
+        if _provider_api_key(
+            settings,
+            _preset_provider(preset),
+            provider_id=preset.provider_id,
+            registry_snapshot=snapshot,
+        )
     }
+    presets.update(_custom_provider_presets(snapshot))
+    return presets
 
 
-def _build_model(preset: AgentPreset, settings: AgentSettings):
+def _build_model(
+    preset: AgentPreset,
+    settings: AgentSettings,
+    registry_snapshot: ProviderRegistrySnapshot | None = None,
+):
     provider = _preset_provider(preset)
     model_name = preset.model.split(":", maxsplit=1)[1]
     model_provider = "google_genai" if provider == "google" else provider
-    api_key = _provider_api_key(settings, provider)
+    snapshot = _resolve_registry_snapshot(settings, registry_snapshot)
+    api_key = _provider_api_key(
+        settings,
+        provider,
+        provider_id=preset.provider_id,
+        registry_snapshot=snapshot,
+    )
     if api_key is None:
-        raise ValueError(f"provider is not configured: {provider}")
-    kwargs = _build_model_kwargs(provider, api_key, settings)
+        raise ValueError(f"provider is not configured: {preset.provider_id or provider}")
+    kwargs = _build_model_kwargs(
+        provider,
+        api_key,
+        settings,
+        provider_id=preset.provider_id,
+        registry_snapshot=snapshot,
+    )
     return init_chat_model(model=model_name, model_provider=model_provider, **kwargs)
 
 
@@ -76,27 +160,38 @@ def _build_model_kwargs(
     provider: str,
     api_key: str,
     settings: AgentSettings,
+    *,
+    provider_id: str | None = None,
+    registry_snapshot: ProviderRegistrySnapshot | None = None,
 ) -> dict[str, str]:
     """Build provider-specific init_chat_model kwargs.
 
     Extracted to avoid duplication between _build_model and build_v2_coordinator.
     """
     kwargs: dict[str, str] = {"api_key": api_key}
+    provider_profile = (
+        find_provider_profile(registry_snapshot, provider_id)
+        if registry_snapshot is not None and provider_id
+        else None
+    )
 
     if provider == "openai":
-        if settings.openai_base_url:
-            kwargs["base_url"] = settings.openai_base_url
+        base_url = provider_profile.base_url if provider_profile else settings.openai_base_url
+        if base_url:
+            kwargs["base_url"] = base_url
 
     elif provider == "anthropic":
         # ChatAnthropic uses anthropic_api_url (full base, SDK appends /v1/messages)
-        if settings.anthropic_base_url:
-            kwargs["anthropic_api_url"] = settings.anthropic_base_url
+        base_url = provider_profile.base_url if provider_profile else settings.anthropic_base_url
+        if base_url:
+            kwargs["anthropic_api_url"] = base_url
 
     elif provider == "google":
         kwargs["google_api_key"] = api_key
-        if settings.google_base_url:
+        base_url = provider_profile.base_url if provider_profile else settings.google_base_url
+        if base_url:
             kwargs["transport"] = "rest"
-            kwargs["base_url"] = settings.google_base_url
+            kwargs["base_url"] = base_url
 
     return kwargs
 
@@ -162,9 +257,13 @@ def _toolset_for_preset(workspace_root: Path, permission_mode: PermissionMode) -
     return toolset
 
 
-def build_graph(preset: AgentPreset, settings: AgentSettings) -> object:
+def build_graph(
+    preset: AgentPreset,
+    settings: AgentSettings,
+    registry_snapshot: ProviderRegistrySnapshot | None = None,
+) -> object:
     return create_deep_agent(
-        model=_build_model(preset, settings),
+        model=_build_model(preset, settings, registry_snapshot),
         tools=_toolset_for_preset(settings.workspace_root, preset.permission_mode),
         system_prompt=SYSTEM_PROMPT,
         checkpointer=MemorySaver(),
@@ -172,21 +271,27 @@ def build_graph(preset: AgentPreset, settings: AgentSettings) -> object:
     )
 
 
-def build_graph_map(settings: AgentSettings) -> dict[str, object]:
+def build_graph_map(
+    settings: AgentSettings,
+    registry_snapshot: ProviderRegistrySnapshot | None = None,
+) -> dict[str, object]:
     return {
-        preset_id: build_graph(preset, settings)
-        for preset_id, preset in available_presets(settings).items()
+        preset_id: build_graph(preset, settings, registry_snapshot)
+        for preset_id, preset in available_presets(settings, registry_snapshot).items()
     }
 
 
-def build_langgraph_agents(settings: AgentSettings) -> dict[str, LangGraphAGUIAgent]:
+def build_langgraph_agents(
+    settings: AgentSettings,
+    registry_snapshot: ProviderRegistrySnapshot | None = None,
+) -> dict[str, LangGraphAGUIAgent]:
     """Build V1 agents per preset. Returns LangGraphAGUIAgent-wrapped agents.
 
     Wrapped agents are compatible with both add_langgraph_fastapi_endpoint
     and CopilotKitRemoteEndpoint.
     """
-    graph_map = build_graph_map(settings)
-    configured_presets = available_presets(settings)
+    graph_map = build_graph_map(settings, registry_snapshot)
+    configured_presets = available_presets(settings, registry_snapshot)
     return {
         preset_id: LangGraphAGUIAgent(
             name=preset_id,
@@ -296,6 +401,8 @@ def build_v2_coordinator(
     model: str,
     permission_mode: str = "balanced",
     settings: AgentSettings | None = None,
+    provider_id: str | None = None,
+    registry_snapshot: ProviderRegistrySnapshot | None = None,
 ):
     """Build a supervisor coordinator that delegates to planner/executor/reviewer sub-agents.
 
@@ -310,11 +417,23 @@ def build_v2_coordinator(
     settings = settings or load_settings()
 
     model_provider = "google_genai" if provider == "google" else provider
-    api_key = _provider_api_key(settings, provider)
+    snapshot = _resolve_registry_snapshot(settings, registry_snapshot)
+    api_key = _provider_api_key(
+        settings,
+        provider,
+        provider_id=provider_id,
+        registry_snapshot=snapshot,
+    )
     if api_key is None:
-        raise ValueError(f"provider is not configured: {provider}")
+        raise ValueError(f"provider is not configured: {provider_id or provider}")
 
-    kwargs = _build_model_kwargs(provider, api_key, settings)
+    kwargs = _build_model_kwargs(
+        provider,
+        api_key,
+        settings,
+        provider_id=provider_id,
+        registry_snapshot=snapshot,
+    )
     llm = init_chat_model(model=model_name, model_provider=model_provider, **kwargs)
 
     permission = PermissionMode(permission_mode)

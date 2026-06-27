@@ -1,12 +1,14 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Literal
+from typing import TYPE_CHECKING, Literal
 
 from pydantic import BaseModel, Field
 
-from app.config import AgentSettings, normalize_runtime_workspace_root
 from app.presets import BUILTIN_PROVIDER_DEFAULT_MODELS
+
+if TYPE_CHECKING:
+    from app.config import AgentSettings
 
 
 ProviderProtocol = Literal["openai", "anthropic", "google", "openai-compatible"]
@@ -75,7 +77,7 @@ def _provider_base_url(settings: AgentSettings, provider_id: str) -> str | None:
 
 
 def load_provider_registry_from_settings(
-    settings: AgentSettings,
+    settings: "AgentSettings",
 ) -> ProviderRegistrySnapshot:
     provider_profiles: list[ProviderProfile] = []
     model_profiles: list[ModelProfile] = []
@@ -112,6 +114,61 @@ def load_provider_registry_from_settings(
     )
 
 
+def find_provider_profile(
+    snapshot: ProviderRegistrySnapshot,
+    provider_id: str,
+) -> ProviderProfile | None:
+    for profile in snapshot.provider_profiles:
+        if profile.id == provider_id:
+            return profile
+    return None
+
+
+def find_default_model_profile(
+    snapshot: ProviderRegistrySnapshot,
+    provider_id: str,
+) -> ModelProfile | None:
+    candidates = [
+        profile
+        for profile in snapshot.model_profiles
+        if profile.provider_id == provider_id and profile.enabled
+    ]
+    for profile in candidates:
+        if profile.is_default:
+            return profile
+    return candidates[0] if candidates else None
+
+
+def build_legacy_provider_summary(
+    snapshot: ProviderRegistrySnapshot,
+) -> dict[str, dict[str, object]]:
+    providers: dict[str, dict[str, object]] = {}
+    for provider_id in BUILTIN_PROVIDER_DEFAULT_MODELS:
+        profile = find_provider_profile(snapshot, provider_id)
+        providers[provider_id] = {
+            "configured": bool(profile and profile.enabled and profile.api_key_present),
+            "baseUrl": profile.base_url if profile else None,
+        }
+    return providers
+
+
+def serialize_provider_profiles(
+    snapshot: ProviderRegistrySnapshot,
+) -> list[dict[str, object]]:
+    profiles: list[dict[str, object]] = []
+    for profile in snapshot.provider_profiles:
+        payload = profile.model_dump(exclude={"api_key"})
+        payload["api_key_present"] = profile.api_key_present
+        profiles.append(payload)
+    return profiles
+
+
+def serialize_model_profiles(
+    snapshot: ProviderRegistrySnapshot,
+) -> list[dict[str, object]]:
+    return [profile.model_dump() for profile in snapshot.model_profiles]
+
+
 def _normalize_provider_profile(value: object) -> ProviderProfile:
     if not isinstance(value, dict):
         raise ValueError("provider profile must be an object")
@@ -123,7 +180,13 @@ def _normalize_provider_profile(value: object) -> ProviderProfile:
         base_url=_read_optional_string(value, "baseUrl", "base_url"),
         auth_scheme=_read_optional_string(value, "authScheme", "auth_scheme")
         or "api_key",
-        api_key=_read_optional_string(value, "apiKey", "api_key"),
+        api_key=_read_optional_string(
+            value,
+            "apiKey",
+            "api_key",
+            "apiKeyValue",
+            "api_key_value",
+        ),
         headers=_read_string_map(value.get("headers")),
         enabled=_read_optional_bool(value, "enabled", default=True),
     )
@@ -191,9 +254,12 @@ def normalize_provider_registry_payload(
     if not isinstance(payload, dict):
         raise ValueError("provider registry payload must be an object")
 
-    workspace_root = normalize_runtime_workspace_root(
-        payload.get("workspaceRoot") or payload["workspace_root"]
-    )
+    raw_workspace_root = payload.get("workspaceRoot") or payload["workspace_root"]
+    workspace_root = Path(raw_workspace_root).expanduser().resolve()
+    if not workspace_root.exists():
+        raise ValueError("workspace root does not exist")
+    if not workspace_root.is_dir():
+        raise ValueError("workspace root is not a directory")
     provider_profiles = [
         _normalize_provider_profile(item)
         for item in payload.get("providerProfiles", payload.get("provider_profiles", []))

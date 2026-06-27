@@ -21,6 +21,12 @@ from copilotkit.integrations.fastapi import add_fastapi_endpoint
 
 from app.config import ConfigStore, load_settings, normalize_runtime_workspace_root
 from app.presets import DEFAULT_PRESET_ID
+from app.provider_registry import (
+    build_legacy_provider_summary,
+    normalize_provider_registry_payload,
+    serialize_model_profiles,
+    serialize_provider_profiles,
+)
 from app.runtime_registry import (
     LiveAgentAccessor,
     RuntimeAgentRegistry,
@@ -46,6 +52,8 @@ app.add_middleware(
 
 class ConfigureRequest(BaseModel):
     agent_workspace_root: str | None = None
+    providerProfiles: list[dict[str, object]] | None = None
+    modelProfiles: list[dict[str, object]] | None = None
     openai_api_key: str | None = None
     openai_base_url: str | None = None
     anthropic_api_key: str | None = None
@@ -54,7 +62,10 @@ class ConfigureRequest(BaseModel):
     google_base_url: str | None = None
 
 
-runtime_registry: RuntimeAgentRegistry = build_runtime_registry(settings)
+runtime_registry: RuntimeAgentRegistry = build_runtime_registry(
+    settings,
+    store.provider_registry_snapshot,
+)
 
 
 def _current_registry() -> RuntimeAgentRegistry:
@@ -68,7 +79,10 @@ add_fastapi_endpoint(app, sdk, "/copilotkit")
 def _reload_agents() -> None:
     """Rebuild the live runtime registry after /configure."""
     global runtime_registry
-    runtime_registry = build_runtime_registry(store.snapshot())
+    runtime_registry = build_runtime_registry(
+        store.snapshot(),
+        store.provider_registry_snapshot,
+    )
 
 
 def _resolve_route_agent(agent_name: str):
@@ -124,23 +138,12 @@ def _classify_route_exception(exc: Exception) -> tuple[str | None, str]:
 
 
 def _runtime_config_payload() -> dict[str, object]:
-    snapshot = store.snapshot()
+    snapshot = store.provider_registry_snapshot
     return {
         "workspaceRoot": str(snapshot.workspace_root),
-        "providers": {
-            "openai": {
-                "configured": bool(snapshot.openai_api_key),
-                "baseUrl": snapshot.openai_base_url,
-            },
-            "anthropic": {
-                "configured": bool(snapshot.anthropic_api_key),
-                "baseUrl": snapshot.anthropic_base_url,
-            },
-            "google": {
-                "configured": bool(snapshot.google_api_key),
-                "baseUrl": snapshot.google_base_url,
-            },
-        },
+        "providerProfiles": serialize_provider_profiles(snapshot),
+        "modelProfiles": serialize_model_profiles(snapshot),
+        "providers": build_legacy_provider_summary(snapshot),
     }
 
 
@@ -207,6 +210,35 @@ async def configure(body: ConfigureRequest) -> JSONResponse:
         changed = True
     if body.google_base_url is not None:
         store.google_base_url = body.google_base_url
+        changed = True
+
+    if body.providerProfiles is not None or body.modelProfiles is not None:
+        current_snapshot = store.provider_registry_snapshot
+        try:
+            next_snapshot = normalize_provider_registry_payload(
+                {
+                    "workspaceRoot": str(store.snapshot().workspace_root),
+                    "providerProfiles": (
+                        body.providerProfiles
+                        if body.providerProfiles is not None
+                        else [profile.model_dump() for profile in current_snapshot.provider_profiles]
+                    ),
+                    "modelProfiles": (
+                        body.modelProfiles
+                        if body.modelProfiles is not None
+                        else [profile.model_dump() for profile in current_snapshot.model_profiles]
+                    ),
+                }
+            )
+        except ValueError as exc:
+            return JSONResponse(
+                {
+                    "detail": str(exc),
+                    "code": "workspace_root_invalid",
+                },
+                status_code=400,
+            )
+        store.provider_registry_snapshot = next_snapshot
         changed = True
 
     if changed:
