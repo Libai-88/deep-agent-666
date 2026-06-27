@@ -1,15 +1,6 @@
-export type ProviderKey = "openai" | "anthropic" | "google";
+export type ProviderKey = string;
 export type PermissionMode = "read-only" | "balanced" | "full-access";
-export type AgentPresetId =
-  | "openai-read-only"
-  | "openai-balanced"
-  | "openai-full-access"
-  | "anthropic-read-only"
-  | "anthropic-balanced"
-  | "anthropic-full-access"
-  | "google-read-only"
-  | "google-balanced"
-  | "google-full-access";
+export type AgentPresetId = string;
 
 export type AgentPresetDefinition = {
   id: AgentPresetId;
@@ -98,18 +89,28 @@ export const STATIC_AGENT_PRESET_CATALOG: AgentPresetCatalog = {
 };
 
 export function isAgentPresetId(value: string): value is AgentPresetId {
-  return KNOWN_AGENT_PRESET_IDS.includes(value as AgentPresetId);
+  return value.trim().length > 0;
 }
 
 export function parsePresetId(presetId: AgentPresetId): {
   provider: ProviderKey;
   permissionMode: PermissionMode;
 } {
-  const separatorIndex = presetId.indexOf("-");
+  const suffixes: PermissionMode[] = ["read-only", "balanced", "full-access"];
+  const matchedSuffix = suffixes.find((suffix) =>
+    presetId.endsWith(`-${suffix}`),
+  );
+
+  if (!matchedSuffix) {
+    return {
+      provider: presetId,
+      permissionMode: "balanced",
+    };
+  }
 
   return {
-    provider: presetId.slice(0, separatorIndex) as ProviderKey,
-    permissionMode: presetId.slice(separatorIndex + 1) as PermissionMode,
+    provider: presetId.slice(0, -(`-${matchedSuffix}`).length) as ProviderKey,
+    permissionMode: matchedSuffix,
   };
 }
 
@@ -137,5 +138,5 @@ export function resolvePresetId(
   provider: ProviderKey,
   permissionMode: PermissionMode,
 ): AgentPresetId {
-  return `${provider}-${permissionMode}` as AgentPresetId;
+  return `${provider}-${permissionMode}`;
 }

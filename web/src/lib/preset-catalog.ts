@@ -3,9 +3,9 @@ import {
   type AgentPresetCatalog,
   type AgentPresetDefinition,
   type AgentPresetId,
-  isAgentPresetId,
   parsePresetId,
   resolveDefaultPresetId,
+  type PermissionMode,
 } from "./agent-presets";
 
 export type CatalogSource = "live" | "fallback";
@@ -39,17 +39,31 @@ function isPresetRecord(value: unknown): value is {
   );
 }
 
+function normalizePermissionMode(value: unknown): PermissionMode | null {
+  if (
+    value === "read-only" ||
+    value === "balanced" ||
+    value === "full-access"
+  ) {
+    return value;
+  }
+
+  return null;
+}
+
 function toPresetDefinition(value: {
   id: AgentPresetId;
   label: string;
+  provider?: string;
+  permissionMode?: PermissionMode | null;
 }): AgentPresetDefinition {
-  const { provider, permissionMode } = parsePresetId(value.id);
+  const parsed = parsePresetId(value.id);
 
   return {
     id: value.id,
     label: value.label,
-    provider,
-    permissionMode,
+    provider: value.provider ?? parsed.provider,
+    permissionMode: value.permissionMode ?? parsed.permissionMode,
   };
 }
 
@@ -61,7 +75,21 @@ export function normalizePresetCatalog(payload: unknown): AgentPresetCatalog {
   const candidate = payload as Record<string, unknown>;
   const rawPresets = Array.isArray(candidate.presets) ? candidate.presets : [];
   const presets = rawPresets.reduce<AgentPresetDefinition[]>((result, preset) => {
-    if (!isPresetRecord(preset) || !isAgentPresetId(preset.id)) {
+    if (!isPresetRecord(preset)) {
+      return result;
+    }
+
+    const provider =
+      typeof (preset as Record<string, unknown>).provider === "string"
+        ? ((preset as Record<string, unknown>).provider as string)
+        : typeof (preset as Record<string, unknown>).provider_id === "string"
+          ? ((preset as Record<string, unknown>).provider_id as string)
+          : undefined;
+    const permissionMode = normalizePermissionMode(
+      (preset as Record<string, unknown>).permissionMode ??
+        (preset as Record<string, unknown>).permission_mode,
+    );
+    if (!permissionMode) {
       return result;
     }
 
@@ -69,6 +97,8 @@ export function normalizePresetCatalog(payload: unknown): AgentPresetCatalog {
       toPresetDefinition({
         id: preset.id,
         label: preset.label,
+        provider,
+        permissionMode,
       }),
     );
     return result;
@@ -76,7 +106,8 @@ export function normalizePresetCatalog(payload: unknown): AgentPresetCatalog {
 
   const rawDefaultPresetId = candidate.defaultPresetId;
   const defaultPresetId =
-    typeof rawDefaultPresetId === "string" && isAgentPresetId(rawDefaultPresetId)
+    typeof rawDefaultPresetId === "string" &&
+    presets.some((preset) => preset.id === rawDefaultPresetId)
       ? rawDefaultPresetId
       : null;
 

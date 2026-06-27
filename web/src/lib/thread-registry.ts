@@ -1,7 +1,6 @@
 import { randomUUID } from "@copilotkit/shared";
 
 import {
-  ALL_AGENT_PRESETS,
   type AgentPresetDefinition,
   type AgentPresetId,
 } from "./agent-presets";
@@ -20,9 +19,6 @@ type ResolveNextThreadIdAfterDeleteInput = {
 };
 
 const STORAGE_KEY = "deep-agent-666.threads";
-const VALID_PRESET_IDS = new Set(
-  ALL_AGENT_PRESETS.map((preset) => preset.id),
-);
 
 function isLocalThread(value: unknown): value is LocalThread {
   if (!value || typeof value !== "object") {
@@ -35,8 +31,7 @@ function isLocalThread(value: unknown): value is LocalThread {
     typeof candidate.id === "string" &&
     typeof candidate.title === "string" &&
     typeof candidate.updatedAt === "number" &&
-    typeof candidate.presetId === "string" &&
-    VALID_PRESET_IDS.has(candidate.presetId as AgentPresetId)
+    typeof candidate.presetId === "string"
   );
 }
 

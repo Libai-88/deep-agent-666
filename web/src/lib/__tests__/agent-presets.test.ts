@@ -41,6 +41,13 @@ describe("agent presets", () => {
     });
   });
 
+  it("parses custom provider preset ids that contain internal hyphens", () => {
+    expect(parsePresetId("lab-gateway-balanced")).toEqual({
+      provider: "lab-gateway",
+      permissionMode: "balanced",
+    });
+  });
+
   it("falls back to the first available preset when the default is unavailable", () => {
     expect(
       resolveDefaultPresetId({

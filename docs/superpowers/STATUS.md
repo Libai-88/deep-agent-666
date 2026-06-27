@@ -1,6 +1,6 @@
 # Deep Agent 666 — 当前状态
 
-> 最后更新：2026-06-27 (V1 完成，V2 release hardening 完成，V3 首用引导完成，V4 本地持久化线程运行时完成，V5 live provider activation 完成，V6 first response roundtrip 完成，V7 provider alignment/runtime recovery 完成，V8 runtime failure normalization 完成，V9 retry replay recovery 完成，V10 thread history gap recovery 完成，V11 thread history drift recovery 完成，V12 runtime persistence proof 完成，V13 runtime catalog fallback 完成，V14 coordinator workbench regression 完成，V15 runtime-config workspace root 完成，V16 coordinator restored-thread continuity 完成，V17 thread management 完成，V18 runtime diagnostics 完成，V19 runtime bootstrap reconnect 完成，V20 active-thread recovery shell 完成，V21 contextual recovery actions 完成，V22 coordinator recovery replay 完成，V23 true process restart persistence 完成，V24 coordinator true process restart 完成，V25 coordinator browser restart continuity 完成，V26 coordinator restart history-gap replay 完成，V27 A2UI diff preview activation 完成，Phase A unified runtime protocol 完成)
+> 最后更新：2026-06-27 (V1 完成，V2 release hardening 完成，V3 首用引导完成，V4 本地持久化线程运行时完成，V5 live provider activation 完成，V6 first response roundtrip 完成，V7 provider alignment/runtime recovery 完成，V8 runtime failure normalization 完成，V9 retry replay recovery 完成，V10 thread history gap recovery 完成，V11 thread history drift recovery 完成，V12 runtime persistence proof 完成，V13 runtime catalog fallback 完成，V14 coordinator workbench regression 完成，V15 runtime-config workspace root 完成，V16 coordinator restored-thread continuity 完成，V17 thread management 完成，V18 runtime diagnostics 完成，V19 runtime bootstrap reconnect 完成，V20 active-thread recovery shell 完成，V21 contextual recovery actions 完成，V22 coordinator recovery replay 完成，V23 true process restart persistence 完成，V24 coordinator true process restart 完成，V25 coordinator browser restart continuity 完成，V26 coordinator restart history-gap replay 完成，V27 A2UI diff preview activation 完成，Phase A unified runtime protocol 完成，V28 control plane/custom provider foundation 完成)
 
 ## 当前结论
 
@@ -9,15 +9,16 @@
 - V3 首用引导已在 `380b84c` 完成并推送远端。
 - 当前产品基线是：一个本地工作区、一个 Web、一个 FastAPI/Deep Agents 服务，支持工程和研究混合场景，并已补齐“同页配置后即可启动首条任务并收到首条响应”的首用闭环。
 - 当前产品也已具备产品内运行时诊断面，用户可以直接看到 backend reachability、preset source、provider 配置数和 workspace root，而不是只看一条错误文案。
+- 当前产品已具备 custom provider/control-plane 基础能力：可在 Settings 中新增 `openai-compatible` provider/model，frontend 会接纳动态 preset，线程内也已有 run-control 与暂停计划编辑边界。
 
 ## 测试状态
 
 | 套件 | 数量 | 状态 |
 |------|------|------|
-| 后端 (pytest) | 63 | ✅ 全通过 |
-| 前端 (vitest) | 96 | ✅ 全通过 |
+| 后端 (pytest) | 73 | ✅ 全通过 |
+| 前端 (vitest) | 107 | ✅ 全通过 |
 | Build (next build) | — | ✅ |
-| E2E (playwright) | 25 | ✅ 全通过 |
+| E2E (playwright) | 26 | ✅ 全通过 |
 | Docker Compose 配置校验 | — | ⚠️ 当前机器未安装 `docker`，未执行命令级验证 |
 
 ## 已完成
@@ -164,6 +165,11 @@
 - Python workspace 写工具现在会返回结构化编辑结果，包含 `summary`、`before`、`after`、`change_type` 和 `a2ui_operations`
 - 前端 workbench 归一化已兼容结构化工具结果：artifact 继续显示摘要文本，A2UI surface 则内联渲染 `DiffPreview`
 - 浏览器回归已证明 coordinator 流中的 `replace_text_in_file_tool` 结果会在 Results 面板旁同步出现 diff preview，而不会污染最终 summary
+
+### V28: Control Plane / Custom Provider Foundation ✅
+- Settings 现在支持新增 `openai-compatible` custom provider 和 custom model，而不再只是只读展示 registry 快照
+- 前端 preset catalog、线程恢复和 active shell 现在会接纳动态 preset，不会再把 registry 生成的 custom preset 静默过滤掉
+- workbench 新增 `RunControlBar`、暂停态 `PlanEditorPanel`，timeline 也已把内部运行事件改写成更适合终端用户理解的文案
 
 ### Phase A: Unified Runtime Protocol ✅
 - coordinator backend state 新增 `workbench_events` 契约，开始把 delegation、artifact 和状态事件统一到同一条 workbench 协议里

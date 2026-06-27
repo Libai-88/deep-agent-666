@@ -392,10 +392,11 @@ function HomePageContent() {
   const currentPreset = useMemo(() => {
     if (!activeThread) return null;
     return (
+      findPresetById(catalogState.catalog.presets, activeThread.presetId) ??
       findPresetById(ALL_AGENT_PRESETS, activeThread.presetId as AgentPresetId) ??
       null
     );
-  }, [activeThread]);
+  }, [activeThread, catalogState.catalog.presets]);
   const activeAgentId = useMemo(() => {
     if (!currentPreset) return undefined;
     return resolveThreadAgentId(currentPreset.id, currentPreset.permissionMode);
@@ -644,7 +645,11 @@ function HomePageContent() {
       setPendingThreadRun({
         id: crypto.randomUUID(),
         threadId: thread.id,
-        agentId: resolveThreadAgentId(presetId, findPresetById(ALL_AGENT_PRESETS, presetId)?.permissionMode ?? "balanced"),
+        agentId: resolveThreadAgentId(
+          presetId,
+          findPresetById(catalogState.catalog.presets, presetId)?.permissionMode ??
+            "balanced",
+        ),
         prompt: template.prompt,
       });
     },
@@ -771,6 +776,10 @@ function HomePageContent() {
 
   const settingsPreset =
     currentPreset ??
+    findPresetById(
+      catalogState.catalog.presets,
+      resolveDefaultPresetId(catalogState.catalog) ?? "openai-balanced",
+    ) ??
     findPresetById(
       ALL_AGENT_PRESETS,
       resolveDefaultPresetId(catalogState.catalog) ?? "openai-balanced",
@@ -960,7 +969,7 @@ function HomePageContent() {
               <div className="flex items-center gap-2 border-b border-border px-4 py-2">
                 <span className="text-xs text-muted-foreground">Model:</span>
                 <PresetSelector
-                  presets={ALL_AGENT_PRESETS.filter(
+                  presets={catalogState.catalog.presets.filter(
                     (p) => p.provider === currentPreset.provider,
                   )}
                   value={activeThread.presetId as AgentPresetId}
@@ -970,7 +979,7 @@ function HomePageContent() {
                   Permission:
                 </span>
                 <PresetSelector
-                  presets={ALL_AGENT_PRESETS.filter(
+                  presets={catalogState.catalog.presets.filter(
                     (p) => p.permissionMode === currentPreset.permissionMode,
                   )}
                   value={activeThread.presetId as AgentPresetId}
@@ -2060,7 +2069,7 @@ function SettingsDialog({
         onClick={() => onOpenChange(false)}
       >
         <div
-          className="w-full max-w-lg rounded-xl border border-border bg-white p-6 shadow-lg"
+          className="max-h-[85vh] w-full max-w-lg overflow-y-auto rounded-xl border border-border bg-white p-6 shadow-lg"
           onClick={(e) => e.stopPropagation()}
         >
         <h2 className="text-lg font-semibold text-card-foreground">Settings</h2>
@@ -2175,10 +2184,12 @@ function SettingsDialog({
 
         <div className="mt-5">
           <ProviderRegistryEditor
+            apiKeys={apiKeys}
             providerProfiles={providerProfiles}
             modelProfiles={modelProfiles}
             onProviderChange={setProviderProfiles}
             onModelChange={setModelProfiles}
+            onApiKeyChange={setApiKeys}
           />
         </div>
 
