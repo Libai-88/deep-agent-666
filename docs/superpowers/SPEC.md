@@ -34,7 +34,7 @@
 | 前端 | Next.js 16 + React 19 + @copilotkit/react-core v2 |
 | 代理层 | @ag-ui/client HttpAgent + createCopilotRuntimeHandler |
 | UI | shadcn/ui + Tailwind v4 + lucide-react |
-| 测试 | pytest (59) + vitest (89) + playwright (21) |
+| 测试 | pytest (59) + vitest (89) + playwright (22) |
 
 ## 关键决策
 
@@ -56,6 +56,6 @@
 
 | 问题 | P级 | 说明 |
 |------|-----|------|
-| 更广覆盖的 runtime restart/resume 仍待扩展 | P1 | V22 已补齐 coordinator recovery replay proof 与 live-activity anti-false-gap 保护，但跨更多入口与真实进程重启的覆盖仍可继续增强 |
+| 更广覆盖的 runtime restart/resume 仍待扩展 | P1 | V23 已补齐主 CopilotKit 路由的真实 Web 进程重启恢复证明，但跨更多入口与 coordinator 连续场景的覆盖仍可继续增强 |
 | DataChart 组件 | P1 | V2 spec 可选组件，未实现 |
-| 更广对话恢复验证 | P1 | 已启用 `SqliteAgentRunner`，并覆盖 prompt 重放、历史缺失、部分历史漂移提示、主运行时跨实例恢复证明、主路由 catalog fallback 恢复，以及 coordinator starter 主工作流回归；后续仍可扩展到更多入口与真实进程重启 |
+| 更广对话恢复验证 | P1 | 已启用 `SqliteAgentRunner`，并覆盖 prompt 重放、历史缺失、部分历史漂移提示、主运行时跨实例恢复证明、主路由 catalog fallback 恢复、coordinator starter 主工作流回归，以及主 CopilotKit 路由真实 Web 进程重启恢复；后续仍可扩展到更多入口与更复杂的 coordinator 恢复链路 |

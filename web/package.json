@@ -8,7 +8,8 @@
     "lint": "eslint .",
     "typecheck": "next typegen && tsc --noEmit",
     "test": "vitest run",
-    "e2e": "playwright test"
+    "e2e:process-restart": "npm run build && playwright test --config playwright.process-restart.config.ts",
+    "e2e": "playwright test && npm run e2e:process-restart"
   },
   "dependencies": {
     "@ag-ui/a2a-middleware": "^0.0.2",
