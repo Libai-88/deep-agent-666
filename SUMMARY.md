@@ -4,6 +4,7 @@
 
 ## 2026-06-27 更新
 
+- `V27` 已完成 A2UI diff preview 激活：文本文件写入与替换现在会返回结构化编辑结果，并在聊天流中内联渲染 `DiffPreview`。
 - `V1` 已在 `6a33da3 feat(v1): complete coordinator workbench runtime` 完成。
 - `V2` 已在 `69d6d96 feat(v2): add release hardening baseline` 完成并推送远端。
 - `V3` 已在 `380b84c test(v3): cover onboarding launch path` 收口并推送远端。
@@ -72,8 +73,8 @@ CopilotRuntime (Next.js route handler)
 
 | 套件 | 数量 | 状态 |
 |------|------|------|
-| 后端 pytest | **59** | ✅ 全通过 |
-| 前端 vitest | **90** | ✅ 全通过 |
+| 后端 pytest | **60** | ✅ 全通过 |
+| 前端 vitest | **91** | ✅ 全通过 |
 | Next.js build | — | ✅ 无错误 |
 | E2E (playwright) | **25** | ✅ 全通过 |
 | Docker Compose 配置校验 | — | ⚠️ 当前机器未安装 `docker`，未执行命令级验证 |
@@ -202,7 +203,7 @@ CopilotRuntime (Next.js route handler):
 
 Python FastAPI:
   uvicorn on port 8123
-  61 tests passing
+  60 tests passing
 ```
 
 ---
@@ -214,7 +215,7 @@ Python FastAPI:
 | 更广覆盖的 runtime restart/resume 验证仍待扩展 | 🟡 P1 | V26 已补齐真实重启后切到空 runtime store 的 history-gap replay 证明，但跨更多入口与更多 agent 组合的恢复场景仍可继续增强 | 建议继续补强 |
 | #4 同步 invoke 阻塞事件循环 | 🟡 P2 | LangGraph 工具同步设计，长命令影响性能 | 否 — LangGraph 设计特性 |
 | #6 预设双端维护 | 🟡 P3 | 新增预设需改 Python + TS 两处 | 否 — 有注释指引 |
-| A2UI 未与 Python 工具对接 | 🟡 P3 | 前端 catalog 就绪，coordinator 工具未调用 `a2ui.render()` | 否 — 阶段 B 未完成部分 |
+| A2UI 仍只覆盖文本写入/替换 diff preview | 🟡 P3 | V27 已把 Python workspace 写工具接到 `DiffPreview`，但更多工具结果尚未扩展成 A2UI surface | 否 — 后续可扩展 |
 | Coordinator 更多恢复入口仍可继续扩展 | 🟡 P2 | V22 已覆盖 reconnect 后同线程 replay 主路径，V25/V26 已补齐真实浏览器重启连续性与空 runtime store 后的同线程恢复，但 coordinator 在更多入口组合下仍可继续扩展 | 建议继续补强 |
 | interrupt_on 已禁用 | 🟡 P3 | 去掉后才无 Console Error | 建议修 — 需审批流程时恢复 |
 | Inspector `{}` 解析警告 | 🟢 P4 | `[CopilotKit Inspector] Failed to parse tool-call result content {}` | 否 — SDK 升级后解决 |
@@ -229,8 +230,8 @@ Python FastAPI:
 
 | 标准 | 当前 | 达标 |
 |------|------|------|
-| 后端测试 ≥ 50 | 59 ✅ | 已达标 |
-| 前端测试 ≥ 20 | 90 ✅ | 已达标 |
+| 后端测试 ≥ 50 | 60 ✅ | 已达标 |
+| 前端测试 ≥ 20 | 91 ✅ | 已达标 |
 | E2E ≥ 5 条 | 24 ✅ | 已达标 |
 | 0 个 Console Error | 有 Inspector 警告 | SDK 升级 |
 | Docker 部署 | ❌ | Dockerfile + compose |

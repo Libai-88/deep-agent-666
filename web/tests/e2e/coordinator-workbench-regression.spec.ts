@@ -63,6 +63,93 @@ function buildCoordinatorRunStream(threadId: string, runId: string): string {
       content: "Executor found the risky recovery path.",
     })}`,
     `data: ${JSON.stringify({
+      type: "TOOL_CALL_START",
+      toolCallId: "replace-call-1",
+      toolCallName: "replace_text_in_file_tool",
+      parentMessageId: "assistant-message-1",
+    })}`,
+    `data: ${JSON.stringify({
+      type: "TOOL_CALL_ARGS",
+      toolCallId: "replace-call-1",
+      delta: JSON.stringify({
+        path: "docs/plan.md",
+        old_text: "draft architecture",
+        new_text: "final architecture",
+      }),
+    })}`,
+    `data: ${JSON.stringify({
+      type: "TOOL_CALL_END",
+      toolCallId: "replace-call-1",
+    })}`,
+    `data: ${JSON.stringify({
+      type: "TOOL_CALL_RESULT",
+      toolCallId: "replace-call-1",
+      messageId: "tool-message-replace-1",
+      role: "tool",
+      content: JSON.stringify({
+        summary: "updated docs/plan.md",
+        path: "docs/plan.md",
+        change_type: "modified",
+        before: "draft architecture",
+        after: "final architecture",
+        a2ui_operations: [
+          {
+            version: "v0.9",
+            createSurface: {
+              surfaceId: "diff-preview-docs-plan-md",
+              catalogId: "deepagent://a2ui-catalog",
+            },
+          },
+          {
+            version: "v0.9",
+            updateComponents: {
+              surfaceId: "diff-preview-docs-plan-md",
+              components: [
+                {
+                  id: "root",
+                  component: "DiffPreview",
+                  filePath: "docs/plan.md",
+                  before: "draft architecture",
+                  after: "final architecture",
+                },
+              ],
+            },
+          },
+        ],
+      }),
+    })}`,
+    `data: ${JSON.stringify({
+      type: "ACTIVITY_SNAPSHOT",
+      messageId: "a2ui-activity-replace-1",
+      activityType: "a2ui-surface",
+      content: {
+        a2ui_operations: [
+          {
+            version: "v0.9",
+            createSurface: {
+              surfaceId: "diff-preview-docs-plan-md",
+              catalogId: "deepagent://a2ui-catalog",
+            },
+          },
+          {
+            version: "v0.9",
+            updateComponents: {
+              surfaceId: "diff-preview-docs-plan-md",
+              components: [
+                {
+                  id: "root",
+                  component: "DiffPreview",
+                  filePath: "docs/plan.md",
+                  before: "draft architecture",
+                  after: "final architecture",
+                },
+              ],
+            },
+          },
+        ],
+      },
+    })}`,
+    `data: ${JSON.stringify({
       type: "STATE_SNAPSHOT",
       snapshot: {
         task_kind: "engineering",
@@ -181,6 +268,10 @@ test("starter-launched coordinator run updates cards, timeline, and results", as
       contentType: "application/json",
       body: JSON.stringify({
         mode: "sse",
+        a2uiEnabled: true,
+        a2ui: {
+          enabled: true,
+        },
         agents: {
           default: { id: "coordinator-openai-balanced" },
           "coordinator-openai-balanced": {
@@ -260,6 +351,13 @@ test("starter-launched coordinator run updates cards, timeline, and results", as
 
   await expect(
     page.getByRole("heading", { name: "Results" }),
+  ).toBeVisible();
+  await expect(page.locator("[data-surface-id='diff-preview-docs-plan-md']")).toBeVisible();
+  await expect(page.getByText("Modified")).toBeVisible();
+  await expect(page.getByText("Before")).toBeVisible();
+  await expect(page.getByText("After")).toBeVisible();
+  await expect(
+    page.getByTestId("artifact-results-panel").getByText("updated docs/plan.md"),
   ).toBeVisible();
   await expect(
     page.getByTestId("artifact-final-summary").getByText(

@@ -83,6 +83,7 @@ Open `http://127.0.0.1:3000`.
 
 ## Current limits
 
+- `V27` 已激活 A2UI diff preview：`write_text_file` / `replace_text_in_file` 现在会返回结构化编辑结果，并在聊天流里内联渲染 `DiffPreview`。
 - The CopilotKit runtime now uses a local SQLite thread store by default (`COPILOTKIT_THREADS_DB_PATH`, default `./data/threads.db`), and `Retry last task` now persists the last runnable prompt so a restored thread can replay it after refresh/reload.
 - Restored threads that still have local workbench context but no runtime message history, or only a partial runtime history that is missing the latest local task, are now detected explicitly and routed into a recovery flow instead of silently looking healthy.
 - Provider configuration now re-bootstraps the root runtime in the same session, so a beginner can save a key and launch the first guided task without a manual reload.

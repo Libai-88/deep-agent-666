@@ -3,6 +3,8 @@ from __future__ import annotations
 import os
 from pathlib import Path
 import subprocess
+import re
+from typing import Any
 
 
 # Skip files larger than this when searching (prevents OOM)
@@ -18,6 +20,56 @@ _BINARY_EXTENSIONS = frozenset({
     ".o", ".a", ".lib",
     ".pdf", ".doc", ".docx", ".xls", ".xlsx",
 })
+
+_A2UI_CATALOG_ID = "deepagent://a2ui-catalog"
+
+
+def _diff_surface_id(path: str) -> str:
+    slug = re.sub(r"[^a-zA-Z0-9]+", "-", path).strip("-").lower()
+    return f"diff-preview-{slug or 'file'}"
+
+
+def _diff_preview_payload(
+    *,
+    path: str,
+    summary: str,
+    change_type: str,
+    before: str,
+    after: str,
+) -> dict[str, Any]:
+    normalized_path = path.replace("\\", "/")
+    surface_id = _diff_surface_id(normalized_path)
+    return {
+        "summary": summary,
+        "path": normalized_path,
+        "change_type": change_type,
+        "before": before,
+        "after": after,
+        "a2ui_operations": [
+            {
+                "version": "v0.9",
+                "createSurface": {
+                    "surfaceId": surface_id,
+                    "catalogId": _A2UI_CATALOG_ID,
+                },
+            },
+            {
+                "version": "v0.9",
+                "updateComponents": {
+                    "surfaceId": surface_id,
+                    "components": [
+                        {
+                            "id": "root",
+                            "component": "DiffPreview",
+                            "filePath": normalized_path,
+                            "before": before,
+                            "after": after,
+                        },
+                    ],
+                },
+            },
+        ],
+    }
 
 
 def resolve_workspace_path(workspace_root: Path, relative_path: str) -> Path:
@@ -68,20 +120,36 @@ def read_text_file(workspace_root: Path, path: str) -> str:
     return target.read_text(encoding="utf-8")
 
 
-def write_text_file(workspace_root: Path, path: str, content: str) -> str:
+def write_text_file(workspace_root: Path, path: str, content: str) -> dict[str, Any]:
     target = resolve_workspace_path(workspace_root, path)
+    before = target.read_text(encoding="utf-8") if target.exists() else ""
     target.parent.mkdir(parents=True, exist_ok=True)
     target.write_text(content, encoding="utf-8")
-    return f"wrote {target.relative_to(workspace_root)}"
+    relative = str(target.relative_to(workspace_root)).replace("\\", "/")
+    return _diff_preview_payload(
+        path=relative,
+        summary=f"wrote {relative}",
+        change_type="created" if before == "" else "modified",
+        before=before,
+        after=content,
+    )
 
 
-def replace_text_in_file(workspace_root: Path, path: str, old_text: str, new_text: str) -> str:
+def replace_text_in_file(workspace_root: Path, path: str, old_text: str, new_text: str) -> dict[str, Any]:
     target = resolve_workspace_path(workspace_root, path)
     content = target.read_text(encoding="utf-8")
     if old_text not in content:
         raise ValueError("old_text not found in file")
-    target.write_text(content.replace(old_text, new_text, 1), encoding="utf-8")
-    return f"updated {target.relative_to(workspace_root)}"
+    updated = content.replace(old_text, new_text, 1)
+    target.write_text(updated, encoding="utf-8")
+    relative = str(target.relative_to(workspace_root)).replace("\\", "/")
+    return _diff_preview_payload(
+        path=relative,
+        summary=f"updated {relative}",
+        change_type="modified",
+        before=content,
+        after=updated,
+    )
 
 
 def run_command(workspace_root: Path, command: str, cwd: str = ".") -> str:

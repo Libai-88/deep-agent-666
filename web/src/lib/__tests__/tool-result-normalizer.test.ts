@@ -47,6 +47,36 @@ describe("tool-result-normalizer", () => {
     expect(findingArtifacts[0]?.kind).toBe("finding");
   });
 
+  it("uses summary text for structured edit payload artifacts", () => {
+    const fileArtifacts = normalizeToolCallToArtifacts({
+      name: "replace_text_in_file_tool",
+      status: "complete",
+      args: { path: "src/app.ts" },
+      result: JSON.stringify({
+        summary: "updated src/app.ts",
+        path: "src/app.ts",
+        before: "const status = 'draft';",
+        after: "const status = 'ready';",
+        a2ui_operations: [
+          {
+            version: "v0.9",
+            createSurface: {
+              surfaceId: "diff-preview-src-app-ts",
+              catalogId: "deepagent://a2ui-catalog",
+            },
+          },
+        ],
+      }),
+    });
+
+    expect(fileArtifacts[0]).toMatchObject({
+      kind: "file",
+      title: "src/app.ts",
+      path: "src/app.ts",
+      content: "updated src/app.ts",
+    });
+  });
+
   it("maps coordinator delegations into timeline todos and result artifacts", () => {
     const delegations = [
       {
@@ -106,6 +136,42 @@ describe("tool-result-normalizer", () => {
     expect(extractFinalSummary({ final_summary: "Coordinator complete" })).toBe(
       "Coordinator complete",
     );
+    expect(
+      extractFinalSummary({
+        summary: "updated src/app.ts",
+        path: "src/app.ts",
+        before: "old",
+        after: "new",
+        a2ui_operations: [
+          {
+            version: "v0.9",
+            createSurface: {
+              surfaceId: "diff-preview-src-app-ts",
+              catalogId: "deepagent://a2ui-catalog",
+            },
+          },
+        ],
+      }),
+    ).toBeNull();
+    expect(
+      extractFinalSummary(
+        JSON.stringify({
+          summary: "updated src/app.ts",
+          path: "src/app.ts",
+          before: "old",
+          after: "new",
+          a2ui_operations: [
+            {
+              version: "v0.9",
+              createSurface: {
+                surfaceId: "diff-preview-src-app-ts",
+                catalogId: "deepagent://a2ui-catalog",
+              },
+            },
+          ],
+        }),
+      ),
+    ).toBeNull();
   });
 
   it("resets stale agent timeline state and promotes reviewer output during coordinator tool fallback", () => {

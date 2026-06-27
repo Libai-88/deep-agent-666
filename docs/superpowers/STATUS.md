@@ -1,6 +1,6 @@
 # Deep Agent 666 — 当前状态
 
-> 最后更新：2026-06-27 (V1 完成，V2 release hardening 完成，V3 首用引导完成，V4 本地持久化线程运行时完成，V5 live provider activation 完成，V6 first response roundtrip 完成，V7 provider alignment/runtime recovery 完成，V8 runtime failure normalization 完成，V9 retry replay recovery 完成，V10 thread history gap recovery 完成，V11 thread history drift recovery 完成，V12 runtime persistence proof 完成，V13 runtime catalog fallback 完成，V14 coordinator workbench regression 完成，V15 runtime-config workspace root 完成，V16 coordinator restored-thread continuity 完成，V17 thread management 完成，V18 runtime diagnostics 完成，V19 runtime bootstrap reconnect 完成，V20 active-thread recovery shell 完成，V21 contextual recovery actions 完成，V22 coordinator recovery replay 完成，V23 true process restart persistence 完成，V24 coordinator true process restart 完成，V25 coordinator browser restart continuity 完成，V26 coordinator restart history-gap replay 完成)
+> 最后更新：2026-06-27 (V1 完成，V2 release hardening 完成，V3 首用引导完成，V4 本地持久化线程运行时完成，V5 live provider activation 完成，V6 first response roundtrip 完成，V7 provider alignment/runtime recovery 完成，V8 runtime failure normalization 完成，V9 retry replay recovery 完成，V10 thread history gap recovery 完成，V11 thread history drift recovery 完成，V12 runtime persistence proof 完成，V13 runtime catalog fallback 完成，V14 coordinator workbench regression 完成，V15 runtime-config workspace root 完成，V16 coordinator restored-thread continuity 完成，V17 thread management 完成，V18 runtime diagnostics 完成，V19 runtime bootstrap reconnect 完成，V20 active-thread recovery shell 完成，V21 contextual recovery actions 完成，V22 coordinator recovery replay 完成，V23 true process restart persistence 完成，V24 coordinator true process restart 完成，V25 coordinator browser restart continuity 完成，V26 coordinator restart history-gap replay 完成，V27 A2UI diff preview activation 完成)
 
 ## 当前结论
 
@@ -14,8 +14,8 @@
 
 | 套件 | 数量 | 状态 |
 |------|------|------|
-| 后端 (pytest) | 59 | ✅ 全通过 |
-| 前端 (vitest) | 90 | ✅ 全通过 |
+| 后端 (pytest) | 60 | ✅ 全通过 |
+| 前端 (vitest) | 91 | ✅ 全通过 |
 | Build (next build) | — | ✅ |
 | E2E (playwright) | 25 | ✅ 全通过 |
 | Docker Compose 配置校验 | — | ⚠️ 当前机器未安装 `docker`，未执行命令级验证 |
@@ -159,6 +159,11 @@
 - 新增场景证明：产品会明确显示 `Thread history unavailable`，同时保留本地 timeline/results shell，而不是静默退回 starter gate
 - backend 恢复后，`Retry last task` 可在原 coordinator 线程内重放最后任务，并把新的 runtime 历史写回新的 SQLite store
 - Playwright 总数提升到 25，专用进程重启套件提升到 4 条
+
+### V27: A2UI Diff Preview Activation ✅
+- Python workspace 写工具现在会返回结构化编辑结果，包含 `summary`、`before`、`after`、`change_type` 和 `a2ui_operations`
+- 前端 workbench 归一化已兼容结构化工具结果：artifact 继续显示摘要文本，A2UI surface 则内联渲染 `DiffPreview`
+- 浏览器回归已证明 coordinator 流中的 `replace_text_in_file_tool` 结果会在 Results 面板旁同步出现 diff preview，而不会污染最终 summary
 
 ## 关键提交
 

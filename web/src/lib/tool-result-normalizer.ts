@@ -22,6 +22,34 @@ type DelegationPayload = {
   result: string;
 };
 
+type StructuredEditResult = {
+  summary?: unknown;
+  path?: unknown;
+  change_type?: unknown;
+  before?: unknown;
+  after?: unknown;
+  a2ui_operations?: unknown;
+};
+
+function parseStructuredToolResult(result: unknown): StructuredEditResult | null {
+  if (result && typeof result === "object") {
+    return result as StructuredEditResult;
+  }
+
+  if (typeof result !== "string") {
+    return null;
+  }
+
+  try {
+    const parsed = JSON.parse(result) as unknown;
+    return parsed && typeof parsed === "object"
+      ? (parsed as StructuredEditResult)
+      : null;
+  } catch {
+    return null;
+  }
+}
+
 export function inferTaskKindFromMessage(message: string): WorkbenchTaskKind {
   const lower = message.toLowerCase();
   if (
@@ -77,12 +105,19 @@ export function normalizeToolCallToArtifacts(
     payload.name === "write_text_file_tool" ||
     payload.name === "replace_text_in_file_tool"
   ) {
+    const structuredResult = parseStructuredToolResult(payload.result);
     const path =
       typeof payload.args?.file_path === "string"
         ? payload.args.file_path
         : typeof payload.args?.path === "string"
           ? payload.args.path
+          : typeof structuredResult?.path === "string"
+            ? structuredResult.path
           : "";
+    const summary =
+      typeof structuredResult?.summary === "string"
+        ? structuredResult.summary
+        : null;
     return [
       {
         id: `artifact-${Date.now()}-file`,
@@ -90,8 +125,10 @@ export function normalizeToolCallToArtifacts(
         title: path || "Written file",
         path: path || undefined,
         content:
-          typeof payload.result === "string"
-            ? payload.result
+          summary
+            ? summary
+            : typeof payload.result === "string"
+              ? payload.result
             : JSON.stringify(payload.result ?? payload.args?.content ?? "", null, 2),
         createdAt: Date.now(),
         source: "tool",
@@ -123,6 +160,10 @@ export function normalizeToolCallToArtifacts(
 }
 
 export function extractFinalSummary(result: unknown): string | null {
+  const structuredResult = parseStructuredToolResult(result);
+  if (structuredResult?.a2ui_operations) {
+    return null;
+  }
   if (typeof result === "string" && result.trim()) {
     return result;
   }

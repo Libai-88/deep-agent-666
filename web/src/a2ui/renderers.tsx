@@ -2,7 +2,13 @@
 
 import React from "react";
 
-function DiffPreviewRenderer({ filePath, before, after }: { filePath: string; before: string; after: string }) {
+function DiffPreviewRenderer({
+  props,
+}: {
+  props: { filePath: string; before: string; after: string };
+}) {
+  const { filePath, before, after } = props;
+
   return (
     <div className="my-2 overflow-hidden rounded-2xl border border-[#DBDBE5] bg-white shadow-sm">
       <div className="flex items-center justify-between border-b border-[#E9E9EF] bg-[#FAFAFC] px-4 py-2">
