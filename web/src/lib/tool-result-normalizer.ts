@@ -4,7 +4,10 @@ import type {
   ThreadWorkbenchState,
   WorkbenchTodo,
 } from "./workbench-state";
-import { normalizeToolPayloadToEvents } from "./runtime-events";
+import {
+  normalizeToolPayloadToEvents,
+  type WorkbenchEvent,
+} from "./runtime-events";
 
 type ToolPayload = {
   name?: string;
@@ -226,6 +229,45 @@ export function normalizeDelegationArtifacts(
       createdAt: Date.now() + index,
       source: "delegation",
     }));
+}
+
+export function applyWorkbenchEvents(
+  state: ThreadWorkbenchState,
+  events: WorkbenchEvent[],
+): ThreadWorkbenchState {
+  const todos = events
+    .filter((event) => event.kind === "delegation")
+    .map((event) => ({
+      id: event.id,
+      content: event.message,
+      status:
+        event.status === "completed"
+          ? "completed"
+          : event.status === "running"
+            ? "in_progress"
+            : "pending",
+      source: "agent" as const,
+    }));
+
+  const artifacts = events
+    .filter((event) => event.kind === "artifact" && event.status === "completed")
+    .map((event, index) => ({
+      id: event.id,
+      kind: event.artifactKind ?? "finding",
+      title: event.title,
+      path: event.artifactPath,
+      content: event.message,
+      createdAt: event.createdAt + index,
+      source: "tool" as const,
+    }));
+
+  return {
+    ...state,
+    todos,
+    artifacts,
+    events,
+    updatedAt: Date.now(),
+  };
 }
 
 export function applyCoordinatorToolCallFallback(

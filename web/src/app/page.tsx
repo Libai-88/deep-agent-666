@@ -50,6 +50,7 @@ import {
   type ThreadWorkbenchState,
 } from "@/lib/workbench-state";
 import {
+  applyWorkbenchEvents,
   applyCoordinatorToolCallFallback,
   extractFinalSummary,
   inferTaskKindFromMessage,
@@ -58,6 +59,7 @@ import {
   normalizeToolCallToArtifacts,
   normalizeToolCallToTodos,
 } from "@/lib/tool-result-normalizer";
+import { normalizeSnapshotEvents } from "@/lib/runtime-events";
 import { resolveThreadAgentId } from "@/lib/thread-agent";
 import {
   ALL_AGENT_PRESETS,
@@ -744,6 +746,7 @@ function HomePageContent() {
           <ResizablePanel id="timeline" order={2} defaultSize={22} minSize={18}>
             <TaskTimelinePanel
               taskKind={workbenchState.taskKind}
+              events={workbenchState.events}
               todos={workbenchState.todos}
             />
           </ResizablePanel>
@@ -1356,11 +1359,13 @@ function ActiveThreadChat({
         status: "running" | "completed" | "failed";
         result: string;
       }>;
+      workbench_events?: unknown;
       task_kind?: "engineering" | "research" | "general";
       final_summary?: string;
     };
 
     const delegations = Array.isArray(state.delegations) ? state.delegations : [];
+    const events = normalizeSnapshotEvents(state.workbench_events);
     const finalSummary =
       typeof state.final_summary === "string" && state.final_summary.trim()
         ? state.final_summary
@@ -1368,6 +1373,7 @@ function ActiveThreadChat({
 
     return {
       delegations,
+      events,
       taskKind: state.task_kind,
       finalSummary,
     };
@@ -1453,13 +1459,23 @@ function ActiveThreadChat({
   useEffect(() => {
     if (!coordinatorWorkbenchSnapshot) return;
 
-    const { delegations, taskKind, finalSummary } = coordinatorWorkbenchSnapshot;
+    const { delegations, events, taskKind, finalSummary } = coordinatorWorkbenchSnapshot;
 
-    if (delegations.length === 0 && !taskKind && !finalSummary) {
+    if (delegations.length === 0 && events.length === 0 && !taskKind && !finalSummary) {
       return;
     }
 
     setWorkbenchState((previous) => {
+      if (events.length > 0) {
+        const next = applyWorkbenchEvents(previous, events);
+        return {
+          ...next,
+          taskKind: taskKind ?? next.taskKind,
+          finalSummary: finalSummary ?? next.finalSummary,
+          updatedAt: Date.now(),
+        };
+      }
+
       const nextTodos = delegations.length > 0
         ? normalizeDelegationsToTodos(delegations)
         : previous.todos;

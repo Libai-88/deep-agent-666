@@ -32,4 +32,28 @@ describe("TaskTimelinePanel", () => {
     expect(html).toContain("In progress");
     expect(html).not.toContain("in_progress");
   });
+
+  it("renders event labels before falling back to todo-only cards", () => {
+    const html = renderToStaticMarkup(
+      <TaskTimelinePanel
+        taskKind="engineering"
+        events={[
+          {
+            id: "event-1",
+            kind: "delegation",
+            status: "running",
+            title: "Executor started",
+            message: "Inspect risky files and TODOs.",
+            source: "executor",
+            createdAt: 1,
+          },
+        ]}
+        todos={[]}
+      />,
+    );
+
+    expect(html).toContain("Executor started");
+    expect(html).toContain("Inspect risky files and TODOs.");
+    expect(html).toContain("In progress");
+  });
 });

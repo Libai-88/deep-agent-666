@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  applyWorkbenchEvents,
   applyCoordinatorToolCallFallback,
   extractFinalSummary,
   inferTaskKindFromMessage,
@@ -172,6 +173,46 @@ describe("tool-result-normalizer", () => {
         }),
       ),
     ).toBeNull();
+  });
+
+  it("derives timeline todos and artifacts from unified workbench events", () => {
+    const next = applyWorkbenchEvents(
+      {
+        taskKind: "engineering",
+        todos: [],
+        artifacts: [],
+        events: [],
+        finalSummary: null,
+        lastUserPrompt: null,
+        updatedAt: 1,
+      },
+      [
+        {
+          id: "planner-1",
+          kind: "delegation",
+          status: "completed",
+          title: "Planner finished",
+          message: "Inspect the repository architecture.",
+          source: "planner",
+          createdAt: 2,
+        },
+        {
+          id: "artifact-1",
+          kind: "artifact",
+          status: "completed",
+          title: "updated docs/plan.md",
+          message: "updated docs/plan.md",
+          source: "tool",
+          artifactPath: "docs/plan.md",
+          artifactKind: "file",
+          createdAt: 3,
+        },
+      ],
+    );
+
+    expect(next.todos[0]?.content).toBe("Inspect the repository architecture.");
+    expect(next.artifacts[0]?.path).toBe("docs/plan.md");
+    expect(next.events).toHaveLength(2);
   });
 
   it("resets stale agent timeline state and promotes reviewer output during coordinator tool fallback", () => {

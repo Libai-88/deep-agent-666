@@ -2,6 +2,7 @@ import type {
   WorkbenchTaskKind,
   WorkbenchTodo,
 } from "@/lib/workbench-state";
+import type { WorkbenchEvent } from "@/lib/runtime-events";
 
 function taskKindLabel(taskKind: WorkbenchTaskKind): string {
   if (taskKind === "engineering") return "Engineering";
@@ -17,11 +18,15 @@ function todoStatusLabel(status: WorkbenchTodo["status"]): string {
 
 export function TaskTimelinePanel({
   taskKind,
+  events = [],
   todos,
 }: {
   taskKind: WorkbenchTaskKind;
+  events?: WorkbenchEvent[];
   todos: WorkbenchTodo[];
 }) {
+  const timelineEvents = events.filter((event) => event.kind === "delegation");
+
   return (
     <section
       data-testid="task-timeline-panel"
@@ -34,23 +39,45 @@ export function TaskTimelinePanel({
         </p>
       </header>
       <div className="flex-1 overflow-y-auto px-4 py-3">
-        {todos.length === 0 ? (
+        {timelineEvents.length === 0 && todos.length === 0 ? (
           <p className="text-sm text-muted-foreground">
             No tracked tasks yet.
           </p>
         ) : (
-          todos.map((todo) => (
-            <div
-              key={todo.id}
-              data-testid={`timeline-todo-${todo.id}`}
-              className="mb-3 rounded-lg border border-border bg-background p-3"
-            >
-              <div className="text-sm font-medium">{todo.content}</div>
-              <div className="mt-1 text-xs text-muted-foreground">
-                {todoStatusLabel(todo.status)}
-              </div>
-            </div>
-          ))
+          timelineEvents.length > 0
+            ? timelineEvents.map((event) => (
+                <div
+                  key={event.id}
+                  data-testid={`timeline-todo-${event.id}`}
+                  className="mb-3 rounded-lg border border-border bg-background p-3"
+                >
+                  <div className="text-sm font-medium">{event.title}</div>
+                  <div className="mt-1 text-xs text-muted-foreground">
+                    {event.message}
+                  </div>
+                  <div className="mt-1 text-xs text-muted-foreground">
+                    {todoStatusLabel(
+                      event.status === "completed"
+                        ? "completed"
+                        : event.status === "running"
+                          ? "in_progress"
+                          : "pending",
+                    )}
+                  </div>
+                </div>
+              ))
+            : todos.map((todo) => (
+                <div
+                  key={todo.id}
+                  data-testid={`timeline-todo-${todo.id}`}
+                  className="mb-3 rounded-lg border border-border bg-background p-3"
+                >
+                  <div className="text-sm font-medium">{todo.content}</div>
+                  <div className="mt-1 text-xs text-muted-foreground">
+                    {todoStatusLabel(todo.status)}
+                  </div>
+                </div>
+              ))
         )}
       </div>
     </section>
