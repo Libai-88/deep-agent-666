@@ -16,7 +16,7 @@ from langgraph.types import Command
 from app.config import AgentSettings, load_settings
 from app.permissions import PermissionMode, mutable_tool_names
 from app.presets import ALL_PRESETS, AgentPreset
-from app.state import CoordinatorState, Delegation
+from app.state import CoordinatorState, Delegation, WorkbenchEvent
 from app.task_profile import infer_task_kind, task_prompt_fragment
 from app.tools.documents import inspect_document, read_document
 from app.tools.workspace import (
@@ -197,6 +197,101 @@ def build_langgraph_agents(settings: AgentSettings) -> dict[str, LangGraphAGUIAg
     }
 
 
+def _build_workbench_event(
+    *,
+    kind: Literal["delegation", "status", "artifact"],
+    status: Literal["running", "completed", "failed", "info"],
+    title: str,
+    message: str,
+    source: Literal["planner", "executor", "reviewer", "tool", "system"],
+    artifact_path: str | None = None,
+    artifact_kind: Literal["file", "finding", "summary"] | None = None,
+) -> WorkbenchEvent:
+    return {
+        "id": str(uuid.uuid4()),
+        "kind": kind,
+        "status": status,
+        "title": title,
+        "message": message,
+        "source": source,
+        "artifact_path": artifact_path,
+        "artifact_kind": artifact_kind,
+    }
+
+
+def _build_delegation_running_command(
+    *,
+    sub_agent: Literal["planner", "executor", "reviewer"],
+    task: str,
+    tool_call_id: str,
+    task_kind: str,
+) -> Command:
+    entry: Delegation = {
+        "id": str(uuid.uuid4()),
+        "sub_agent": sub_agent,
+        "task": task,
+        "status": "running",
+        "result": "",
+    }
+    return Command(
+        update={
+            "delegations": [entry],
+            "workbench_events": [
+                _build_workbench_event(
+                    kind="delegation",
+                    status="running",
+                    title=f"{sub_agent.title()} started",
+                    message=task,
+                    source=sub_agent,
+                )
+            ],
+            "task_kind": task_kind,
+            "messages": [
+                ToolMessage(content="starting...", tool_call_id=tool_call_id)
+            ],
+        }
+    )
+
+
+def _build_delegation_completed_command(
+    *,
+    sub_agent: Literal["planner", "executor", "reviewer"],
+    task: str,
+    status: Literal["running", "completed", "failed"],
+    result: str,
+    tool_call_id: str,
+    task_kind: str,
+) -> Command:
+    entry: Delegation = {
+        "id": str(uuid.uuid4()),
+        "sub_agent": sub_agent,
+        "task": task,
+        "status": status,
+        "result": result,
+    }
+    status_title = "completed" if status == "completed" else "failed"
+    return Command(
+        update={
+            "delegations": [entry],
+            "workbench_events": [
+                _build_workbench_event(
+                    kind="delegation",
+                    status=status,
+                    title=f"{sub_agent.title()} {status_title}",
+                    message=result if result else task,
+                    source=sub_agent,
+                    artifact_kind="summary" if sub_agent == "reviewer" and status == "completed" else None,
+                )
+            ],
+            "task_kind": task_kind,
+            "final_summary": result if status == "completed" else "",
+            "messages": [
+                ToolMessage(content=result, tool_call_id=tool_call_id)
+            ],
+        }
+    )
+
+
 def build_v2_coordinator(
     model: str,
     permission_mode: str = "balanced",
@@ -275,59 +370,8 @@ def build_v2_coordinator(
             return ""
         return str(messages[-1].content)
 
-    def _running_command(
-        sub_agent: str,
-        task: str,
-        tool_call_id: str,
-        task_kind: str,
-    ) -> Command:
-        """Emit a 'running' delegation entry so the frontend shows the pulse
-        indicator before the sub-agent completes."""
-        entry: Delegation = {
-            "id": str(uuid.uuid4()),
-            "sub_agent": sub_agent,  # type: ignore[typeddict-item]
-            "task": task,
-            "status": "running",
-            "result": "",
-        }
-        return Command(
-            update={
-                "delegations": [entry],
-                "task_kind": task_kind,
-                "messages": [
-                    ToolMessage(content="starting...", tool_call_id=tool_call_id)
-                ],
-            }
-        )
-
-    def _delegation_command(
-        sub_agent: str,
-        task: str,
-        status: Literal["running", "completed", "failed"],
-        result: str,
-        tool_call_id: str,
-        task_kind: str,
-    ) -> Command:
-        entry: Delegation = {
-            "id": str(uuid.uuid4()),
-            "sub_agent": sub_agent,  # type: ignore[typeddict-item]
-            "task": task,
-            "status": status,
-            "result": result,
-        }
-        return Command(
-            update={
-                "delegations": [entry],
-                "task_kind": task_kind,
-                "final_summary": result if status == "completed" else "",
-                "messages": [
-                    ToolMessage(content=result, tool_call_id=tool_call_id)
-                ],
-            }
-        )
-
     def _delegate(
-        sub_agent_name: str,
+        sub_agent_name: Literal["planner", "executor", "reviewer"],
         agent,
         task: str,
         tool_call_id: str,
@@ -340,34 +384,35 @@ def build_v2_coordinator(
         )
         try:
             # First emit running status
-            running_cmd = _running_command(
-                sub_agent_name,
-                task,
-                tool_call_id,
-                task_kind,
+            running_cmd = _build_delegation_running_command(
+                sub_agent=sub_agent_name,
+                task=task,
+                tool_call_id=tool_call_id,
+                task_kind=task_kind,
             )
+            _ = running_cmd
             result = _invoke_sub_agent(agent, enriched_task)
             # Then emit completed
-            return _delegation_command(
-                sub_agent_name,
-                task,
-                "completed",
-                result,
-                tool_call_id,
-                task_kind,
+            return _build_delegation_completed_command(
+                sub_agent=sub_agent_name,
+                task=task,
+                status="completed",
+                result=result,
+                tool_call_id=tool_call_id,
+                task_kind=task_kind,
             )
         except Exception as exc:
             message = (
                 f"sub-agent call failed: {exc.__class__.__name__} "
                 f"(see server logs for details)"
             )
-            return _delegation_command(
-                sub_agent_name,
-                task,
-                "failed",
-                message,
-                tool_call_id,
-                task_kind,
+            return _build_delegation_completed_command(
+                sub_agent=sub_agent_name,
+                task=task,
+                status="failed",
+                result=message,
+                tool_call_id=tool_call_id,
+                task_kind=task_kind,
             )
 
     # ── Supervisor tools ──────────────────────────────────────────────

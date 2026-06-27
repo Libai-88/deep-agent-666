@@ -1,5 +1,10 @@
 """Tests for the V2 coordinator agent builder."""
-from app.agent_factory import build_v2_coordinator
+from app.agent_factory import (
+    _build_delegation_completed_command,
+    _build_delegation_running_command,
+    build_v2_coordinator,
+)
+from app.state import CoordinatorState
 
 
 def test_coordinator_builds_for_all_permission_modes(monkeypatch, tmp_path):
@@ -37,3 +42,43 @@ def test_coordinator_full_access_includes_write_tools(monkeypatch, tmp_path):
         permission_mode="full-access",
     )
     assert coordinator is not None
+
+
+def test_coordinator_state_declares_workbench_events_channel() -> None:
+    annotations = CoordinatorState.__annotations__
+    assert "workbench_events" in annotations
+
+
+def test_running_delegation_command_includes_workbench_event() -> None:
+    command = _build_delegation_running_command(
+        sub_agent="planner",
+        task="Inspect the repository architecture.",
+        tool_call_id="tool-call-1",
+        task_kind="engineering",
+    )
+
+    update = command.update or {}
+    assert update["task_kind"] == "engineering"
+    assert update["workbench_events"][0]["kind"] == "delegation"
+    assert update["workbench_events"][0]["status"] == "running"
+    assert update["workbench_events"][0]["message"] == "Inspect the repository architecture."
+    assert update["workbench_events"][0]["source"] == "planner"
+
+
+def test_completed_delegation_command_includes_workbench_event() -> None:
+    command = _build_delegation_completed_command(
+        sub_agent="reviewer",
+        task="Summarize the repository review.",
+        status="completed",
+        result="Reviewer confirmed the next engineering steps.",
+        tool_call_id="tool-call-2",
+        task_kind="engineering",
+    )
+
+    update = command.update or {}
+    assert update["final_summary"] == "Reviewer confirmed the next engineering steps."
+    assert update["workbench_events"][0]["kind"] == "delegation"
+    assert update["workbench_events"][0]["status"] == "completed"
+    assert update["workbench_events"][0]["title"] == "Reviewer completed"
+    assert update["workbench_events"][0]["message"] == "Reviewer confirmed the next engineering steps."
+    assert update["workbench_events"][0]["source"] == "reviewer"

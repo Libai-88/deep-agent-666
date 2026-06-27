@@ -23,6 +23,19 @@ class Delegation(typing.TypedDict):
     result: str
 
 
+class WorkbenchEvent(typing.TypedDict):
+    """A normalized workbench event for timeline and artifact rendering."""
+
+    id: str
+    kind: Literal["delegation", "status", "artifact"]
+    status: Literal["running", "completed", "failed", "info"]
+    title: str
+    message: str
+    source: Literal["planner", "executor", "reviewer", "tool", "system"]
+    artifact_path: str | None
+    artifact_kind: Literal["file", "finding", "summary"] | None
+
+
 class CoordinatorState(BaseAgentState):
     """Supervisor coordinator state with delegation tracking.
 
@@ -32,5 +45,6 @@ class CoordinatorState(BaseAgentState):
     """
 
     delegations: Annotated[list[Delegation], add]
+    workbench_events: Annotated[list[WorkbenchEvent], add]
     task_kind: TaskKind
     final_summary: str
