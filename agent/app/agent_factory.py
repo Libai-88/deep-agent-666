@@ -141,12 +141,29 @@ def _build_model(
 ):
     provider = _preset_provider(preset)
     model_name = preset.model.split(":", maxsplit=1)[1]
+    return build_runtime_model(
+        provider=provider,
+        model_name=model_name,
+        settings=settings,
+        provider_id=preset.provider_id,
+        registry_snapshot=registry_snapshot,
+    )
+
+
+def build_runtime_model(
+    *,
+    provider: str,
+    model_name: str,
+    settings: AgentSettings,
+    provider_id: str | None = None,
+    registry_snapshot: ProviderRegistrySnapshot | None = None,
+):
     model_provider = "google_genai" if provider == "google" else provider
     snapshot = _resolve_registry_snapshot(settings, registry_snapshot)
     api_key = _provider_api_key(
         settings,
         provider,
-        provider_id=preset.provider_id,
+        provider_id=provider_id,
         registry_snapshot=snapshot,
     )
     if api_key is None:
@@ -155,7 +172,7 @@ def _build_model(
         provider,
         api_key,
         settings,
-        provider_id=preset.provider_id,
+        provider_id=provider_id,
         registry_snapshot=snapshot,
     )
     return init_chat_model(model=model_name, model_provider=model_provider, **kwargs)
@@ -168,12 +185,12 @@ def _build_model_kwargs(
     *,
     provider_id: str | None = None,
     registry_snapshot: ProviderRegistrySnapshot | None = None,
-) -> dict[str, str]:
+) -> dict[str, object]:
     """Build provider-specific init_chat_model kwargs.
 
     Extracted to avoid duplication between _build_model and build_v2_coordinator.
     """
-    kwargs: dict[str, str] = {"api_key": api_key}
+    kwargs: dict[str, object] = {"api_key": api_key}
     provider_profile = (
         find_provider_profile(registry_snapshot, provider_id)
         if registry_snapshot is not None and provider_id
@@ -184,12 +201,16 @@ def _build_model_kwargs(
         base_url = provider_profile.base_url if provider_profile else settings.openai_base_url
         if base_url:
             kwargs["base_url"] = base_url
+        if provider_profile and provider_profile.headers:
+            kwargs["default_headers"] = provider_profile.headers
 
     elif provider == "anthropic":
         # ChatAnthropic uses anthropic_api_url (full base, SDK appends /v1/messages)
         base_url = provider_profile.base_url if provider_profile else settings.anthropic_base_url
         if base_url:
             kwargs["anthropic_api_url"] = base_url
+        if provider_profile and provider_profile.headers:
+            kwargs["default_headers"] = provider_profile.headers
 
     elif provider == "google":
         kwargs["google_api_key"] = api_key
@@ -197,6 +218,8 @@ def _build_model_kwargs(
         if base_url:
             kwargs["transport"] = "rest"
             kwargs["base_url"] = base_url
+        if provider_profile and provider_profile.headers:
+            kwargs["additional_headers"] = provider_profile.headers
 
     return kwargs
 

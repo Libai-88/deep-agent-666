@@ -10,7 +10,9 @@ from fastapi.testclient import TestClient
 def _reload_main(monkeypatch, tmp_path):
     workspace = tmp_path / "workspace"
     workspace.mkdir()
+    registry_path = tmp_path / "provider-registry.json"
     monkeypatch.setenv("AGENT_WORKSPACE_ROOT", str(workspace))
+    monkeypatch.setenv("AGENT_PROVIDER_REGISTRY_PATH", str(registry_path))
     sys.modules.pop("app.main", None)
     import app.main as main_module
 
@@ -182,6 +184,8 @@ def test_config_snapshot_returns_provider_and_model_profiles(
     assert "providerProfiles" in payload
     assert "modelProfiles" in payload
     assert payload["providerProfiles"][0]["id"] == "openai"
+    assert payload["providerProfiles"][0]["authScheme"] == "api_key"
+    assert payload["providerProfiles"][0]["apiKeyPresent"] is True
     assert payload["modelProfiles"][0]["provider_id"] == "openai"
 
 

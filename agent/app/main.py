@@ -20,13 +20,17 @@ from copilotkit import CopilotKitRemoteEndpoint
 from copilotkit.integrations.fastapi import add_fastapi_endpoint
 
 from app.config import ConfigStore, load_settings, normalize_runtime_workspace_root
+from app.permissions import PermissionMode
+from app.presets import AgentPreset
 from app.presets import DEFAULT_PRESET_ID
 from app.provider_registry import (
     build_legacy_provider_summary,
+    find_provider_profile,
     normalize_provider_registry_payload,
     serialize_model_profiles,
     serialize_provider_profiles,
 )
+from app.agent_factory import build_runtime_model
 from app.runtime_registry import (
     LiveAgentAccessor,
     RuntimeAgentRegistry,
@@ -67,6 +71,11 @@ class RunControlRequest(BaseModel):
     action: str
     run_id: str | None = None
     plan_patch: str | None = None
+
+
+class ProviderProbeRequest(BaseModel):
+    providerProfile: dict[str, object]
+    modelProfile: dict[str, object]
 
 
 runtime_registry: RuntimeAgentRegistry = build_runtime_registry(
@@ -151,6 +160,47 @@ def _runtime_config_payload() -> dict[str, object]:
         "providerProfiles": serialize_provider_profiles(snapshot),
         "modelProfiles": serialize_model_profiles(snapshot),
         "providers": build_legacy_provider_summary(snapshot),
+    }
+
+
+def probe_provider_model(
+    provider_profile_payload: dict[str, object],
+    model_profile_payload: dict[str, object],
+) -> dict[str, object]:
+    snapshot = normalize_provider_registry_payload(
+        {
+            "workspaceRoot": str(store.snapshot().workspace_root),
+            "providerProfiles": [provider_profile_payload],
+            "modelProfiles": [model_profile_payload],
+        }
+    )
+    provider_profile = find_provider_profile(
+        snapshot,
+        str(provider_profile_payload.get("id", "")),
+    )
+    if provider_profile is None:
+        raise ValueError("provider probe payload did not include a valid provider")
+
+    model_profile = snapshot.model_profiles[0]
+    provider = (
+        "openai"
+        if provider_profile.protocol == "openai-compatible"
+        else provider_profile.protocol
+    )
+    model = build_runtime_model(
+        provider=provider,
+        model_name=model_profile.model_name,
+        settings=store.snapshot(),
+        provider_id=provider_profile.id,
+        registry_snapshot=snapshot,
+    )
+    model.invoke("Reply with OK.")
+    return {
+        "status": "ready",
+        "code": None,
+        "message": "Provider responded successfully.",
+        "providerId": provider_profile.id,
+        "modelId": model_profile.id,
     }
 
 
@@ -286,6 +336,39 @@ async def configure(body: ConfigureRequest) -> JSONResponse:
             **_runtime_config_payload(),
         }
     )
+
+
+@app.post("/providers/probe")
+async def provider_probe(body: ProviderProbeRequest) -> JSONResponse:
+    try:
+        result = probe_provider_model(body.providerProfile, body.modelProfile)
+    except ValueError as exc:
+        return JSONResponse(
+            {
+                "status": "invalid_config",
+                "code": "provider_invalid_config",
+                "message": str(exc),
+            },
+            status_code=400,
+        )
+    except Exception as exc:  # noqa: BLE001
+        code, message = _classify_route_exception(exc)
+        status = {
+            "provider_auth_failed": "auth_failed",
+            "provider_access_denied": "access_denied",
+            "provider_model_unavailable": "model_unavailable",
+            None: "unreachable",
+        }[code]
+        return JSONResponse(
+            {
+                "status": status,
+                "code": code,
+                "message": message,
+            },
+            status_code=200,
+        )
+
+    return JSONResponse(result)
 
 
 @app.post("/control")

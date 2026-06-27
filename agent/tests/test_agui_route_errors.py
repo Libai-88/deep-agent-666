@@ -12,7 +12,9 @@ from ag_ui.core.events import (
 def _reload_main(monkeypatch, tmp_path):
     workspace = tmp_path / "workspace"
     workspace.mkdir()
+    registry_path = tmp_path / "provider-registry.json"
     monkeypatch.setenv("AGENT_WORKSPACE_ROOT", str(workspace))
+    monkeypatch.setenv("AGENT_PROVIDER_REGISTRY_PATH", str(registry_path))
     sys.modules.pop("app.main", None)
     import app.main as main_module
     return importlib.reload(main_module)
