@@ -50,6 +50,7 @@ import {
   type ThreadWorkbenchState,
 } from "@/lib/workbench-state";
 import {
+  applyCoordinatorToolCallFallback,
   extractFinalSummary,
   inferTaskKindFromMessage,
   normalizeDelegationArtifacts,
@@ -99,6 +100,7 @@ import {
   seedWorkbenchForStarterTemplate,
 } from "@/lib/starter-templates";
 import {
+  extractLatestAssistantText,
   extractLatestUserPrompt,
   resolvePendingRunPrompt,
 } from "@/lib/retry-run";
@@ -222,6 +224,7 @@ function HomePageContent() {
     () => createEmptyWorkbenchState(),
   );
   const [loadedWorkbenchThreadId, setLoadedWorkbenchThreadId] = useState<string | null>(null);
+  const [hasLiveThreadActivity, setHasLiveThreadActivity] = useState(false);
 
   // Persist threads to localStorage on change
   useEffect(() => {
@@ -340,11 +343,13 @@ function HomePageContent() {
     if (!activeThread) {
       setLoadedWorkbenchThreadId(null);
       setWorkbenchState(createEmptyWorkbenchState());
+      setHasLiveThreadActivity(false);
       return;
     }
     setLoadedWorkbenchThreadId(null);
     setWorkbenchState(loadWorkbenchState(activeThread.id));
     setLoadedWorkbenchThreadId(activeThread.id);
+    setHasLiveThreadActivity(false);
   }, [activeThread]);
 
   useEffect(() => {
@@ -786,10 +791,12 @@ function HomePageContent() {
                   >
                     <WorkbenchRuntimeHooks
                       activeAgentId={activeAgentId}
+                      setHasLiveThreadActivity={setHasLiveThreadActivity}
                       setWorkbenchState={setWorkbenchState}
                     />
                     <ThreadHistoryGapMonitor
                       activeAgentId={activeAgentId}
+                      hasLiveThreadActivity={hasLiveThreadActivity}
                       runtimeAvailability={runtimeAvailability}
                       workbenchState={workbenchState}
                       pendingThreadRun={pendingThreadRun}
@@ -810,6 +817,7 @@ function HomePageContent() {
                       activeAgentId={activeAgentId}
                       activeThread={activeThread}
                       currentPreset={currentPreset}
+                      setHasLiveThreadActivity={setHasLiveThreadActivity}
                       threadId={threadId}
                       workspaceRoot={runtimeSettings.workspaceRoot}
                       pendingThreadRun={pendingThreadRun}
@@ -986,51 +994,104 @@ function PendingThreadRunController({
 
 function WorkbenchRuntimeHooks({
   activeAgentId,
+  setHasLiveThreadActivity,
   setWorkbenchState,
 }: {
   activeAgentId: string;
+  setHasLiveThreadActivity: React.Dispatch<React.SetStateAction<boolean>>;
   setWorkbenchState: React.Dispatch<React.SetStateAction<ThreadWorkbenchState>>;
 }) {
   useRenderTool({
     agentId: activeAgentId,
     name: "planner_tool",
     parameters: z.object({ task: z.string().optional() }),
-    render: ({ parameters, status, result }) => (
-      <SubAgentActivityCard
-        subAgent="planner"
-        task={typeof parameters?.task === "string" ? parameters.task : undefined}
-        status={status === "complete" ? "complete" : status === "executing" ? "executing" : "inProgress"}
-        result={typeof result === "string" ? result : undefined}
-      />
-    ),
+    render: ({ parameters, status, result }) => {
+      queueMicrotask(() => {
+        setHasLiveThreadActivity(true);
+        setWorkbenchState((previous) =>
+          applyCoordinatorToolCallFallback(previous, {
+            name: "planner_tool",
+            status,
+            args:
+              parameters && typeof parameters === "object"
+                ? (parameters as Record<string, unknown>)
+                : null,
+            result,
+          }),
+        );
+      });
+
+      return (
+        <SubAgentActivityCard
+          subAgent="planner"
+          task={typeof parameters?.task === "string" ? parameters.task : undefined}
+          status={status === "complete" ? "complete" : status === "executing" ? "executing" : "inProgress"}
+          result={typeof result === "string" ? result : undefined}
+        />
+      );
+    },
   });
 
   useRenderTool({
     agentId: activeAgentId,
     name: "executor_tool",
     parameters: z.object({ task: z.string().optional() }),
-    render: ({ parameters, status, result }) => (
-      <SubAgentActivityCard
-        subAgent="executor"
-        task={typeof parameters?.task === "string" ? parameters.task : undefined}
-        status={status === "complete" ? "complete" : status === "executing" ? "executing" : "inProgress"}
-        result={typeof result === "string" ? result : undefined}
-      />
-    ),
+    render: ({ parameters, status, result }) => {
+      queueMicrotask(() => {
+        setHasLiveThreadActivity(true);
+        setWorkbenchState((previous) =>
+          applyCoordinatorToolCallFallback(previous, {
+            name: "executor_tool",
+            status,
+            args:
+              parameters && typeof parameters === "object"
+                ? (parameters as Record<string, unknown>)
+                : null,
+            result,
+          }),
+        );
+      });
+
+      return (
+        <SubAgentActivityCard
+          subAgent="executor"
+          task={typeof parameters?.task === "string" ? parameters.task : undefined}
+          status={status === "complete" ? "complete" : status === "executing" ? "executing" : "inProgress"}
+          result={typeof result === "string" ? result : undefined}
+        />
+      );
+    },
   });
 
   useRenderTool({
     agentId: activeAgentId,
     name: "reviewer_tool",
     parameters: z.object({ task: z.string().optional() }),
-    render: ({ parameters, status, result }) => (
-      <SubAgentActivityCard
-        subAgent="reviewer"
-        task={typeof parameters?.task === "string" ? parameters.task : undefined}
-        status={status === "complete" ? "complete" : status === "executing" ? "executing" : "inProgress"}
-        result={typeof result === "string" ? result : undefined}
-      />
-    ),
+    render: ({ parameters, status, result }) => {
+      queueMicrotask(() => {
+        setHasLiveThreadActivity(true);
+        setWorkbenchState((previous) =>
+          applyCoordinatorToolCallFallback(previous, {
+            name: "reviewer_tool",
+            status,
+            args:
+              parameters && typeof parameters === "object"
+                ? (parameters as Record<string, unknown>)
+                : null,
+            result,
+          }),
+        );
+      });
+
+      return (
+        <SubAgentActivityCard
+          subAgent="reviewer"
+          task={typeof parameters?.task === "string" ? parameters.task : undefined}
+          status={status === "complete" ? "complete" : status === "executing" ? "executing" : "inProgress"}
+          result={typeof result === "string" ? result : undefined}
+        />
+      );
+    },
   });
 
   useRenderTool({
@@ -1052,6 +1113,7 @@ function WorkbenchRuntimeHooks({
 
       if (normalizedTodos.length > 0 || normalizedArtifacts.length > 0) {
         queueMicrotask(() => {
+          setHasLiveThreadActivity(true);
           setWorkbenchState((previous) => {
             const withTodos =
               normalizedTodos.length > 0
@@ -1135,6 +1197,7 @@ function WorkbenchRuntimeHooks({
 
 function ThreadHistoryGapMonitor({
   activeAgentId,
+  hasLiveThreadActivity,
   runtimeAvailability,
   workbenchState,
   pendingThreadRun,
@@ -1142,6 +1205,7 @@ function ThreadHistoryGapMonitor({
   setRecoverableError,
 }: {
   activeAgentId: string;
+  hasLiveThreadActivity: boolean;
   runtimeAvailability: RuntimeAvailability;
   workbenchState: ThreadWorkbenchState;
   pendingThreadRun: PendingThreadRun | null;
@@ -1165,6 +1229,7 @@ function ThreadHistoryGapMonitor({
     }
 
     if (
+      hasLiveThreadActivity ||
       pendingThreadRun ||
       !restorableContext ||
       runtimeAvailability !== "ready"
@@ -1228,6 +1293,7 @@ function ThreadHistoryGapMonitor({
     recoverableError,
     restorableContext,
     runtimeAvailability,
+    hasLiveThreadActivity,
     setRecoverableError,
     workbenchState.lastUserPrompt,
   ]);
@@ -1239,6 +1305,7 @@ function ActiveThreadChat({
   activeAgentId,
   activeThread,
   currentPreset,
+  setHasLiveThreadActivity,
   threadId,
   workspaceRoot,
   pendingThreadRun,
@@ -1248,6 +1315,7 @@ function ActiveThreadChat({
   activeAgentId: string;
   activeThread: LocalThread;
   currentPreset: AgentPresetDefinition;
+  setHasLiveThreadActivity: React.Dispatch<React.SetStateAction<boolean>>;
   threadId: string | null;
   workspaceRoot: string | null;
   pendingThreadRun: PendingThreadRun | null;
@@ -1275,8 +1343,49 @@ function ActiveThreadChat({
     value: workspaceContext,
   });
 
+  const coordinatorWorkbenchSnapshot = (() => {
+    if (!agent?.state || typeof agent.state !== "object") {
+      return null;
+    }
+
+    const state = agent.state as {
+      delegations?: Array<{
+        id: string;
+        sub_agent: "planner" | "executor" | "reviewer";
+        task: string;
+        status: "running" | "completed" | "failed";
+        result: string;
+      }>;
+      task_kind?: "engineering" | "research" | "general";
+      final_summary?: string;
+    };
+
+    const delegations = Array.isArray(state.delegations) ? state.delegations : [];
+    const finalSummary =
+      typeof state.final_summary === "string" && state.final_summary.trim()
+        ? state.final_summary
+        : null;
+
+    return {
+      delegations,
+      taskKind: state.task_kind,
+      finalSummary,
+    };
+  })();
+
+  const coordinatorWorkbenchSignature = coordinatorWorkbenchSnapshot
+    ? JSON.stringify(coordinatorWorkbenchSnapshot)
+    : null;
+  const latestCoordinatorAssistantText =
+    agent && Array.isArray(agent.messages) && activeAgentId.startsWith("coordinator-")
+      ? extractLatestAssistantText(agent.messages)
+      : null;
+
   useEffect(() => {
     if (!agent || !Array.isArray(agent.messages)) return;
+    if (agent.messages.length > 0) {
+      setHasLiveThreadActivity(true);
+    }
 
     const latestUserPrompt = extractLatestUserPrompt(agent.messages);
     if (!latestUserPrompt) return;
@@ -1297,7 +1406,7 @@ function ActiveThreadChat({
         updatedAt: Date.now(),
       };
     });
-  }, [agent, agent?.messages, setWorkbenchState]);
+  }, [agent, agent?.messages, setHasLiveThreadActivity, setWorkbenchState]);
 
   useEffect(() => {
     if (!agent || !Array.isArray(agent.messages)) return;
@@ -1326,25 +1435,25 @@ function ActiveThreadChat({
   }, [activeThread.id, agent, agent?.messages, setThreads]);
 
   useEffect(() => {
-    if (!agent?.state || typeof agent.state !== "object") return;
+    if (!latestCoordinatorAssistantText) return;
 
-    const state = agent.state as {
-      delegations?: Array<{
-        id: string;
-        sub_agent: "planner" | "executor" | "reviewer";
-        task: string;
-        status: "running" | "completed" | "failed";
-        result: string;
-      }>;
-      task_kind?: "engineering" | "research" | "general";
-      final_summary?: string;
-    };
+    setWorkbenchState((previous) => {
+      if (previous.finalSummary === latestCoordinatorAssistantText) {
+        return previous;
+      }
 
-    const delegations = Array.isArray(state.delegations) ? state.delegations : [];
-    const taskKind = state.task_kind;
-    const finalSummary = typeof state.final_summary === "string" && state.final_summary.trim()
-      ? state.final_summary
-      : null;
+      return {
+        ...previous,
+        finalSummary: latestCoordinatorAssistantText,
+        updatedAt: Date.now(),
+      };
+    });
+  }, [latestCoordinatorAssistantText, setWorkbenchState]);
+
+  useEffect(() => {
+    if (!coordinatorWorkbenchSnapshot) return;
+
+    const { delegations, taskKind, finalSummary } = coordinatorWorkbenchSnapshot;
 
     if (delegations.length === 0 && !taskKind && !finalSummary) {
       return;
@@ -1374,7 +1483,7 @@ function ActiveThreadChat({
         updatedAt: Date.now(),
       };
     });
-  }, [agent, agent?.state, setWorkbenchState]);
+  }, [coordinatorWorkbenchSignature, setWorkbenchState]);
 
   return (
     <>

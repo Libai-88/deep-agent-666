@@ -1,6 +1,7 @@
 import type {
   WorkbenchArtifact,
   WorkbenchTaskKind,
+  ThreadWorkbenchState,
   WorkbenchTodo,
 } from "./workbench-state";
 
@@ -148,6 +149,15 @@ function delegationTitle(subAgent: DelegationPayload["sub_agent"]): string {
   return "Reviewer result";
 }
 
+function normalizeCoordinatorToolName(
+  name: string | undefined,
+): DelegationPayload["sub_agent"] | null {
+  if (name === "planner_tool") return "planner";
+  if (name === "executor_tool") return "executor";
+  if (name === "reviewer_tool") return "reviewer";
+  return null;
+}
+
 export function normalizeDelegationsToTodos(
   delegations: readonly DelegationPayload[],
 ): WorkbenchTodo[] {
@@ -172,4 +182,76 @@ export function normalizeDelegationArtifacts(
       createdAt: Date.now() + index,
       source: "delegation",
     }));
+}
+
+export function applyCoordinatorToolCallFallback(
+  state: ThreadWorkbenchState,
+  payload: ToolPayload,
+): ThreadWorkbenchState {
+  const subAgent = normalizeCoordinatorToolName(payload.name);
+  const task =
+    typeof payload.args?.task === "string" ? payload.args.task.trim() : "";
+
+  if (!subAgent || !task) {
+    return state;
+  }
+
+  const todoStatus =
+    payload.status === "complete"
+      ? "completed"
+      : payload.status === "executing"
+        ? "in_progress"
+        : "pending";
+  const todo: WorkbenchTodo = {
+    id: `coordinator-tool-${subAgent}`,
+    content: task,
+    status: todoStatus,
+    source: "agent",
+  };
+
+  const shouldResetCoordinatorFallback = subAgent === "planner";
+  const nextTodosBase = shouldResetCoordinatorFallback
+    ? state.todos.filter((existingTodo) => existingTodo.source === "user")
+    : state.todos;
+  const nextArtifactsBase = shouldResetCoordinatorFallback
+    ? state.artifacts.filter((artifact) => artifact.source !== "delegation")
+    : state.artifacts;
+
+  const nextTodos = [
+    ...nextTodosBase.filter((existingTodo) => existingTodo.id !== todo.id),
+    todo,
+  ];
+
+  const resultText =
+    typeof payload.result === "string" ? payload.result.trim() : "";
+  const artifactId = `delegation-coordinator-tool-${subAgent}`;
+  const nextArtifacts: WorkbenchArtifact[] =
+    payload.status === "complete" && resultText
+      ? [
+          ...nextArtifactsBase.filter(
+            (artifact) => artifact.id !== artifactId,
+          ),
+          {
+            id: artifactId,
+            kind: subAgent === "reviewer" ? "summary" : "finding",
+            title: delegationTitle(subAgent),
+            content: resultText,
+            createdAt: Date.now(),
+            source: "delegation",
+          },
+        ]
+      : nextArtifactsBase;
+
+  const nextFinalSummary =
+    subAgent === "reviewer" && payload.status === "complete" && resultText
+      ? resultText
+      : state.finalSummary;
+
+  return {
+    ...state,
+    todos: nextTodos,
+    artifacts: nextArtifacts,
+    finalSummary: nextFinalSummary,
+    updatedAt: Date.now(),
+  };
 }

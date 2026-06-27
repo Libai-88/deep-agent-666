@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  applyCoordinatorToolCallFallback,
   extractFinalSummary,
   inferTaskKindFromMessage,
   normalizeDelegationArtifacts,
@@ -105,5 +106,61 @@ describe("tool-result-normalizer", () => {
     expect(extractFinalSummary({ final_summary: "Coordinator complete" })).toBe(
       "Coordinator complete",
     );
+  });
+
+  it("resets stale agent timeline state and promotes reviewer output during coordinator tool fallback", () => {
+    const afterPlanner = applyCoordinatorToolCallFallback(
+      {
+        taskKind: "engineering",
+        todos: [
+          {
+            id: "persisted-old",
+            content: "Persisted coordinator task before reconnect",
+            status: "completed",
+            source: "agent",
+          },
+        ],
+        artifacts: [],
+        finalSummary: "Persisted coordinator summary before replay.",
+        lastUserPrompt: "Retry the last coordinator task.",
+        updatedAt: 1,
+      },
+      {
+        name: "planner_tool",
+        status: "complete",
+        args: { task: "Rebuild the coordinator recovery plan." },
+        result: "Planner rebuilt the coordinator recovery plan.",
+      },
+    );
+
+    expect(afterPlanner.todos).toEqual([
+      {
+        id: "coordinator-tool-planner",
+        content: "Rebuild the coordinator recovery plan.",
+        status: "completed",
+        source: "agent",
+      },
+    ]);
+
+    const afterReviewer = applyCoordinatorToolCallFallback(afterPlanner, {
+      name: "reviewer_tool",
+      status: "complete",
+      args: { task: "Confirm the restored coordinator outcome." },
+      result: "Reviewer confirmed the restored coordinator outcome.",
+    });
+
+    expect(afterReviewer.finalSummary).toBe(
+      "Reviewer confirmed the restored coordinator outcome.",
+    );
+    expect(
+      afterReviewer.artifacts.find(
+        (artifact) => artifact.id === "delegation-coordinator-tool-reviewer",
+      ),
+    ).toMatchObject({
+      kind: "summary",
+      title: "Reviewer result",
+      content: "Reviewer confirmed the restored coordinator outcome.",
+      source: "delegation",
+    });
   });
 });

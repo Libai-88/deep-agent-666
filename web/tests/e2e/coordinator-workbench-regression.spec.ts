@@ -263,7 +263,7 @@ test("starter-launched coordinator run updates cards, timeline, and results", as
   ).toBeVisible();
   await expect(
     page.getByTestId("artifact-final-summary").getByText(
-      "Repository review complete.",
+      "Reviewer confirmed the next engineering steps.",
     ),
   ).toBeVisible();
 });

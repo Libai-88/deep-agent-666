@@ -25,6 +25,7 @@
 - `V19` 已补齐 runtime bootstrap reconnect：backend 恢复后，同一标签页无需手动刷新也能重新挂载 CopilotKit 并启动首个任务。
 - `V20` 已补齐 active-thread recovery shell：可恢复故障下保留当前线程工作台，不再直接把用户踢回 gate。
 - `V21` 已补齐 contextual recovery actions：active-thread 在 backend 不可达且本地存有最后任务时，会直接给出 `Retry last task`，恢复后仍可在原线程内重试。
+- `V22` 已补齐 coordinator recovery replay proof：coordinator 恢复线程在 reconnect 后可继续同线程重放，并避免把已有 live activity 误判成 `thread_history_unavailable`。
 
 ---
 
@@ -67,10 +68,10 @@ CopilotRuntime (Next.js route handler)
 
 | 套件 | 数量 | 状态 |
 |------|------|------|
-| 后端 pytest | **61** | ✅ 全通过 |
-| 前端 vitest | **85** | ✅ 全通过 |
+| 后端 pytest | **59** | ✅ 全通过 |
+| 前端 vitest | **89** | ✅ 全通过 |
 | Next.js build | — | ✅ 无错误 |
-| E2E (playwright) | **19** | ✅ 全通过 |
+| E2E (playwright) | **21** | ✅ 全通过 |
 | Docker Compose 配置校验 | — | ⚠️ 当前机器未安装 `docker`，未执行命令级验证 |
 
 ---
@@ -206,11 +207,11 @@ Python FastAPI:
 
 | 问题 | 优先级 | 说明 | 必须修？ |
 |------|--------|------|---------|
-| 更广覆盖的 runtime restart/resume 验证仍待补齐 | 🟡 P1 | V21 已补齐 active-thread recoverable shell preservation + contextual retry action，但跨更多入口与真实进程重启的覆盖仍可继续增强 | 建议继续补强 |
+| 更广覆盖的 runtime restart/resume 验证仍待扩展 | 🟡 P1 | V22 已补齐 coordinator recovery replay proof，但跨更多入口与真实进程重启的覆盖仍可继续增强 | 建议继续补强 |
 | #4 同步 invoke 阻塞事件循环 | 🟡 P2 | LangGraph 工具同步设计，长命令影响性能 | 否 — LangGraph 设计特性 |
 | #6 预设双端维护 | 🟡 P3 | 新增预设需改 Python + TS 两处 | 否 — 有注释指引 |
 | A2UI 未与 Python 工具对接 | 🟡 P3 | 前端 catalog 就绪，coordinator 工具未调用 `a2ui.render()` | 否 — 阶段 B 未完成部分 |
-| Coordinator 更深层恢复场景仍缺浏览器覆盖 | 🟡 P2 | V14 已覆盖 starter -> planner/executor/reviewer -> workbench 主路径，但恢复线程下的 coordinator 连续场景仍可继续扩展 | 建议继续补强 |
+| Coordinator 更多恢复入口仍可继续扩展 | 🟡 P2 | V22 已覆盖 reconnect 后同线程 replay 主路径，但跨更多入口与真实进程重启的 coordinator 连续场景仍可继续扩展 | 建议继续补强 |
 | interrupt_on 已禁用 | 🟡 P3 | 去掉后才无 Console Error | 建议修 — 需审批流程时恢复 |
 | Inspector `{}` 解析警告 | 🟢 P4 | `[CopilotKit Inspector] Failed to parse tool-call result content {}` | 否 — SDK 升级后解决 |
 | 运行时恢复回归覆盖不足 | 🟡 P2 | 已切到 SQLite，但还缺“重启后继续线程”的更深 E2E | 建议补 — 属于 V4 后续验证 |
@@ -225,8 +226,8 @@ Python FastAPI:
 | 标准 | 当前 | 达标 |
 |------|------|------|
 | 后端测试 ≥ 50 | 59 ✅ | 已达标 |
-| 前端测试 ≥ 20 | 86 ✅ | 已达标 |
-| E2E ≥ 5 条 | 20 ✅ | 已达标 |
+| 前端测试 ≥ 20 | 89 ✅ | 已达标 |
+| E2E ≥ 5 条 | 21 ✅ | 已达标 |
 | 0 个 Console Error | 有 Inspector 警告 | SDK 升级 |
 | Docker 部署 | ❌ | Dockerfile + compose |
 | Windows 桌面壳 | ❌ | Electron wrapper |
@@ -269,6 +270,7 @@ V18 基线提交: `见最新提交` — runtime diagnostics baseline
 V19 基线提交: `见最新提交` — runtime bootstrap reconnect baseline
 V20 基线提交: `见最新提交` — active-thread recovery shell baseline
 V21 基线提交: `a24adc8` — contextual recovery actions baseline
+V22 基线提交: `见最新提交` — coordinator recovery replay baseline
 
 日志：
 ```

@@ -97,6 +97,7 @@ Open `http://127.0.0.1:3000`.
 - Backend recovery actions now also re-bootstrap the CopilotKit runtime in the current tab, so a beginner can retry connection and launch the next guided task without manually reloading the page first.
 - Recoverable runtime/backend failures no longer force active threads back into the onboarding gate; the current thread shell, timeline, and results stay visible while the user recovers in place.
 - Active-thread recovery is now context-aware: when a stored last task exists, backend-unreachable notices can surface `Retry last task` directly in the same thread, so the user can reconnect and replay without retyping the prompt.
+- Coordinator threads now have a dedicated recovery replay proof: after reconnecting from a history-gap state, the same thread can replay its last task and refresh coordinator cards, timeline, and results without a false `thread_history_unavailable` interruption.
 
 ## Test
 

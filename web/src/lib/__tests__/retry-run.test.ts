@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  extractLatestAssistantText,
   extractLatestUserPrompt,
   resolvePendingRunPrompt,
 } from "../retry-run";
@@ -19,6 +20,28 @@ describe("retry-run", () => {
     expect(
       extractLatestUserPrompt([{ role: "assistant", content: "Only assistant" }]),
     ).toBeNull();
+  });
+
+  it("extracts the latest assistant text from mixed message history", () => {
+    expect(
+      extractLatestAssistantText([
+        { role: "assistant", content: "Earlier answer" },
+        { role: "assistant", content: ["Recovered", "summary"] },
+      ]),
+    ).toBe("Recovered summary");
+  });
+
+  it("extracts assistant text from structured content payloads", () => {
+    expect(
+      extractLatestAssistantText([
+        {
+          role: "assistant",
+          content: [
+            { text: "Coordinator replay completed after reconnect." },
+          ],
+        },
+      ]),
+    ).toBe("Coordinator replay completed after reconnect.");
   });
 
   it("does not inject a duplicate prompt when the latest user message already matches", () => {
