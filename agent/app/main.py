@@ -214,20 +214,47 @@ async def configure(body: ConfigureRequest) -> JSONResponse:
 
     if body.providerProfiles is not None or body.modelProfiles is not None:
         current_snapshot = store.provider_registry_snapshot
+        incoming_provider_profiles = (
+            body.providerProfiles
+            if body.providerProfiles is not None
+            else [profile.model_dump() for profile in current_snapshot.provider_profiles]
+        )
+        incoming_model_profiles = (
+            body.modelProfiles
+            if body.modelProfiles is not None
+            else [profile.model_dump() for profile in current_snapshot.model_profiles]
+        )
+
+        builtin_provider_ids = {"openai", "anthropic", "google"}
+        merged_provider_profiles = [
+            profile.model_dump()
+            for profile in current_snapshot.provider_profiles
+            if profile.id in builtin_provider_ids
+        ]
+        merged_provider_profiles.extend(
+            profile
+            for profile in incoming_provider_profiles
+            if str(profile.get("id")) not in builtin_provider_ids
+        )
+
+        merged_model_profiles = [
+            profile.model_dump()
+            for profile in current_snapshot.model_profiles
+            if profile.provider_id in builtin_provider_ids
+        ]
+        merged_model_profiles.extend(
+            profile
+            for profile in incoming_model_profiles
+            if str(
+                profile.get("providerId", profile.get("provider_id", ""))
+            ) not in builtin_provider_ids
+        )
         try:
             next_snapshot = normalize_provider_registry_payload(
                 {
                     "workspaceRoot": str(store.snapshot().workspace_root),
-                    "providerProfiles": (
-                        body.providerProfiles
-                        if body.providerProfiles is not None
-                        else [profile.model_dump() for profile in current_snapshot.provider_profiles]
-                    ),
-                    "modelProfiles": (
-                        body.modelProfiles
-                        if body.modelProfiles is not None
-                        else [profile.model_dump() for profile in current_snapshot.model_profiles]
-                    ),
+                    "providerProfiles": merged_provider_profiles,
+                    "modelProfiles": merged_model_profiles,
                 }
             )
         except ValueError as exc:

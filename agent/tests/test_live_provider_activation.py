@@ -227,3 +227,48 @@ def test_configure_custom_openai_compatible_provider_creates_launchable_presets(
         preset_id.startswith("lab-gateway-")
         for preset_id in payload["preset_ids"]
     )
+
+
+def test_configure_custom_provider_preserves_existing_builtin_provider_agents(
+    monkeypatch,
+    tmp_path,
+) -> None:
+    monkeypatch.setenv("OPENAI_API_KEY", "test-openai-key")
+
+    main_module = _reload_main(monkeypatch, tmp_path)
+    client = TestClient(main_module.app)
+
+    response = client.post(
+        "/configure",
+        json={
+            "providerProfiles": [
+                {
+                    "id": "lab-gateway",
+                    "label": "Lab Gateway",
+                    "protocol": "openai-compatible",
+                    "baseUrl": "https://gateway.example.com/v1",
+                    "apiKey": "secret",
+                    "enabled": True,
+                }
+            ],
+            "modelProfiles": [
+                {
+                    "id": "lab-gpt5",
+                    "providerId": "lab-gateway",
+                    "modelName": "gpt-5.4",
+                    "label": "GPT 5.4",
+                    "capabilities": ["chat", "tools"],
+                    "isDefault": True,
+                    "enabled": True,
+                }
+            ],
+        },
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert "openai-balanced" in payload["preset_ids"]
+    assert any(
+        preset_id.startswith("lab-gateway-")
+        for preset_id in payload["preset_ids"]
+    )
