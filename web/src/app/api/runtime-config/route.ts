@@ -8,7 +8,16 @@ async function proxyJson(
   path: string,
   init?: RequestInit,
 ): Promise<Response> {
-  const response = await fetch(`${BACKEND_URL}${path}`, init);
+  let response: Response;
+  try {
+    response = await fetch(`${BACKEND_URL}${path}`, init);
+  } catch (error) {
+    if (path === "/config") {
+      return Response.json(normalizeRuntimeSettings(null));
+    }
+
+    throw error;
+  }
 
   if (!response.ok) {
     const text = await response.text();

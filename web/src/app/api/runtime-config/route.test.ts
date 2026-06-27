@@ -111,4 +111,32 @@ describe("runtime-config route", () => {
       code: "workspace_root_invalid",
     });
   });
+
+  it("returns a normalized empty runtime snapshot when the backend config endpoint is unreachable", async () => {
+    fetchMock.mockRejectedValue(new Error("connect ECONNREFUSED"));
+
+    process.env.AGENT_BASE_URL = "http://127.0.0.1:8123";
+    const { GET } = await import("./route");
+
+    const response = await GET();
+
+    expect(response.status).toBe(200);
+    expect(await response.json()).toEqual({
+      workspaceRoot: null,
+      providers: {
+        openai: {
+          configured: false,
+          baseUrl: null,
+        },
+        anthropic: {
+          configured: false,
+          baseUrl: null,
+        },
+        google: {
+          configured: false,
+          baseUrl: null,
+        },
+      },
+    });
+  });
 });

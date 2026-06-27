@@ -28,6 +28,7 @@
 - `V22` 已补齐 coordinator recovery replay proof：coordinator 恢复线程在 reconnect 后可继续同线程重放，并避免把已有 live activity 误判成 `thread_history_unavailable`。
 - `V23` 已补齐 true process restart persistence proof：真实 `next start` 进程在 backend 离线后重启，仍可通过 SQLite 线程存储和 cached preset catalog 恢复已完成线程。
 - `V24` 已补齐 coordinator true process restart proof：真实 `next start` 进程在 backend 离线后重启，仍可通过 SQLite 线程存储和 cached preset catalog 恢复已完成的 coordinator 线程。
+- `V25` 已补齐 coordinator browser restart continuity proof：真实 `next start` 进程在 backend 离线后重启，浏览器中的同一 coordinator 线程仍可恢复聊天、timeline、results 和 degraded 状态提示。
 
 ---
 
@@ -71,9 +72,9 @@ CopilotRuntime (Next.js route handler)
 | 套件 | 数量 | 状态 |
 |------|------|------|
 | 后端 pytest | **59** | ✅ 全通过 |
-| 前端 vitest | **89** | ✅ 全通过 |
+| 前端 vitest | **90** | ✅ 全通过 |
 | Next.js build | — | ✅ 无错误 |
-| E2E (playwright) | **23** | ✅ 全通过 |
+| E2E (playwright) | **24** | ✅ 全通过 |
 | Docker Compose 配置校验 | — | ⚠️ 当前机器未安装 `docker`，未执行命令级验证 |
 
 ---
@@ -209,15 +210,15 @@ Python FastAPI:
 
 | 问题 | 优先级 | 说明 | 必须修？ |
 |------|--------|------|---------|
-| 更广覆盖的 runtime restart/resume 验证仍待扩展 | 🟡 P1 | V24 已补齐主 agent 路由与 coordinator 路由的真实 Web 进程重启恢复证明，但跨更多入口与更复杂的浏览器连续场景仍可继续增强 | 建议继续补强 |
+| 更广覆盖的 runtime restart/resume 验证仍待扩展 | 🟡 P1 | V25 已补齐 coordinator 的真实浏览器重启连续性证明，但跨更多入口与更深的恢复交互场景仍可继续增强 | 建议继续补强 |
 | #4 同步 invoke 阻塞事件循环 | 🟡 P2 | LangGraph 工具同步设计，长命令影响性能 | 否 — LangGraph 设计特性 |
 | #6 预设双端维护 | 🟡 P3 | 新增预设需改 Python + TS 两处 | 否 — 有注释指引 |
 | A2UI 未与 Python 工具对接 | 🟡 P3 | 前端 catalog 就绪，coordinator 工具未调用 `a2ui.render()` | 否 — 阶段 B 未完成部分 |
-| Coordinator 更多恢复入口仍可继续扩展 | 🟡 P2 | V22 已覆盖 reconnect 后同线程 replay 主路径，V24 已补齐 coordinator 主路由真实 Web 进程重启证明，但 coordinator 在更复杂浏览器连续场景下仍可继续扩展 | 建议继续补强 |
+| Coordinator 更多恢复入口仍可继续扩展 | 🟡 P2 | V22 已覆盖 reconnect 后同线程 replay 主路径，V25 已补齐真实浏览器重启连续性证明，但 coordinator 在更深恢复交互场景下仍可继续扩展 | 建议继续补强 |
 | interrupt_on 已禁用 | 🟡 P3 | 去掉后才无 Console Error | 建议修 — 需审批流程时恢复 |
 | Inspector `{}` 解析警告 | 🟢 P4 | `[CopilotKit Inspector] Failed to parse tool-call result content {}` | 否 — SDK 升级后解决 |
 | 运行时恢复回归覆盖不足 | 🟡 P2 | 已切到 SQLite，但还缺“重启后继续线程”的更深 E2E | 建议补 — 属于 V4 后续验证 |
-| 线程恢复与更深层入口回归覆盖仍可继续扩展 | 🟡 P1 | 当前已证明产品层可识别全空与部分历史漂移，并证明主运行时、主路由入口以及单 agent / coordinator 的真实 Web 进程重启都能在关键 fallback 场景下恢复消息；后续重点是扩展到更多入口与更复杂的恢复链路 | 建议继续补强 |
+| 线程恢复与更深层入口回归覆盖仍可继续扩展 | 🟡 P1 | 当前已证明产品层可识别全空与部分历史漂移，并证明主运行时、主路由入口以及 coordinator 浏览器重启连续性都能在关键 fallback 场景下恢复消息；后续重点是扩展到更多入口与更复杂的恢复链路 | 建议继续补强 |
 
 ---
 
@@ -228,8 +229,8 @@ Python FastAPI:
 | 标准 | 当前 | 达标 |
 |------|------|------|
 | 后端测试 ≥ 50 | 59 ✅ | 已达标 |
-| 前端测试 ≥ 20 | 89 ✅ | 已达标 |
-| E2E ≥ 5 条 | 23 ✅ | 已达标 |
+| 前端测试 ≥ 20 | 90 ✅ | 已达标 |
+| E2E ≥ 5 条 | 24 ✅ | 已达标 |
 | 0 个 Console Error | 有 Inspector 警告 | SDK 升级 |
 | Docker 部署 | ❌ | Dockerfile + compose |
 | Windows 桌面壳 | ❌ | Electron wrapper |
@@ -237,7 +238,7 @@ Python FastAPI:
 ### 建议优先级
 
 ```
-P1: 扩展更多 runtime 入口与更复杂浏览器连续场景下的 restart/resume 一致性验证
+P1: 扩展更多 runtime 入口与更深恢复交互场景下的 restart/resume 一致性验证
 P1: CI 打通 E2E 测试（让 smoke/chat round-trip 自动运行）
 P2: 补 Docker 部署方案
 P3: 恢复 interrupt_on + 修复空结果
@@ -274,6 +275,7 @@ V20 基线提交: `见最新提交` — active-thread recovery shell baseline
 V21 基线提交: `a24adc8` — contextual recovery actions baseline
 V22 基线提交: `551e2e3` — coordinator recovery replay baseline
 V23 基线提交: `f7d6e70` — true process restart persistence baseline
+V24 基线提交: `186a349` — coordinator true process restart baseline
 
 日志：
 ```

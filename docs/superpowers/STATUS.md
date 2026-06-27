@@ -1,6 +1,6 @@
 # Deep Agent 666 — 当前状态
 
-> 最后更新：2026-06-27 (V1 完成，V2 release hardening 完成，V3 首用引导完成，V4 本地持久化线程运行时完成，V5 live provider activation 完成，V6 first response roundtrip 完成，V7 provider alignment/runtime recovery 完成，V8 runtime failure normalization 完成，V9 retry replay recovery 完成，V10 thread history gap recovery 完成，V11 thread history drift recovery 完成，V12 runtime persistence proof 完成，V13 runtime catalog fallback 完成，V14 coordinator workbench regression 完成，V15 runtime-config workspace root 完成，V16 coordinator restored-thread continuity 完成，V17 thread management 完成，V18 runtime diagnostics 完成，V19 runtime bootstrap reconnect 完成，V20 active-thread recovery shell 完成，V21 contextual recovery actions 完成，V22 coordinator recovery replay 完成，V23 true process restart persistence 完成，V24 coordinator true process restart 完成)
+> 最后更新：2026-06-27 (V1 完成，V2 release hardening 完成，V3 首用引导完成，V4 本地持久化线程运行时完成，V5 live provider activation 完成，V6 first response roundtrip 完成，V7 provider alignment/runtime recovery 完成，V8 runtime failure normalization 完成，V9 retry replay recovery 完成，V10 thread history gap recovery 完成，V11 thread history drift recovery 完成，V12 runtime persistence proof 完成，V13 runtime catalog fallback 完成，V14 coordinator workbench regression 完成，V15 runtime-config workspace root 完成，V16 coordinator restored-thread continuity 完成，V17 thread management 完成，V18 runtime diagnostics 完成，V19 runtime bootstrap reconnect 完成，V20 active-thread recovery shell 完成，V21 contextual recovery actions 完成，V22 coordinator recovery replay 完成，V23 true process restart persistence 完成，V24 coordinator true process restart 完成，V25 coordinator browser restart continuity 完成)
 
 ## 当前结论
 
@@ -15,9 +15,9 @@
 | 套件 | 数量 | 状态 |
 |------|------|------|
 | 后端 (pytest) | 59 | ✅ 全通过 |
-| 前端 (vitest) | 89 | ✅ 全通过 |
+| 前端 (vitest) | 90 | ✅ 全通过 |
 | Build (next build) | — | ✅ |
-| E2E (playwright) | 23 | ✅ 全通过 |
+| E2E (playwright) | 24 | ✅ 全通过 |
 | Docker Compose 配置校验 | — | ⚠️ 当前机器未安装 `docker`，未执行命令级验证 |
 
 ## 已完成
@@ -149,6 +149,11 @@
 - 新增场景证明：`coordinator-openai-balanced` 在真实 Web 进程重启且 backend 离线后，仍可通过 SQLite 线程存储与 cached preset catalog 恢复已完成线程
 - 当前 restart 基线已把 degraded diagnostics、单 agent 恢复与 coordinator 恢复统一收口到同一套真实生产运行时证明中
 
+### V25: Coordinator Browser Restart Continuity ✅
+- 进程级 restart suite 现在不只证明路由可恢复，还证明真实浏览器 UI 能在同一上下文里重新打开已完成的 coordinator 线程
+- 新增场景证明：真实 `next start` 重启且 backend 离线后，聊天恢复、timeline 保留、results 面板可读、runtime badge 降级提示都能在同一 coordinator 线程里继续成立
+- 当前恢复基线已从“路由恢复可证明”升级到“新手可见的 coordinator shell 连续性可证明”
+
 ## 关键提交
 
 | Commit | 说明 |
@@ -163,6 +168,6 @@
 
 ## 下一步
 
-- 下一阶段重点不再是“是否已经证明单 agent / coordinator 主路由能跨真实 Web 进程重启恢复线程”，而是把更多 runtime 入口与更复杂的浏览器连续场景继续扩展。
+- 下一阶段重点不再是“是否已经证明 coordinator 在真实重启后还能在浏览器里连续打开”，而是把更多 runtime 入口与更深的恢复交互场景继续扩展。
 - 完成标准是：真实模型失败与成功路径在所有主要入口都能稳定结束，并且新手既能看懂状态，也能在更多恢复入口里保住上下文完成恢复而不是靠猜。
 - 文档中若仍出现旧的 `openrouter/free`、或把 OpenAI 默认路径与 OpenRouter 混写的表述，应以本页和最新提交为准。

@@ -66,7 +66,12 @@ test.describe("Page loads correctly", () => {
     await page.waitForTimeout(3000);
 
     // No runtime errors
-    expect(errors.filter((e) => !e.includes("copilotkit") && !e.includes("INCOMPLETE_STREAM")).length).toBe(0);
+    const relevantErrors = errors.filter(
+      (e) => !e.includes("copilotkit") && !e.includes("INCOMPLETE_STREAM"),
+    );
+    if (relevantErrors.length > 0) {
+      throw new Error(`Console errors:\n${relevantErrors.join("\n")}`);
+    }
   });
 
   test("runtime info endpoint only exposes configured agents", async ({ request }) => {
