@@ -4,6 +4,7 @@
 
 ## 2026-06-27 更新
 
+- `Phase A` 已完成统一 runtime protocol 基线：coordinator `workbench_events`、tool 结果和 A2UI artifact 现在共享同一套 workbench event 语义，timeline / results / final summary 不再只靠 delegation 特判。
 - `V27` 已完成 A2UI diff preview 激活：文本文件写入与替换现在会返回结构化编辑结果，并在聊天流中内联渲染 `DiffPreview`。
 - `V1` 已在 `6a33da3 feat(v1): complete coordinator workbench runtime` 完成。
 - `V2` 已在 `69d6d96 feat(v2): add release hardening baseline` 完成并推送远端。
@@ -73,8 +74,8 @@ CopilotRuntime (Next.js route handler)
 
 | 套件 | 数量 | 状态 |
 |------|------|------|
-| 后端 pytest | **60** | ✅ 全通过 |
-| 前端 vitest | **91** | ✅ 全通过 |
+| 后端 pytest | **63** | ✅ 全通过 |
+| 前端 vitest | **96** | ✅ 全通过 |
 | Next.js build | — | ✅ 无错误 |
 | E2E (playwright) | **25** | ✅ 全通过 |
 | Docker Compose 配置校验 | — | ⚠️ 当前机器未安装 `docker`，未执行命令级验证 |
@@ -230,9 +231,9 @@ Python FastAPI:
 
 | 标准 | 当前 | 达标 |
 |------|------|------|
-| 后端测试 ≥ 50 | 60 ✅ | 已达标 |
-| 前端测试 ≥ 20 | 91 ✅ | 已达标 |
-| E2E ≥ 5 条 | 24 ✅ | 已达标 |
+| 后端测试 ≥ 50 | 63 ✅ | 已达标 |
+| 前端测试 ≥ 20 | 96 ✅ | 已达标 |
+| E2E ≥ 5 条 | 25 ✅ | 已达标 |
 | 0 个 Console Error | 有 Inspector 警告 | SDK 升级 |
 | Docker 部署 | ❌ | Dockerfile + compose |
 | Windows 桌面壳 | ❌ | Electron wrapper |

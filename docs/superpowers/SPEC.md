@@ -34,7 +34,7 @@
 | 前端 | Next.js 16 + React 19 + @copilotkit/react-core v2 |
 | 代理层 | @ag-ui/client HttpAgent + createCopilotRuntimeHandler |
 | UI | shadcn/ui + Tailwind v4 + lucide-react |
-| 测试 | pytest (60) + vitest (91) + playwright (25) |
+| 测试 | pytest (63) + vitest (96) + playwright (25) |
 
 ## 关键决策
 
@@ -51,6 +51,7 @@
 - Runtime recovery must re-bootstrap the active tab — 页面不能只把状态刷新成 healthy，还必须让当前 tab 内的 CopilotKit runtime 真正重新挂载
 - Recoverable active-thread failures should preserve local context — 只要线程本身有效，timeline/results/last prompt 不应因为 backend/runtime 可恢复故障而被 gate 挡住
 - Text file edits should emit structured A2UI diff payloads — `write_text_file` / `replace_text_in_file` 必须同时服务 workbench artifact 摘要和聊天内联 `DiffPreview`
+- Workbench runtime semantics should converge on one event protocol — timeline、artifact 和 final summary 应优先消费共享 `workbench event` 语义，而不是分别依赖 delegation 特判、tool 字符串解析和页面级补丁
 - CORS middleware (Python) — 开发模式需要（已不再需要，因为不走浏览器直连）
 
 ## 已知技术债

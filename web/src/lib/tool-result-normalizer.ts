@@ -240,12 +240,13 @@ export function applyWorkbenchEvents(
     .map((event) => ({
       id: event.id,
       content: event.message,
-      status:
+      status: (
         event.status === "completed"
           ? "completed"
           : event.status === "running"
             ? "in_progress"
-            : "pending",
+            : "pending"
+      ) as WorkbenchTodo["status"],
       source: "agent" as const,
     }));
 
@@ -261,11 +262,23 @@ export function applyWorkbenchEvents(
       source: "tool" as const,
     }));
 
+  const reviewerSummary =
+    [...events]
+      .reverse()
+      .find(
+        (event) =>
+          event.kind === "delegation" &&
+          event.source === "reviewer" &&
+          event.status === "completed" &&
+          event.message.trim(),
+      )?.message ?? state.finalSummary;
+
   return {
     ...state,
     todos,
     artifacts,
     events,
+    finalSummary: reviewerSummary,
     updatedAt: Date.now(),
   };
 }

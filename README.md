@@ -83,6 +83,7 @@ Open `http://127.0.0.1:3000`.
 
 ## Current limits
 
+- `Phase A` 已统一 workbench runtime protocol：coordinator state snapshot、tool 结果和 A2UI artifact 现在会收口为共享的 `workbench event` 语义，timeline、results 和 final summary 统一消费这一层协议。
 - `V27` 已激活 A2UI diff preview：`write_text_file` / `replace_text_in_file` 现在会返回结构化编辑结果，并在聊天流里内联渲染 `DiffPreview`。
 - The CopilotKit runtime now uses a local SQLite thread store by default (`COPILOTKIT_THREADS_DB_PATH`, default `./data/threads.db`), and `Retry last task` now persists the last runnable prompt so a restored thread can replay it after refresh/reload.
 - Restored threads that still have local workbench context but no runtime message history, or only a partial runtime history that is missing the latest local task, are now detected explicitly and routed into a recovery flow instead of silently looking healthy.

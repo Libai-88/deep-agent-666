@@ -213,6 +213,36 @@ describe("tool-result-normalizer", () => {
     expect(next.todos[0]?.content).toBe("Inspect the repository architecture.");
     expect(next.artifacts[0]?.path).toBe("docs/plan.md");
     expect(next.events).toHaveLength(2);
+    expect(next.finalSummary).toBeNull();
+  });
+
+  it("promotes completed reviewer events into the workbench final summary", () => {
+    const next = applyWorkbenchEvents(
+      {
+        taskKind: "engineering",
+        todos: [],
+        artifacts: [],
+        events: [],
+        finalSummary: null,
+        lastUserPrompt: null,
+        updatedAt: 1,
+      },
+      [
+        {
+          id: "reviewer-1",
+          kind: "delegation",
+          status: "completed",
+          title: "Reviewer completed",
+          message: "Reviewer confirmed the next engineering steps.",
+          source: "reviewer",
+          createdAt: 2,
+        },
+      ],
+    );
+
+    expect(next.finalSummary).toBe(
+      "Reviewer confirmed the next engineering steps.",
+    );
   });
 
   it("resets stale agent timeline state and promotes reviewer output during coordinator tool fallback", () => {
@@ -228,6 +258,7 @@ describe("tool-result-normalizer", () => {
           },
         ],
         artifacts: [],
+        events: [],
         finalSummary: "Persisted coordinator summary before replay.",
         lastUserPrompt: "Retry the last coordinator task.",
         updatedAt: 1,

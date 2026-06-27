@@ -29,6 +29,18 @@ function buildCoordinatorRunStream(threadId: string, runId: string): string {
       type: "STATE_SNAPSHOT",
       snapshot: {
         task_kind: "engineering",
+        workbench_events: [
+          {
+            id: "event-planner-1",
+            kind: "delegation",
+            status: "completed",
+            title: "Planner finished",
+            message: "Inspect the repository architecture.",
+            source: "planner",
+            artifact_path: null,
+            artifact_kind: null,
+          },
+        ],
         delegations: [
           {
             id: "delegation-planner-1",
@@ -153,6 +165,38 @@ function buildCoordinatorRunStream(threadId: string, runId: string): string {
       type: "STATE_SNAPSHOT",
       snapshot: {
         task_kind: "engineering",
+        workbench_events: [
+          {
+            id: "event-planner-1",
+            kind: "delegation",
+            status: "completed",
+            title: "Planner finished",
+            message: "Inspect the repository architecture.",
+            source: "planner",
+            artifact_path: null,
+            artifact_kind: null,
+          },
+          {
+            id: "event-executor-1",
+            kind: "delegation",
+            status: "completed",
+            title: "Executor finished",
+            message: "Inspect risky files and TODOs.",
+            source: "executor",
+            artifact_path: null,
+            artifact_kind: null,
+          },
+          {
+            id: "event-artifact-1",
+            kind: "artifact",
+            status: "completed",
+            title: "updated docs/plan.md",
+            message: "updated docs/plan.md",
+            source: "tool",
+            artifact_path: "docs/plan.md",
+            artifact_kind: "file",
+          },
+        ],
         delegations: [
           {
             id: "delegation-planner-1",
@@ -198,6 +242,48 @@ function buildCoordinatorRunStream(threadId: string, runId: string): string {
       snapshot: {
         task_kind: "engineering",
         final_summary: "Repository review complete.",
+        workbench_events: [
+          {
+            id: "event-planner-1",
+            kind: "delegation",
+            status: "completed",
+            title: "Planner finished",
+            message: "Inspect the repository architecture.",
+            source: "planner",
+            artifact_path: null,
+            artifact_kind: null,
+          },
+          {
+            id: "event-executor-1",
+            kind: "delegation",
+            status: "completed",
+            title: "Executor finished",
+            message: "Inspect risky files and TODOs.",
+            source: "executor",
+            artifact_path: null,
+            artifact_kind: null,
+          },
+          {
+            id: "event-artifact-1",
+            kind: "artifact",
+            status: "completed",
+            title: "updated docs/plan.md",
+            message: "updated docs/plan.md",
+            source: "tool",
+            artifact_path: "docs/plan.md",
+            artifact_kind: "file",
+          },
+          {
+            id: "event-reviewer-1",
+            kind: "delegation",
+            status: "completed",
+            title: "Reviewer completed",
+            message: "Reviewer confirmed the next engineering steps.",
+            source: "reviewer",
+            artifact_path: null,
+            artifact_kind: "summary",
+          },
+        ],
         delegations: [
           {
             id: "delegation-planner-1",
@@ -345,9 +431,15 @@ test("starter-launched coordinator run updates cards, timeline, and results", as
       .getByTestId("task-timeline-panel")
       .getByText("Inspect the repository architecture."),
   ).toBeVisible();
-  await expect(
-    page.getByTestId("task-timeline-panel").getByText("Completed"),
-  ).toHaveCount(3);
+  await expect(page.getByTestId("timeline-todo-event-planner-1")).toContainText(
+    "Completed",
+  );
+  await expect(page.getByTestId("timeline-todo-event-executor-1")).toContainText(
+    "Completed",
+  );
+  await expect(page.getByTestId("timeline-todo-event-reviewer-1")).toContainText(
+    "Completed",
+  );
 
   await expect(
     page.getByRole("heading", { name: "Results" }),
@@ -357,7 +449,7 @@ test("starter-launched coordinator run updates cards, timeline, and results", as
   await expect(page.getByText("Before")).toBeVisible();
   await expect(page.getByText("After")).toBeVisible();
   await expect(
-    page.getByTestId("artifact-results-panel").getByText("updated docs/plan.md"),
+    page.getByTestId("artifact-card-event-artifact-1"),
   ).toBeVisible();
   await expect(
     page.getByTestId("artifact-final-summary").getByText(

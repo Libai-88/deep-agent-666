@@ -1471,7 +1471,7 @@ function ActiveThreadChat({
         return {
           ...next,
           taskKind: taskKind ?? next.taskKind,
-          finalSummary: finalSummary ?? next.finalSummary,
+          finalSummary: next.finalSummary ?? finalSummary,
           updatedAt: Date.now(),
         };
       }
