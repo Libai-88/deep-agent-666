@@ -37,6 +37,8 @@ describe("runtime diagnostics", () => {
         launchablePresetCount: 1,
         runtimeSettings: {
           workspaceRoot: "D:\\AgentBuild",
+          providerProfiles: [],
+          modelProfiles: [],
           providers: {
             openai: {
               configured: true,

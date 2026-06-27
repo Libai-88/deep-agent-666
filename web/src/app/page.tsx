@@ -52,6 +52,7 @@ import {
 import {
   applyWorkbenchEvents,
   applyCoordinatorToolCallFallback,
+  buildEditablePlanDraft,
   extractFinalSummary,
   inferTaskKindFromMessage,
   normalizeDelegationArtifacts,
@@ -75,6 +76,7 @@ import { FileViewDialog } from "@/components/FileViewDialog";
 import { TaskTimelinePanel } from "@/components/TaskTimelinePanel";
 import { ArtifactResultsPanel } from "@/components/ArtifactResultsPanel";
 import { HomePageShell } from "@/components/HomePageShell";
+import { PlanEditorPanel } from "@/components/PlanEditorPanel";
 import { ProviderRegistryEditor } from "@/components/ProviderRegistryEditor";
 import { RunControlBar } from "@/components/RunControlBar";
 import {
@@ -139,6 +141,12 @@ export default function HomePage() {
 }
 
 type RuntimeAvailability = "ready" | "empty" | "unreachable";
+type CoordinatorControlSnapshot = {
+  status: "idle" | "running" | "waiting_approval" | "stopped" | "failed" | "completed";
+  currentStep: string | null;
+  availableActions: RunControlAction[];
+  pendingApproval: boolean;
+};
 
 async function fetchRuntimeAvailability(): Promise<RuntimeAvailability> {
   try {
@@ -183,6 +191,45 @@ async function fetchRuntimeDiagnostics(): Promise<RuntimeDiagnostics> {
   }
 
   return normalizeRuntimeDiagnostics((await response.json()) as unknown);
+}
+
+function normalizeCoordinatorControlState(
+  input: unknown,
+): CoordinatorControlSnapshot | null {
+  if (!input || typeof input !== "object") {
+    return null;
+  }
+
+  const record = input as Record<string, unknown>;
+  const status = record.status;
+  if (
+    status !== "idle" &&
+    status !== "running" &&
+    status !== "waiting_approval" &&
+    status !== "stopped" &&
+    status !== "failed" &&
+    status !== "completed"
+  ) {
+    return null;
+  }
+
+  const availableActions = Array.isArray(record.available_actions)
+    ? record.available_actions.filter(
+        (action): action is RunControlAction =>
+          action === "stop" ||
+          action === "retry" ||
+          action === "resume" ||
+          action === "edit_plan",
+      )
+    : [];
+
+  return {
+    status,
+    currentStep:
+      typeof record.current_step === "string" ? record.current_step : null,
+    availableActions,
+    pendingApproval: Boolean(record.pending_approval),
+  };
 }
 
 function HomePageContent() {
@@ -230,11 +277,15 @@ function HomePageContent() {
 
   const [threads, setThreads] = useState<LocalThread[]>(() => loadThreads());
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [planEditorOpen, setPlanEditorOpen] = useState(false);
+  const [planEditorDraft, setPlanEditorDraft] = useState("");
   const [workbenchState, setWorkbenchState] = useState<ThreadWorkbenchState>(
     () => createEmptyWorkbenchState(),
   );
   const [loadedWorkbenchThreadId, setLoadedWorkbenchThreadId] = useState<string | null>(null);
   const [hasLiveThreadActivity, setHasLiveThreadActivity] = useState(false);
+  const [coordinatorControlState, setCoordinatorControlState] =
+    useState<CoordinatorControlSnapshot | null>(null);
 
   // Persist threads to localStorage on change
   useEffect(() => {
@@ -354,12 +405,18 @@ function HomePageContent() {
       setLoadedWorkbenchThreadId(null);
       setWorkbenchState(createEmptyWorkbenchState());
       setHasLiveThreadActivity(false);
+      setCoordinatorControlState(null);
+      setPlanEditorOpen(false);
+      setPlanEditorDraft("");
       return;
     }
     setLoadedWorkbenchThreadId(null);
     setWorkbenchState(loadWorkbenchState(activeThread.id));
     setLoadedWorkbenchThreadId(activeThread.id);
     setHasLiveThreadActivity(false);
+    setCoordinatorControlState(null);
+    setPlanEditorOpen(false);
+    setPlanEditorDraft("");
   }, [activeThread]);
 
   useEffect(() => {
@@ -408,7 +465,8 @@ function HomePageContent() {
       resolveRunControlState({
         threadId: activeThread?.id ?? null,
         runStatus:
-          runtimeAvailability === "ready" &&
+          coordinatorControlState?.status ??
+          (runtimeAvailability === "ready" &&
           !effectiveRecoverableError &&
           pendingThreadRun &&
           activeThread &&
@@ -418,13 +476,14 @@ function HomePageContent() {
               ? "waiting_approval"
               : effectiveRecoverableError
                 ? "failed"
-                : "idle",
+                : "idle"),
         currentStep:
-          pendingThreadRun && activeThread && pendingThreadRun.threadId === activeThread.id
+          coordinatorControlState?.currentStep ??
+          (pendingThreadRun && activeThread && pendingThreadRun.threadId === activeThread.id
             ? "Running agent task"
             : effectiveRecoverableError === "thread_history_unavailable"
               ? "Thread recovery"
-              : workbenchState.events.at(-1)?.title ?? null,
+              : workbenchState.events.at(-1)?.title ?? null),
         activeProviderId: currentPreset?.provider ?? null,
         activeModelId: currentPreset?.label ?? null,
         recoverableError: effectiveRecoverableError,
@@ -432,6 +491,7 @@ function HomePageContent() {
       }),
     [
       activeThread,
+      coordinatorControlState,
       currentPreset,
       effectiveRecoverableError,
       pendingThreadRun,
@@ -648,7 +708,10 @@ function HomePageContent() {
       }
 
       if (action === "edit_plan") {
-        setSettingsOpen(true);
+        setPlanEditorDraft(
+          buildEditablePlanDraft(workbenchState.todos, workbenchState.events),
+        );
+        setPlanEditorOpen(true);
         return;
       }
 
@@ -673,8 +736,38 @@ function HomePageContent() {
         setRecoverableError("runtime_request_failed");
       }
     },
-    [activeThread, handleRecoveryAction],
+    [activeThread, handleRecoveryAction, workbenchState.events, workbenchState.todos],
   );
+
+  const handlePlanEditorSubmit = useCallback(async () => {
+    if (!activeThread) {
+      return;
+    }
+
+    try {
+      const response = await fetch("/api/runtime-control", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          thread_id: activeThread.id,
+          action: "edit_plan",
+          plan_patch: planEditorDraft,
+        }),
+      });
+
+      if (!response.ok) {
+        setRecoverableError("runtime_request_failed");
+        return;
+      }
+
+      setPlanEditorOpen(false);
+      setRecoverableError(null);
+    } catch {
+      setRecoverableError("backend_unreachable");
+    }
+  }, [activeThread, planEditorDraft]);
 
   const settingsPreset =
     currentPreset ??
@@ -855,6 +948,14 @@ function HomePageContent() {
                   onAction={(action) => void handleRunControlAction(action)}
                 />
               </div>
+              <PlanEditorPanel
+                open={planEditorOpen}
+                currentStep={runControlState.currentStep}
+                draftPlan={planEditorDraft}
+                onDraftPlanChange={setPlanEditorDraft}
+                onOpenChange={setPlanEditorOpen}
+                onSubmit={() => void handlePlanEditorSubmit()}
+              />
               {/* Model / Permission bar */}
               <div className="flex items-center gap-2 border-b border-border px-4 py-2">
                 <span className="text-xs text-muted-foreground">Model:</span>
@@ -886,6 +987,7 @@ function HomePageContent() {
                   >
                     <WorkbenchRuntimeHooks
                       activeAgentId={activeAgentId}
+                      setCoordinatorControlState={setCoordinatorControlState}
                       setHasLiveThreadActivity={setHasLiveThreadActivity}
                       setWorkbenchState={setWorkbenchState}
                     />
@@ -911,6 +1013,7 @@ function HomePageContent() {
                     <ActiveThreadChat
                       activeAgentId={activeAgentId}
                       activeThread={activeThread}
+                      setCoordinatorControlState={setCoordinatorControlState}
                       currentPreset={currentPreset}
                       setHasLiveThreadActivity={setHasLiveThreadActivity}
                       threadId={threadId}
@@ -1089,10 +1192,14 @@ function PendingThreadRunController({
 
 function WorkbenchRuntimeHooks({
   activeAgentId,
+  setCoordinatorControlState,
   setHasLiveThreadActivity,
   setWorkbenchState,
 }: {
   activeAgentId: string;
+  setCoordinatorControlState: React.Dispatch<
+    React.SetStateAction<CoordinatorControlSnapshot | null>
+  >;
   setHasLiveThreadActivity: React.Dispatch<React.SetStateAction<boolean>>;
   setWorkbenchState: React.Dispatch<React.SetStateAction<ThreadWorkbenchState>>;
 }) {
@@ -1399,6 +1506,7 @@ function ThreadHistoryGapMonitor({
 function ActiveThreadChat({
   activeAgentId,
   activeThread,
+  setCoordinatorControlState,
   currentPreset,
   setHasLiveThreadActivity,
   threadId,
@@ -1409,6 +1517,9 @@ function ActiveThreadChat({
 }: {
   activeAgentId: string;
   activeThread: LocalThread;
+  setCoordinatorControlState: React.Dispatch<
+    React.SetStateAction<CoordinatorControlSnapshot | null>
+  >;
   currentPreset: AgentPresetDefinition;
   setHasLiveThreadActivity: React.Dispatch<React.SetStateAction<boolean>>;
   threadId: string | null;
@@ -1454,6 +1565,7 @@ function ActiveThreadChat({
       workbench_events?: unknown;
       task_kind?: "engineering" | "research" | "general";
       final_summary?: string;
+      control_state?: unknown;
     };
 
     const delegations = Array.isArray(state.delegations) ? state.delegations : [];
@@ -1462,12 +1574,14 @@ function ActiveThreadChat({
       typeof state.final_summary === "string" && state.final_summary.trim()
         ? state.final_summary
         : null;
+    const controlState = normalizeCoordinatorControlState(state.control_state);
 
     return {
       delegations,
       events,
       taskKind: state.task_kind,
       finalSummary,
+      controlState,
     };
   })();
 
@@ -1549,9 +1663,19 @@ function ActiveThreadChat({
   }, [latestCoordinatorAssistantText, setWorkbenchState]);
 
   useEffect(() => {
-    if (!coordinatorWorkbenchSnapshot) return;
+    if (!coordinatorWorkbenchSnapshot) {
+      setCoordinatorControlState(null);
+      return;
+    }
 
-    const { delegations, events, taskKind, finalSummary } = coordinatorWorkbenchSnapshot;
+    const {
+      delegations,
+      events,
+      taskKind,
+      finalSummary,
+      controlState,
+    } = coordinatorWorkbenchSnapshot;
+    setCoordinatorControlState(controlState ?? null);
 
     if (delegations.length === 0 && events.length === 0 && !taskKind && !finalSummary) {
       return;
@@ -1591,7 +1715,7 @@ function ActiveThreadChat({
         updatedAt: Date.now(),
       };
     });
-  }, [coordinatorWorkbenchSignature, setWorkbenchState]);
+  }, [coordinatorWorkbenchSignature, setCoordinatorControlState, setWorkbenchState]);
 
   return (
     <>

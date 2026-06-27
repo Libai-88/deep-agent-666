@@ -25,7 +25,9 @@ export function TaskTimelinePanel({
   events?: WorkbenchEvent[];
   todos: WorkbenchTodo[];
 }) {
-  const timelineEvents = events.filter((event) => event.kind === "delegation");
+  const timelineEvents = events.filter(
+    (event) => event.kind === "delegation" || event.kind === "status",
+  );
 
   return (
     <section

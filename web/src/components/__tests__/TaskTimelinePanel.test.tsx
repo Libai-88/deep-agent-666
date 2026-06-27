@@ -2,6 +2,7 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 
 import { TaskTimelinePanel } from "../TaskTimelinePanel";
+import { normalizeSnapshotEvents } from "@/lib/runtime-events";
 
 describe("TaskTimelinePanel", () => {
   it("renders task kind with human-readable statuses", () => {
@@ -54,6 +55,30 @@ describe("TaskTimelinePanel", () => {
 
     expect(html).toContain("Executor started");
     expect(html).toContain("Inspect risky files and TODOs.");
+    expect(html).toContain("In progress");
+  });
+
+  it("maps runtime activity to user-facing timeline copy", () => {
+    const events = normalizeSnapshotEvents([
+      {
+        kind: "status",
+        status: "running",
+        title: "executor started",
+        message: "replace text in file",
+        source: "executor",
+      },
+    ]);
+
+    const html = renderToStaticMarkup(
+      <TaskTimelinePanel
+        taskKind="engineering"
+        events={events}
+        todos={[]}
+      />,
+    );
+
+    expect(events[0]?.title).toContain("Writing");
+    expect(html).toContain("Writing");
     expect(html).toContain("In progress");
   });
 });

@@ -53,3 +53,19 @@ def test_coordinator_state_appends_delegations():
     assert state["delegations"][0]["sub_agent"] == "planner"
     assert state["delegations"][1]["sub_agent"] == "executor"
     assert state["task_kind"] == "engineering"
+
+
+def test_coordinator_state_marks_editable_pause_boundary():
+    state: CoordinatorState = {
+        "workbench_events": [],
+        "delegations": [],
+        "task_kind": "engineering",
+        "final_summary": "",
+        "control_state": {
+            "status": "waiting_approval",
+            "current_step": "Planner review",
+            "available_actions": ["resume", "edit_plan"],
+        },
+    }
+
+    assert state["control_state"]["available_actions"] == ["resume", "edit_plan"]

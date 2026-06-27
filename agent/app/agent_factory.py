@@ -22,7 +22,12 @@ from app.provider_registry import (
     find_provider_profile,
     load_provider_registry_from_settings,
 )
-from app.state import CoordinatorState, Delegation, WorkbenchEvent
+from app.state import (
+    CoordinatorControlState,
+    CoordinatorState,
+    Delegation,
+    WorkbenchEvent,
+)
 from app.task_profile import infer_task_kind, task_prompt_fragment
 from app.tools.documents import inspect_document, read_document
 from app.tools.workspace import (
@@ -338,6 +343,12 @@ def _build_delegation_running_command(
         "status": "running",
         "result": "",
     }
+    control_state: CoordinatorControlState = {
+        "status": "running",
+        "current_step": f"{sub_agent.title()} running",
+        "available_actions": ["stop"],
+        "pending_approval": False,
+    }
     return Command(
         update={
             "delegations": [entry],
@@ -350,6 +361,7 @@ def _build_delegation_running_command(
                     source=sub_agent,
                 )
             ],
+            "control_state": control_state,
             "task_kind": task_kind,
             "messages": [
                 ToolMessage(content="starting...", tool_call_id=tool_call_id)
@@ -375,6 +387,34 @@ def _build_delegation_completed_command(
         "result": result,
     }
     status_title = "completed" if status == "completed" else "failed"
+    if sub_agent == "planner" and status == "completed":
+        control_state: CoordinatorControlState = {
+            "status": "waiting_approval",
+            "current_step": "Planner review",
+            "available_actions": ["resume", "edit_plan"],
+            "pending_approval": True,
+        }
+    elif status == "failed":
+        control_state = {
+            "status": "failed",
+            "current_step": f"{sub_agent.title()} failed",
+            "available_actions": ["retry"],
+            "pending_approval": False,
+        }
+    elif sub_agent == "reviewer" and status == "completed":
+        control_state = {
+            "status": "completed",
+            "current_step": "Review complete",
+            "available_actions": [],
+            "pending_approval": False,
+        }
+    else:
+        control_state = {
+            "status": "running",
+            "current_step": f"{sub_agent.title()} completed",
+            "available_actions": ["stop"],
+            "pending_approval": False,
+        }
     return Command(
         update={
             "delegations": [entry],
@@ -388,6 +428,7 @@ def _build_delegation_completed_command(
                     artifact_kind="summary" if sub_agent == "reviewer" and status == "completed" else None,
                 )
             ],
+            "control_state": control_state,
             "task_kind": task_kind,
             "final_summary": result if status == "completed" else "",
             "messages": [

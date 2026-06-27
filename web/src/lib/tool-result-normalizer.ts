@@ -165,6 +165,28 @@ export function normalizeToolCallToArtifacts(
 
 export { normalizeToolPayloadToEvents } from "./runtime-events";
 
+export function buildEditablePlanDraft(
+  todos: readonly WorkbenchTodo[],
+  events: readonly WorkbenchEvent[] = [],
+): string {
+  const steps = todos
+    .map((todo) => todo.content.trim())
+    .filter(Boolean);
+
+  if (steps.length > 0) {
+    return steps.map((step, index) => `${index + 1}. ${step}`).join("\n");
+  }
+
+  const eventSteps = events
+    .filter((event) => event.kind === "delegation" || event.kind === "status")
+    .map((event) => event.message.trim() || event.title.trim())
+    .filter(Boolean);
+
+  return eventSteps
+    .map((step, index) => `${index + 1}. ${step}`)
+    .join("\n");
+}
+
 export function extractFinalSummary(result: unknown): string | null {
   const structuredResult = parseStructuredToolResult(result);
   if (structuredResult?.a2ui_operations) {

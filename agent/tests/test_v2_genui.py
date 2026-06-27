@@ -1,5 +1,7 @@
 """Tests for the GenUI middleware."""
 import asyncio
+import sys
+import types
 
 from app.middleware.genui import GenUIMiddleware, genui_middleware
 
@@ -75,6 +77,50 @@ def test_genui_middleware_delegations():
     }
     asyncio.run(genui_middleware(state, {}))
     assert True
+
+
+def test_genui_middleware_control_state():
+    """Coordinator control_state emits a state update for paused runs."""
+    emissions: list[dict] = []
+
+    async def fake_emit_state(_config, payload):
+        emissions.append(payload)
+
+    langgraph_module = types.ModuleType("copilotkit.langgraph")
+    langgraph_module.copilotkit_emit_state = fake_emit_state
+    copilotkit_module = types.ModuleType("copilotkit")
+    copilotkit_module.langgraph = langgraph_module
+
+    previous_copilotkit = sys.modules.get("copilotkit")
+    previous_langgraph = sys.modules.get("copilotkit.langgraph")
+    sys.modules["copilotkit"] = copilotkit_module
+    sys.modules["copilotkit.langgraph"] = langgraph_module
+
+    state = {
+        "delegations": [],
+        "task_kind": "engineering",
+        "final_summary": "",
+        "control_state": {
+            "status": "waiting_approval",
+            "current_step": "Planner review",
+            "available_actions": ["resume", "edit_plan"],
+            "pending_approval": True,
+        },
+    }
+    try:
+        asyncio.run(genui_middleware(state, {}))
+    finally:
+        if previous_copilotkit is None:
+            sys.modules.pop("copilotkit", None)
+        else:
+            sys.modules["copilotkit"] = previous_copilotkit
+
+        if previous_langgraph is None:
+            sys.modules.pop("copilotkit.langgraph", None)
+        else:
+            sys.modules["copilotkit.langgraph"] = previous_langgraph
+
+    assert {"control_state": state["control_state"]} in emissions
 
 
 def test_coordinator_state_tracks_task_kind_and_final_summary():

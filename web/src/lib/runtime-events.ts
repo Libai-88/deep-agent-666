@@ -104,6 +104,54 @@ function normalizeEventSource(value: unknown): WorkbenchEventSource {
   return "tool";
 }
 
+function resolveActivityTitle(
+  kind: WorkbenchEventKind,
+  source: WorkbenchEventSource,
+  status: WorkbenchEventStatus,
+  title: string,
+  message: string,
+): string {
+  if (kind !== "status") {
+    return title;
+  }
+
+  const lower = `${title} ${message}`.toLowerCase();
+
+  if (source === "planner") {
+    return status === "completed" ? "Plan ready" : "Planning next steps";
+  }
+
+  if (source === "reviewer") {
+    return status === "completed" ? "Review complete" : "Reviewing results";
+  }
+
+  if (source === "executor") {
+    if (
+      lower.includes("replace text") ||
+      lower.includes("write file") ||
+      lower.includes("write text") ||
+      lower.includes("edit file") ||
+      lower.includes("implement") ||
+      lower.includes("code")
+    ) {
+      return "Writing code";
+    }
+
+    if (
+      lower.includes("read ") ||
+      lower.includes("inspect") ||
+      lower.includes("search") ||
+      lower.includes("analy")
+    ) {
+      return "Inspecting files";
+    }
+
+    return status === "completed" ? "Execution complete" : "Running task";
+  }
+
+  return title;
+}
+
 export function normalizeSnapshotEvents(input: unknown): WorkbenchEvent[] {
   if (!Array.isArray(input)) return [];
 
@@ -117,14 +165,20 @@ export function normalizeSnapshotEvents(input: unknown): WorkbenchEvent[] {
         event.artifact_kind === "summary"
           ? event.artifact_kind
           : undefined;
+      const kind = normalizeEventKind(event.kind);
+      const status = normalizeEventStatus(event.status);
+      const source = normalizeEventSource(event.source);
+      const title =
+        typeof event.title === "string" ? event.title : "Workbench event";
+      const message = typeof event.message === "string" ? event.message : "";
 
       return {
         id: typeof event.id === "string" ? event.id : `snapshot-${index}`,
-        kind: normalizeEventKind(event.kind),
-        status: normalizeEventStatus(event.status),
-        title: typeof event.title === "string" ? event.title : "Workbench event",
-        message: typeof event.message === "string" ? event.message : "",
-        source: normalizeEventSource(event.source),
+        kind,
+        status,
+        title: resolveActivityTitle(kind, source, status, title, message),
+        message,
+        source,
         createdAt: Date.now() + index,
         artifactPath:
           typeof event.artifact_path === "string"

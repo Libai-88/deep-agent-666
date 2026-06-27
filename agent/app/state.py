@@ -36,6 +36,22 @@ class WorkbenchEvent(typing.TypedDict):
     artifact_kind: Literal["file", "finding", "summary"] | None
 
 
+class CoordinatorControlState(typing.TypedDict, total=False):
+    """A normalized control surface for paused or running coordinator work."""
+
+    status: Literal[
+        "idle",
+        "running",
+        "waiting_approval",
+        "stopped",
+        "failed",
+        "completed",
+    ]
+    current_step: str
+    available_actions: list[Literal["stop", "retry", "resume", "edit_plan"]]
+    pending_approval: bool
+
+
 class CoordinatorState(BaseAgentState):
     """Supervisor coordinator state with delegation tracking.
 
@@ -48,3 +64,4 @@ class CoordinatorState(BaseAgentState):
     workbench_events: Annotated[list[WorkbenchEvent], add]
     task_kind: TaskKind
     final_summary: str
+    control_state: CoordinatorControlState
