@@ -52,12 +52,14 @@
 - Recoverable active-thread failures should preserve local context — 只要线程本身有效，timeline/results/last prompt 不应因为 backend/runtime 可恢复故障而被 gate 挡住
 - Text file edits should emit structured A2UI diff payloads — `write_text_file` / `replace_text_in_file` 必须同时服务 workbench artifact 摘要和聊天内联 `DiffPreview`
 - Workbench runtime semantics should converge on one event protocol — timeline、artifact 和 final summary 应优先消费共享 `workbench event` 语义，而不是分别依赖 delegation 特判、tool 字符串解析和页面级补丁
+- Provider/model 接入层必须产品化 — 下一阶段应从固定 `openai/anthropic/google` 槽位升级为可新增自定义供应商、可配置 base URL / headers、可绑定自定义模型的接入注册表
 - CORS middleware (Python) — 开发模式需要（已不再需要，因为不走浏览器直连）
 
 ## 已知技术债
 
 | 问题 | P级 | 说明 |
 |------|-----|------|
+| 自定义供应商 / 自定义模型尚未产品化 | P1 | 当前仍以少量内建 provider 槽位为中心，缺少 provider registry、模型目录和面向终端用户的接入配置体验 |
 | 更广覆盖的 runtime restart/resume 仍待扩展 | P1 | V26 已补齐 coordinator 在真实重启后切到空 runtime store 的 history-gap replay 证明，但跨更多入口与更多 agent 组合的恢复覆盖仍可继续增强 |
 | DataChart 组件 | P1 | V2 spec 可选组件，未实现 |
 | 更广对话恢复验证 | P1 | 已启用 `SqliteAgentRunner`，并覆盖 prompt 重放、历史缺失、部分历史漂移提示、主运行时跨实例恢复证明、主路由 catalog fallback 恢复、coordinator starter 主工作流回归、主 agent / coordinator 路由真实 Web 进程重启恢复、coordinator 浏览器重启连续性，以及空 runtime store 后的同线程 replay；后续仍可扩展到更多入口与更复杂的浏览器恢复链路 |
