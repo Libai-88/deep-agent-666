@@ -766,43 +766,47 @@ function HomePageContent() {
 
               {/* Chat area */}
               <div className="flex-1 min-h-0 flex flex-col">
-                <CopilotChatConfigurationProvider
-                  agentId={activeAgentId}
-                  threadId={activeThread.id}
-                >
-                  <WorkbenchRuntimeHooks
-                    activeAgentId={activeAgentId}
-                    setWorkbenchState={setWorkbenchState}
-                  />
-                  <ThreadHistoryGapMonitor
-                    activeAgentId={activeAgentId}
-                    runtimeAvailability={runtimeAvailability}
-                    workbenchState={workbenchState}
-                    pendingThreadRun={pendingThreadRun}
-                    recoverableError={recoverableError}
-                    setRecoverableError={setRecoverableError}
-                  />
-                  {pendingThreadRun && pendingThreadRun.threadId === activeThread.id ? (
-                    <PendingThreadRunController
-                      key={pendingThreadRun.id}
-                      run={pendingThreadRun}
-                      onComplete={() => setPendingThreadRun(null)}
-                      onError={(error) =>
-                        setRecoverableError(resolveRecoverableErrorCode(error))
-                      }
+                {runtimeAvailability === "ready" ? (
+                  <CopilotChatConfigurationProvider
+                    agentId={activeAgentId}
+                    threadId={activeThread.id}
+                  >
+                    <WorkbenchRuntimeHooks
+                      activeAgentId={activeAgentId}
+                      setWorkbenchState={setWorkbenchState}
                     />
-                  ) : null}
-                  <ActiveThreadChat
-                    activeAgentId={activeAgentId}
-                    activeThread={activeThread}
-                    currentPreset={currentPreset}
-                    threadId={threadId}
-                    workspaceRoot={runtimeSettings.workspaceRoot}
-                    pendingThreadRun={pendingThreadRun}
-                    setThreads={setThreads}
-                    setWorkbenchState={setWorkbenchState}
-                  />
-                </CopilotChatConfigurationProvider>
+                    <ThreadHistoryGapMonitor
+                      activeAgentId={activeAgentId}
+                      runtimeAvailability={runtimeAvailability}
+                      workbenchState={workbenchState}
+                      pendingThreadRun={pendingThreadRun}
+                      recoverableError={recoverableError}
+                      setRecoverableError={setRecoverableError}
+                    />
+                    {pendingThreadRun && pendingThreadRun.threadId === activeThread.id ? (
+                      <PendingThreadRunController
+                        key={pendingThreadRun.id}
+                        run={pendingThreadRun}
+                        onComplete={() => setPendingThreadRun(null)}
+                        onError={(error) =>
+                          setRecoverableError(resolveRecoverableErrorCode(error))
+                        }
+                      />
+                    ) : null}
+                    <ActiveThreadChat
+                      activeAgentId={activeAgentId}
+                      activeThread={activeThread}
+                      currentPreset={currentPreset}
+                      threadId={threadId}
+                      workspaceRoot={runtimeSettings.workspaceRoot}
+                      pendingThreadRun={pendingThreadRun}
+                      setThreads={setThreads}
+                      setWorkbenchState={setWorkbenchState}
+                    />
+                  </CopilotChatConfigurationProvider>
+                ) : (
+                  <ActiveThreadRuntimeFallback runtimeAvailability={runtimeAvailability} />
+                )}
               </div>
             </div>
           </ResizablePanel>
@@ -882,6 +886,31 @@ function useQueryParamState(
   );
 
   return [value, setValue];
+}
+
+function ActiveThreadRuntimeFallback({
+  runtimeAvailability,
+}: {
+  runtimeAvailability: RuntimeAvailability;
+}) {
+  const message =
+    runtimeAvailability === "unreachable"
+      ? "The local runtime is offline. Recover the backend connection to continue this thread."
+      : "The local runtime is not ready yet. Retry the connection or reopen settings to continue.";
+
+  return (
+    <div
+      data-testid="active-thread-runtime-fallback"
+      className="flex flex-1 items-center justify-center px-6"
+    >
+      <div className="max-w-md text-center">
+        <p className="text-sm font-medium text-foreground">
+          Runtime unavailable
+        </p>
+        <p className="mt-2 text-sm text-muted-foreground">{message}</p>
+      </div>
+    </div>
+  );
 }
 
 // ── Shared helpers ──

@@ -95,6 +95,7 @@ Open `http://127.0.0.1:3000`.
 - Local threads can now be renamed and deleted directly from the thread list, with deletion also cleaning persisted workbench state and automatically falling back to the next most recent thread or the starter gate.
 - The shell now exposes runtime diagnostics in-product, with a status badge plus a diagnostics dialog that shows backend reachability, live-vs-fallback preset source, configured providers, and workspace-root context before a beginner has to guess what broke.
 - Backend recovery actions now also re-bootstrap the CopilotKit runtime in the current tab, so a beginner can retry connection and launch the next guided task without manually reloading the page first.
+- Recoverable runtime/backend failures no longer force active threads back into the onboarding gate; the current thread shell, timeline, and results stay visible while the user recovers in place.
 
 ## Test
 

@@ -23,6 +23,7 @@
 - `V17` 已把线程管理产品化：支持直接重命名/删除线程，并在删除当前线程后自动回退到下一个可用线程或 starter gate。
 - `V18` 已把 runtime diagnostics 产品化：支持显示运行时状态徽标，并在产品内直接查看 backend reachability、preset source、provider 配置和 workspace root。
 - `V19` 已补齐 runtime bootstrap reconnect：backend 恢复后，同一标签页无需手动刷新也能重新挂载 CopilotKit 并启动首个任务。
+- `V20` 已补齐 active-thread recovery shell：可恢复故障下保留当前线程工作台，不再直接把用户踢回 gate。
 
 ---
 
@@ -66,9 +67,9 @@ CopilotRuntime (Next.js route handler)
 | 套件 | 数量 | 状态 |
 |------|------|------|
 | 后端 pytest | **61** | ✅ 全通过 |
-| 前端 vitest | **83** | ✅ 全通过 |
+| 前端 vitest | **85** | ✅ 全通过 |
 | Next.js build | — | ✅ 无错误 |
-| E2E (playwright) | **18** | ✅ 全通过 |
+| E2E (playwright) | **19** | ✅ 全通过 |
 | Docker Compose 配置校验 | — | ⚠️ 当前机器未安装 `docker`，未执行命令级验证 |
 
 ---
@@ -141,6 +142,7 @@ SettingsDialog      — 多 provider 密钥配置
 RuntimeStatusBadge  — 运行时状态徽标（healthy/setup-required/degraded/offline）
 RuntimeDiagnosticsDialog — 产品内运行时诊断弹窗，可刷新 backend/catalog/provider/workspace 状态
 Runtime reconnect recovery — 同页 retry connection 后自动重挂 runtime bridge
+Active-thread recovery shell — 可恢复故障下保留当前线程 timeline/results/workbench
 ThreadList          — 支持线程重命名、删除与最近更新排序
 FileViewDialog      — 文件内容预览
 DiffViewer          — 内联 diff 查看器
@@ -203,7 +205,7 @@ Python FastAPI:
 
 | 问题 | 优先级 | 说明 | 必须修？ |
 |------|--------|------|---------|
-| 更广覆盖的 runtime restart/resume 验证仍待补齐 | 🟡 P1 | V19 已补齐同页 reconnect 连续性，但跨更多入口与真实进程重启的覆盖仍可继续增强 | 建议继续补强 |
+| 更广覆盖的 runtime restart/resume 验证仍待补齐 | 🟡 P1 | V20 已补齐 active-thread recoverable shell preservation，但跨更多入口与真实进程重启的覆盖仍可继续增强 | 建议继续补强 |
 | #4 同步 invoke 阻塞事件循环 | 🟡 P2 | LangGraph 工具同步设计，长命令影响性能 | 否 — LangGraph 设计特性 |
 | #6 预设双端维护 | 🟡 P3 | 新增预设需改 Python + TS 两处 | 否 — 有注释指引 |
 | A2UI 未与 Python 工具对接 | 🟡 P3 | 前端 catalog 就绪，coordinator 工具未调用 `a2ui.render()` | 否 — 阶段 B 未完成部分 |
@@ -223,7 +225,7 @@ Python FastAPI:
 |------|------|------|
 | 后端测试 ≥ 50 | 61 ✅ | 已达标 |
 | 前端测试 ≥ 20 | 74 ✅ | 已达标 |
-| E2E ≥ 5 条 | 18 ✅ | 已达标 |
+| E2E ≥ 5 条 | 19 ✅ | 已达标 |
 | 0 个 Console Error | 有 Inspector 警告 | SDK 升级 |
 | Docker 部署 | ❌ | Dockerfile + compose |
 | Windows 桌面壳 | ❌ | Electron wrapper |
@@ -264,6 +266,7 @@ V16 基线提交: `见最新提交` — coordinator restored-thread continuity b
 V17 基线提交: `见最新提交` — thread management baseline
 V18 基线提交: `见最新提交` — runtime diagnostics baseline
 V19 基线提交: `见最新提交` — runtime bootstrap reconnect baseline
+V20 基线提交: `见最新提交` — active-thread recovery shell baseline
 
 日志：
 ```

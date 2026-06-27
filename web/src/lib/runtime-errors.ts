@@ -80,6 +80,26 @@ export function resolveRecoverableActions(
   }
 }
 
+export function shouldPreserveActiveThreadShell(
+  code: RecoverableErrorCode,
+): boolean {
+  switch (code) {
+    case "no_available_presets":
+    case "thread_missing_or_invalid":
+      return false;
+    case "backend_unreachable":
+    case "configuration_failed":
+    case "workspace_root_invalid":
+    case "thread_history_unavailable":
+    case "provider_rate_limited":
+    case "provider_model_unavailable":
+    case "provider_access_denied":
+    case "provider_auth_failed":
+    case "runtime_request_failed":
+      return true;
+  }
+}
+
 function extractRuntimeErrorMessage(value: unknown): string {
   if (!value) {
     return "";

@@ -1,7 +1,10 @@
 import type { AgentPresetCatalog } from "./agent-presets";
 import type { CatalogSource } from "./preset-catalog";
 import type { LocalThread } from "./thread-registry";
-import type { RecoverableErrorCode } from "./runtime-errors";
+import {
+  shouldPreserveActiveThreadShell,
+  type RecoverableErrorCode,
+} from "./runtime-errors";
 
 export type FirstRunState =
   | "checking"
@@ -22,11 +25,21 @@ export type FirstRunResolutionInput = {
 export function resolveFirstRunState(
   input: FirstRunResolutionInput,
 ): FirstRunState {
+  const hasActiveThread =
+    input.activeThreadId !== null &&
+    input.threads.some((thread) => thread.id === input.activeThreadId);
+
   if (input.isChecking) {
     return "checking";
   }
 
   if (input.recoverableError) {
+    if (
+      hasActiveThread &&
+      shouldPreserveActiveThreadShell(input.recoverableError)
+    ) {
+      return "ready-active-thread";
+    }
     return "recoverable-error";
   }
 
@@ -37,10 +50,6 @@ export function resolveFirstRunState(
   if (!input.activeThreadId) {
     return "ready-no-thread";
   }
-
-  const hasActiveThread = input.threads.some(
-    (thread) => thread.id === input.activeThreadId,
-  );
 
   return hasActiveThread ? "ready-active-thread" : "recoverable-error";
 }
