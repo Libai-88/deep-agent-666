@@ -91,3 +91,27 @@ def test_agents_skip_unconfigured_providers(monkeypatch, tmp_path) -> None:
     # Unconfigured providers should not have coordinators
     assert "coordinator-anthropic-balanced" not in agent_names
     assert "coordinator-google-balanced" not in agent_names
+
+
+def test_run_control_endpoint_accepts_stop_action(monkeypatch, tmp_path) -> None:
+    monkeypatch.setenv("OPENAI_API_KEY", "test-key")
+
+    main_module = _reload_main(monkeypatch, tmp_path)
+
+    response = asyncio.run(
+        main_module.run_control(
+            main_module.RunControlRequest(
+                thread_id="thread-1",
+                action="stop",
+            )
+        )
+    )
+
+    assert response.status_code == 200
+    payload = json.loads(response.body)
+    assert payload == {
+        "status": "ok",
+        "threadId": "thread-1",
+        "action": "stop",
+        "runStatus": "stopped",
+    }

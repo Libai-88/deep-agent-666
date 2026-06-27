@@ -62,6 +62,13 @@ class ConfigureRequest(BaseModel):
     google_base_url: str | None = None
 
 
+class RunControlRequest(BaseModel):
+    thread_id: str
+    action: str
+    run_id: str | None = None
+    plan_patch: str | None = None
+
+
 runtime_registry: RuntimeAgentRegistry = build_runtime_registry(
     settings,
     store.provider_registry_snapshot,
@@ -277,6 +284,25 @@ async def configure(body: ConfigureRequest) -> JSONResponse:
             "preset_count": len(_current_registry().presets_by_id),
             "preset_ids": list(_current_registry().presets_by_id.keys()),
             **_runtime_config_payload(),
+        }
+    )
+
+
+@app.post("/control")
+async def run_control(body: RunControlRequest) -> JSONResponse:
+    status_map = {
+        "stop": "stopped",
+        "retry": "running",
+        "resume": "running",
+        "edit_plan": "waiting_approval",
+    }
+
+    return JSONResponse(
+        {
+            "status": "ok",
+            "threadId": body.thread_id,
+            "action": body.action,
+            "runStatus": status_map.get(body.action, "idle"),
         }
     )
 

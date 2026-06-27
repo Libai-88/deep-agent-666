@@ -76,6 +76,7 @@ import { TaskTimelinePanel } from "@/components/TaskTimelinePanel";
 import { ArtifactResultsPanel } from "@/components/ArtifactResultsPanel";
 import { HomePageShell } from "@/components/HomePageShell";
 import { ProviderRegistryEditor } from "@/components/ProviderRegistryEditor";
+import { RunControlBar } from "@/components/RunControlBar";
 import {
   RuntimeDiagnosticsDialog,
   RuntimeStatusBadge,
@@ -119,6 +120,10 @@ import {
   type RuntimeProviderProfile,
   type RuntimeSettings,
 } from "@/lib/runtime-settings";
+import {
+  resolveRunControlState,
+  type RunControlAction,
+} from "@/lib/run-control-state";
 import {
   countConfiguredProviders,
   normalizeRuntimeDiagnostics,
@@ -398,6 +403,44 @@ function HomePageContent() {
     [activeThread, effectiveRecoverableError, workbenchState.lastUserPrompt],
   );
 
+  const runControlState = useMemo(
+    () =>
+      resolveRunControlState({
+        threadId: activeThread?.id ?? null,
+        runStatus:
+          runtimeAvailability === "ready" &&
+          !effectiveRecoverableError &&
+          pendingThreadRun &&
+          activeThread &&
+          pendingThreadRun.threadId === activeThread.id
+            ? "running"
+            : effectiveRecoverableError === "thread_history_unavailable"
+              ? "waiting_approval"
+              : effectiveRecoverableError
+                ? "failed"
+                : "idle",
+        currentStep:
+          pendingThreadRun && activeThread && pendingThreadRun.threadId === activeThread.id
+            ? "Running agent task"
+            : effectiveRecoverableError === "thread_history_unavailable"
+              ? "Thread recovery"
+              : workbenchState.events.at(-1)?.title ?? null,
+        activeProviderId: currentPreset?.provider ?? null,
+        activeModelId: currentPreset?.label ?? null,
+        recoverableError: effectiveRecoverableError,
+        lastRecoverablePrompt: workbenchState.lastUserPrompt,
+      }),
+    [
+      activeThread,
+      currentPreset,
+      effectiveRecoverableError,
+      pendingThreadRun,
+      runtimeAvailability,
+      workbenchState.events,
+      workbenchState.lastUserPrompt,
+    ],
+  );
+
   const effectiveRuntimeDiagnostics = useMemo<RuntimeDiagnostics>(() => {
     if (runtimeDiagnostics.backendReachable) {
       return runtimeDiagnostics;
@@ -593,6 +636,46 @@ function HomePageContent() {
     ],
   );
 
+  const handleRunControlAction = useCallback(
+    async (action: RunControlAction) => {
+      if (action === "retry") {
+        handleRecoveryAction("retry_last_task");
+        return;
+      }
+
+      if (!activeThread) {
+        return;
+      }
+
+      if (action === "edit_plan") {
+        setSettingsOpen(true);
+        return;
+      }
+
+      try {
+        await fetch("/api/runtime-control", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            thread_id: activeThread.id,
+            action,
+          }),
+        });
+      } catch {
+        setRecoverableError("backend_unreachable");
+        return;
+      }
+
+      if (action === "stop") {
+        setPendingThreadRun(null);
+        setRecoverableError("runtime_request_failed");
+      }
+    },
+    [activeThread, handleRecoveryAction],
+  );
+
   const settingsPreset =
     currentPreset ??
     findPresetById(
@@ -766,6 +849,12 @@ function HomePageContent() {
                   onAction={handleRecoveryAction}
                 />
               ) : null}
+              <div className="border-b border-border px-4 py-2">
+                <RunControlBar
+                  state={runControlState}
+                  onAction={(action) => void handleRunControlAction(action)}
+                />
+              </div>
               {/* Model / Permission bar */}
               <div className="flex items-center gap-2 border-b border-border px-4 py-2">
                 <span className="text-xs text-muted-foreground">Model:</span>
