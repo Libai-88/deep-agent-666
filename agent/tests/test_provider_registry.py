@@ -1,3 +1,5 @@
+import pytest
+
 from app.config import AgentSettings
 from app.provider_registry import (
     load_provider_registry_from_settings,
@@ -60,3 +62,38 @@ def test_normalize_provider_registry_payload_accepts_custom_openai_compatible() 
     assert payload.provider_profiles[0].headers == {"X-Team": "chem"}
     assert payload.model_profiles[0].provider_id == "lab-gateway"
     assert payload.model_profiles[0].model_name == "gpt-5.4"
+
+
+def test_normalize_provider_registry_payload_rejects_duplicate_provider_ids(
+    tmp_path,
+) -> None:
+    workspace = tmp_path / "workspace"
+    workspace.mkdir()
+
+    with pytest.raises(ValueError, match="duplicate provider id: lab-gateway"):
+        normalize_provider_registry_payload(
+            {
+                "workspaceRoot": str(workspace),
+                "providerProfiles": [
+                    {
+                        "id": "lab-gateway",
+                        "label": "Lab Gateway A",
+                        "protocol": "openai-compatible",
+                        "baseUrl": "https://gateway-a.example.com/v1",
+                        "apiKey": "secret-a",
+                        "authScheme": "bearer_token",
+                        "enabled": True,
+                    },
+                    {
+                        "id": "lab-gateway",
+                        "label": "Lab Gateway B",
+                        "protocol": "openai-compatible",
+                        "baseUrl": "https://gateway-b.example.com/v1",
+                        "apiKey": "secret-b",
+                        "authScheme": "bearer_token",
+                        "enabled": True,
+                    },
+                ],
+                "modelProfiles": [],
+            }
+        )

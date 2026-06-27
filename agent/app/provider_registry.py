@@ -12,6 +12,7 @@ if TYPE_CHECKING:
 
 
 ProviderProtocol = Literal["openai", "anthropic", "google", "openai-compatible"]
+ProviderAuthScheme = Literal["api_key", "bearer_token"]
 ModelCapability = Literal["chat", "tools", "vision", "long_context"]
 
 
@@ -20,7 +21,7 @@ class ProviderProfile(BaseModel):
     label: str
     protocol: ProviderProtocol
     base_url: str | None = None
-    auth_scheme: str = "api_key"
+    auth_scheme: ProviderAuthScheme = "api_key"
     api_key: str | None = Field(default=None, repr=False)
     headers: dict[str, str] = Field(default_factory=dict)
     enabled: bool = True
@@ -44,6 +45,43 @@ class ProviderRegistrySnapshot(BaseModel):
     workspace_root: Path
     provider_profiles: list[ProviderProfile] = Field(default_factory=list)
     model_profiles: list[ModelProfile] = Field(default_factory=list)
+
+
+def validate_provider_registry_snapshot(
+    snapshot: ProviderRegistrySnapshot,
+) -> ProviderRegistrySnapshot:
+    provider_ids: set[str] = set()
+    model_ids: set[str] = set()
+    models_by_provider: dict[str, list[ModelProfile]] = {}
+
+    for provider in snapshot.provider_profiles:
+        if provider.id in provider_ids:
+            raise ValueError(f"duplicate provider id: {provider.id}")
+        provider_ids.add(provider.id)
+        models_by_provider[provider.id] = []
+
+    for model in snapshot.model_profiles:
+        if model.id in model_ids:
+            raise ValueError(f"duplicate model id: {model.id}")
+        if model.provider_id not in provider_ids:
+            raise ValueError(f"model references unknown provider: {model.provider_id}")
+        model_ids.add(model.id)
+        models_by_provider.setdefault(model.provider_id, []).append(model)
+
+    for provider in snapshot.provider_profiles:
+        models = models_by_provider.get(provider.id, [])
+        enabled_models = [model for model in models if model.enabled]
+        default_models = [model for model in enabled_models if model.is_default]
+
+        if provider.enabled and not enabled_models:
+            raise ValueError(f"enabled provider has no enabled models: {provider.id}")
+
+        if len(default_models) > 1:
+            raise ValueError(
+                f"provider has multiple default models: {provider.id}"
+            )
+
+    return snapshot
 
 
 def _provider_label(provider_id: str) -> str:
@@ -107,10 +145,12 @@ def load_provider_registry_from_settings(
             )
         )
 
-    return ProviderRegistrySnapshot(
+    return validate_provider_registry_snapshot(
+        ProviderRegistrySnapshot(
         workspace_root=settings.workspace_root,
         provider_profiles=provider_profiles,
         model_profiles=model_profiles,
+        )
     )
 
 
@@ -157,8 +197,16 @@ def serialize_provider_profiles(
 ) -> list[dict[str, object]]:
     profiles: list[dict[str, object]] = []
     for profile in snapshot.provider_profiles:
-        payload = profile.model_dump(exclude={"api_key"})
-        payload["api_key_present"] = profile.api_key_present
+        payload = {
+            "id": profile.id,
+            "label": profile.label,
+            "protocol": profile.protocol,
+            "baseUrl": profile.base_url,
+            "authScheme": profile.auth_scheme,
+            "headers": profile.headers,
+            "enabled": profile.enabled,
+            "apiKeyPresent": profile.api_key_present,
+        }
         profiles.append(payload)
     return profiles
 
@@ -167,6 +215,35 @@ def serialize_model_profiles(
     snapshot: ProviderRegistrySnapshot,
 ) -> list[dict[str, object]]:
     return [profile.model_dump() for profile in snapshot.model_profiles]
+
+
+def serialize_provider_registry_snapshot(
+    snapshot: ProviderRegistrySnapshot,
+    *,
+    include_secrets: bool,
+) -> dict[str, object]:
+    provider_profiles: list[dict[str, object]] = []
+    for profile in snapshot.provider_profiles:
+        payload: dict[str, object] = {
+            "id": profile.id,
+            "label": profile.label,
+            "protocol": profile.protocol,
+            "baseUrl": profile.base_url,
+            "authScheme": profile.auth_scheme,
+            "headers": profile.headers,
+            "enabled": profile.enabled,
+        }
+        if include_secrets:
+            payload["apiKey"] = profile.api_key
+        else:
+            payload["apiKeyPresent"] = profile.api_key_present
+        provider_profiles.append(payload)
+
+    return {
+        "workspaceRoot": str(snapshot.workspace_root),
+        "providerProfiles": provider_profiles,
+        "modelProfiles": serialize_model_profiles(snapshot),
+    }
 
 
 def _normalize_provider_profile(value: object) -> ProviderProfile:
@@ -269,8 +346,10 @@ def normalize_provider_registry_payload(
         for item in payload.get("modelProfiles", payload.get("model_profiles", []))
     ]
 
-    return ProviderRegistrySnapshot(
-        workspace_root=workspace_root,
-        provider_profiles=provider_profiles,
-        model_profiles=model_profiles,
+    return validate_provider_registry_snapshot(
+        ProviderRegistrySnapshot(
+            workspace_root=workspace_root,
+            provider_profiles=provider_profiles,
+            model_profiles=model_profiles,
+        )
     )

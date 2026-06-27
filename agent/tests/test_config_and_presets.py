@@ -1,6 +1,7 @@
+import json
 from pathlib import Path
 
-from app.config import AgentSettings, load_settings
+from app.config import AgentSettings, ConfigStore, load_settings
 from app.presets import ALL_PRESETS, DEFAULT_PRESET_ID, get_preset
 
 
@@ -69,3 +70,59 @@ def test_load_settings_is_read_only_and_does_not_create_workspace(monkeypatch, t
     assert settings.anthropic_api_key is None
     assert settings.google_api_key is None
     assert not workspace_root.exists()
+
+
+def test_config_store_reloads_persisted_custom_registry(tmp_path) -> None:
+    workspace = tmp_path / "workspace"
+    workspace.mkdir()
+    registry_path = tmp_path / "provider-registry.json"
+    registry_path.write_text(
+        json.dumps(
+            {
+                "workspaceRoot": str(workspace),
+                "providerProfiles": [
+                    {
+                        "id": "lab-gateway",
+                        "label": "Lab Gateway",
+                        "protocol": "openai-compatible",
+                        "baseUrl": "https://gateway.example.com/v1",
+                        "apiKey": "secret",
+                        "authScheme": "bearer_token",
+                        "enabled": True,
+                        "headers": {"X-Team": "chem"},
+                    }
+                ],
+                "modelProfiles": [
+                    {
+                        "id": "lab-gpt5",
+                        "providerId": "lab-gateway",
+                        "modelName": "gpt-5.4",
+                        "label": "GPT 5.4",
+                        "capabilities": ["chat", "tools"],
+                        "isDefault": True,
+                        "enabled": True,
+                    }
+                ],
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    settings = AgentSettings.model_construct(
+        workspace_root=workspace,
+        openai_api_key=None,
+        openai_base_url=None,
+        anthropic_api_key=None,
+        anthropic_base_url=None,
+        google_api_key=None,
+        google_base_url=None,
+        provider_registry_path=registry_path,
+    )
+
+    store = ConfigStore(settings)
+
+    snapshot = store.provider_registry_snapshot
+    assert snapshot.provider_profiles[0].id == "lab-gateway"
+    assert snapshot.provider_profiles[0].headers == {"X-Team": "chem"}
+    assert snapshot.provider_profiles[0].auth_scheme == "bearer_token"
+    assert snapshot.model_profiles[0].id == "lab-gpt5"
