@@ -137,3 +137,100 @@ test("restores a completed thread after a real web-process restart with backend 
     rmSync(tempDir, { recursive: true, force: true });
   }
 });
+
+test("restores a completed coordinator thread after a real web-process restart with backend offline", async ({
+  request,
+}) => {
+  test.setTimeout(90_000);
+
+  const tempDir = mkdtempSync(join(tmpdir(), "deep-agent-v24-"));
+  const threadsDbPath = join(tempDir, "threads.db");
+  const runtimeCatalogPath = join(tempDir, "runtime-catalog.json");
+  const threadId = "process-restart-coordinator-thread";
+  const runId = "process-restart-coordinator-run";
+  const reconnectRunId = "process-restart-coordinator-connect";
+  const userPrompt =
+    "Analyze this repository structure and summarize the major modules.";
+  let backendProcess: ChildProcess | null = null;
+  let webProcess: ChildProcess | null = null;
+
+  try {
+    backendProcess = startBackend();
+    await waitForHttp(`${BACKEND_BASE_URL}/health`);
+
+    webProcess = startWeb(threadsDbPath, runtimeCatalogPath);
+    await waitForHttp(`${WEB_BASE_URL}/api/copilotkit/info`);
+
+    const firstRun = await request.post(
+      `${WEB_BASE_URL}/api/copilotkit/agent/coordinator-openai-balanced/run`,
+      {
+        data: {
+          threadId,
+          runId,
+          messages: [{ id: "user-message-1", role: "user", content: userPrompt }],
+          state: {},
+          tools: [],
+          context: [],
+          forwardedProps: {},
+        },
+      },
+    );
+
+    expect(firstRun.status()).toBe(200);
+    const firstPayload = await firstRun.text();
+    expect(firstPayload).toContain('"type":"RUN_FINISHED"');
+    expect(firstPayload).toContain("Reviewer confirmed the restart proof.");
+    expect(firstPayload).toContain("Process restart restore is working.");
+
+    await stopProcess(backendProcess, "stub-backend");
+    backendProcess = null;
+
+    await stopProcess(webProcess, "web");
+    webProcess = null;
+
+    webProcess = startWeb(threadsDbPath, runtimeCatalogPath);
+    await waitForHttp(`${WEB_BASE_URL}/api/copilotkit/info`);
+
+    const diagnostics = await request.get(`${WEB_BASE_URL}/api/runtime-diagnostics`);
+    expect(diagnostics.status()).toBe(200);
+    const diagnosticsPayload = (await diagnostics.json()) as {
+      status?: string;
+      backendReachable?: boolean;
+      catalogSource?: string;
+    };
+    expect(diagnosticsPayload).toMatchObject({
+      status: "degraded",
+      backendReachable: false,
+      catalogSource: "fallback",
+    });
+
+    const restored = await request.post(
+      `${WEB_BASE_URL}/api/copilotkit/agent/coordinator-openai-balanced/connect`,
+      {
+        data: {
+          threadId,
+          runId: reconnectRunId,
+          messages: [],
+          state: {},
+          tools: [],
+          context: [],
+          forwardedProps: {},
+        },
+      },
+    );
+
+    expect(restored.status()).toBe(200);
+    const restoredPayload = await restored.text();
+    expect(restoredPayload).toContain('"type":"RUN_STARTED"');
+    expect(restoredPayload).toContain(userPrompt);
+    expect(restoredPayload).toContain("Process restart restore is working.");
+  } finally {
+    if (webProcess) {
+      await stopProcess(webProcess, "web");
+    }
+    if (backendProcess) {
+      await stopProcess(backendProcess, "stub-backend");
+    }
+    rmSync(tempDir, { recursive: true, force: true });
+  }
+});
