@@ -1,3 +1,5 @@
+import type { WorkbenchEvent } from "./runtime-events";
+
 export type WorkbenchTaskKind = "engineering" | "research" | "general";
 
 export type WorkbenchTodo = {
@@ -21,6 +23,7 @@ export type ThreadWorkbenchState = {
   taskKind: WorkbenchTaskKind;
   todos: WorkbenchTodo[];
   artifacts: WorkbenchArtifact[];
+  events: WorkbenchEvent[];
   finalSummary: string | null;
   lastUserPrompt: string | null;
   updatedAt: number;
@@ -33,6 +36,7 @@ export function createEmptyWorkbenchState(): ThreadWorkbenchState {
     taskKind: "general",
     todos: [],
     artifacts: [],
+    events: [],
     finalSummary: null,
     lastUserPrompt: null,
     updatedAt: Date.now(),

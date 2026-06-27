@@ -66,6 +66,7 @@ describe("workbench-state", () => {
     );
 
     expect(loadWorkbenchState("thread-legacy", storage).lastUserPrompt).toBeNull();
+    expect(loadWorkbenchState("thread-legacy", storage).events).toEqual([]);
   });
 
   it("replaces todos and appends artifacts without mutating the original state", () => {
@@ -91,6 +92,7 @@ describe("workbench-state", () => {
     expect(base.todos).toHaveLength(0);
     expect(withTodos.todos).toHaveLength(1);
     expect(withArtifacts.artifacts).toHaveLength(1);
+    expect(withArtifacts.events).toEqual([]);
   });
 
   it("replaces artifacts by source without removing artifacts from other sources", () => {

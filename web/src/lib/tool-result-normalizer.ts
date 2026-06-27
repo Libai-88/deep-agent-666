@@ -4,6 +4,7 @@ import type {
   ThreadWorkbenchState,
   WorkbenchTodo,
 } from "./workbench-state";
+import { normalizeToolPayloadToEvents } from "./runtime-events";
 
 type ToolPayload = {
   name?: string;
@@ -158,6 +159,8 @@ export function normalizeToolCallToArtifacts(
 
   return [];
 }
+
+export { normalizeToolPayloadToEvents } from "./runtime-events";
 
 export function extractFinalSummary(result: unknown): string | null {
   const structuredResult = parseStructuredToolResult(result);
