@@ -411,13 +411,24 @@ function HomePageContent() {
     };
   }, [runtimeDiagnostics, runtimeSettings]);
 
-  const refreshRuntimeSurfaces = useCallback(async () => {
-    await Promise.all([
-      reloadCatalogState(),
-      reloadRuntimeSettings(),
-      reloadRuntimeDiagnostics(),
-    ]);
-  }, [reloadCatalogState, reloadRuntimeDiagnostics, reloadRuntimeSettings]);
+  const refreshRuntimeSurfaces = useCallback(
+    async ({
+      withBootstrap = false,
+    }: {
+      withBootstrap?: boolean;
+    } = {}) => {
+      if (withBootstrap) {
+        await requestRuntimeBootstrapRefresh();
+      }
+
+      await Promise.all([
+        reloadCatalogState(),
+        reloadRuntimeSettings(),
+        reloadRuntimeDiagnostics(),
+      ]);
+    },
+    [reloadCatalogState, reloadRuntimeDiagnostics, reloadRuntimeSettings],
+  );
 
   const handleNewThread = useCallback(() => {
     const defaultId = resolveDefaultPresetId(catalogState.catalog);
@@ -521,7 +532,7 @@ function HomePageContent() {
     (action: RecoverableAction["action"]) => {
       switch (action) {
         case "retry_connection":
-          void refreshRuntimeSurfaces();
+          void refreshRuntimeSurfaces({ withBootstrap: true });
           return;
         case "view_diagnostics":
           setDiagnosticsOpen(true);
@@ -631,7 +642,7 @@ function HomePageContent() {
           onOpenChange={setDiagnosticsOpen}
           diagnostics={effectiveRuntimeDiagnostics}
           refreshing={runtimeDiagnosticsLoading}
-          onRefresh={() => void refreshRuntimeSurfaces()}
+          onRefresh={() => void refreshRuntimeSurfaces({ withBootstrap: true })}
         />
       </div>
     );
@@ -834,7 +845,7 @@ function HomePageContent() {
         onOpenChange={setDiagnosticsOpen}
         diagnostics={effectiveRuntimeDiagnostics}
         refreshing={runtimeDiagnosticsLoading}
-        onRefresh={() => void refreshRuntimeSurfaces()}
+        onRefresh={() => void refreshRuntimeSurfaces({ withBootstrap: true })}
       />
       {previewOpen && previewFile && (
         <FileViewDialog

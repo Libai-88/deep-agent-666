@@ -94,6 +94,7 @@ Open `http://127.0.0.1:3000`.
 - `npm run e2e` now also proves that a completed coordinator thread reopens cleanly after reload with restored chat history plus persisted timeline/results surfaces. The suite covers first-run launch, workspace-root settings saves, coordinator workbench rendering, healthy restored-thread continuity, restored-thread retry recovery, full history-gap detection, and partial history-drift detection with deterministic AG-UI stream fixtures. The Vitest suite also includes runtime-level proofs for both fresh-instance SQLite restore and route-level restore during preset-catalog outages. Remaining hardening is broader multi-entry and true process-restart coverage.
 - Local threads can now be renamed and deleted directly from the thread list, with deletion also cleaning persisted workbench state and automatically falling back to the next most recent thread or the starter gate.
 - The shell now exposes runtime diagnostics in-product, with a status badge plus a diagnostics dialog that shows backend reachability, live-vs-fallback preset source, configured providers, and workspace-root context before a beginner has to guess what broke.
+- Backend recovery actions now also re-bootstrap the CopilotKit runtime in the current tab, so a beginner can retry connection and launch the next guided task without manually reloading the page first.
 
 ## Test
 

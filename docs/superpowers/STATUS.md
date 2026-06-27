@@ -1,6 +1,6 @@
 # Deep Agent 666 — 当前状态
 
-> 最后更新：2026-06-27 (V1 完成，V2 release hardening 完成，V3 首用引导完成，V4 本地持久化线程运行时完成，V5 live provider activation 完成，V6 first response roundtrip 完成，V7 provider alignment/runtime recovery 完成，V8 runtime failure normalization 完成，V9 retry replay recovery 完成，V10 thread history gap recovery 完成，V11 thread history drift recovery 完成，V12 runtime persistence proof 完成，V13 runtime catalog fallback 完成，V14 coordinator workbench regression 完成，V15 runtime-config workspace root 完成，V16 coordinator restored-thread continuity 完成，V17 thread management 完成，V18 runtime diagnostics 完成)
+> 最后更新：2026-06-27 (V1 完成，V2 release hardening 完成，V3 首用引导完成，V4 本地持久化线程运行时完成，V5 live provider activation 完成，V6 first response roundtrip 完成，V7 provider alignment/runtime recovery 完成，V8 runtime failure normalization 完成，V9 retry replay recovery 完成，V10 thread history gap recovery 完成，V11 thread history drift recovery 完成，V12 runtime persistence proof 完成，V13 runtime catalog fallback 完成，V14 coordinator workbench regression 完成，V15 runtime-config workspace root 完成，V16 coordinator restored-thread continuity 完成，V17 thread management 完成，V18 runtime diagnostics 完成，V19 runtime bootstrap reconnect 完成)
 
 ## 当前结论
 
@@ -17,7 +17,7 @@
 | 后端 (pytest) | 61 | ✅ 全通过 |
 | 前端 (vitest) | 83 | ✅ 全通过 |
 | Build (next build) | — | ✅ |
-| E2E (playwright) | 17 | ✅ 全通过 |
+| E2E (playwright) | 18 | ✅ 全通过 |
 | Docker Compose 配置校验 | — | ⚠️ 当前机器未安装 `docker`，未执行命令级验证 |
 
 ## 已完成
@@ -119,6 +119,11 @@
 - 新增同源 `/api/runtime-diagnostics` 聚合路由，把 backend `/health`、runtime config 和 preset catalog source 收口成一个对新手可读的状态快照
 - Onboarding gate 与运行时错误 notice 现在可以直接打开 diagnostics dialog，用户可在产品内刷新状态并确认恢复是否生效
 
+### V19: Runtime Bootstrap Reconnect ✅
+- `Retry connection` 和 diagnostics dialog 的 refresh 现在不只刷新页面状态，也会同步请求 root CopilotKit bootstrap refresh
+- 产品不会再出现“状态看起来恢复了，但当前 tab 里的 runtime 其实还没重新挂上”的假恢复
+- 浏览器回归已证明：离线标签页在 backend 恢复后，无需手动刷新页面即可回到 starter flow 并成功收到首条 assistant 响应
+
 ## 关键提交
 
 | Commit | 说明 |
@@ -133,6 +138,6 @@
 
 ## 下一步
 
-- 下一阶段重点不再是“产品内是否能看见运行时状态”，而是把更多 runtime 入口与真实进程重启场景的覆盖继续扩展。
-- 完成标准是：真实模型失败与成功路径在所有主要入口都能稳定结束，并且新手既能看懂状态，也能基于产品内提示完成恢复而不是靠猜。
+- 下一阶段重点不再是“同页 reconnect 是否可用”，而是把更多 runtime 入口与真实进程重启场景的覆盖继续扩展。
+- 完成标准是：真实模型失败与成功路径在所有主要入口都能稳定结束，并且新手既能看懂状态，也能在更多恢复入口里完成恢复而不是靠猜。
 - 文档中若仍出现旧的 `openrouter/free`、或把 OpenAI 默认路径与 OpenRouter 混写的表述，应以本页和最新提交为准。

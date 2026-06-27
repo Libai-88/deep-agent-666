@@ -34,7 +34,7 @@
 | 前端 | Next.js 16 + React 19 + @copilotkit/react-core v2 |
 | 代理层 | @ag-ui/client HttpAgent + createCopilotRuntimeHandler |
 | UI | shadcn/ui + Tailwind v4 + lucide-react |
-| 测试 | pytest (61) + vitest (83) + playwright (17) |
+| 测试 | pytest (61) + vitest (83) + playwright (18) |
 
 ## 关键决策
 
@@ -48,12 +48,13 @@
 - Workspace root 应可在运行时切换 — 新手不应被迫为了改工作目录而手改 `.env` 或重启服务
 - Local threads 应支持基础生命周期管理 — 新手必须能在产品内重命名和删除线程，而不是依赖浏览器 localStorage 清理
 - Runtime diagnostics 应产品内可见 — 新手必须能在 UI 中看到 backend reachability、preset source 和 provider readiness，而不是只靠错误文案猜状态
+- Runtime recovery must re-bootstrap the active tab — 页面不能只把状态刷新成 healthy，还必须让当前 tab 内的 CopilotKit runtime 真正重新挂载
 - CORS middleware (Python) — 开发模式需要（已不再需要，因为不走浏览器直连）
 
 ## 已知技术债
 
 | 问题 | P级 | 说明 |
 |------|-----|------|
-| 更广覆盖的 runtime restart/resume 仍待扩展 | P1 | V18 已把运行时状态诊断产品化，但跨更多入口与真实进程重启的覆盖仍可继续增强 |
+| 更广覆盖的 runtime restart/resume 仍待扩展 | P1 | V19 已补齐同页 reconnect 连续性，但跨更多入口与真实进程重启的覆盖仍可继续增强 |
 | DataChart 组件 | P1 | V2 spec 可选组件，未实现 |
 | 更广对话恢复验证 | P1 | 已启用 `SqliteAgentRunner`，并覆盖 prompt 重放、历史缺失、部分历史漂移提示、主运行时跨实例恢复证明、主路由 catalog fallback 恢复，以及 coordinator starter 主工作流回归；后续仍可扩展到更多入口与真实进程重启 |
