@@ -12,6 +12,12 @@ class AgentPreset(BaseModel):
 
 DEFAULT_PRESET_ID = "openai-balanced"
 
+BUILTIN_PROVIDER_DEFAULT_MODELS: dict[str, str] = {
+    "openai": "gpt-4.1-mini",
+    "anthropic": "claude-sonnet-4.5",
+    "google": "gemini-2.5-flash",
+}
+
 
 ALL_PRESETS: dict[str, AgentPreset] = {
     "openai-read-only": AgentPreset(
