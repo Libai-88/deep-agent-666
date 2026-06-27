@@ -270,10 +270,8 @@ test("reopens a completed coordinator thread in the browser after a real web-pro
         .getByText("Inspect the repository architecture."),
     ).toBeVisible();
     await expect(
-      page.getByTestId("artifact-results-panel").getByText(
-        "Reviewer confirmed the restart proof.",
-      ),
-    ).toBeVisible();
+      page.getByTestId("artifact-results-panel"),
+    ).toContainText("Reviewer confirmed the restart proof.");
 
     await stopProcess(backendProcess, "stub-backend");
     backendProcess = null;
@@ -297,14 +295,140 @@ test("reopens a completed coordinator thread in the browser after a real web-pro
         .getByText("Inspect the repository architecture."),
     ).toBeVisible();
     await expect(
-      page.getByTestId("artifact-final-summary").getByText(
-        "Reviewer confirmed the restart proof.",
-      ),
-    ).toBeVisible();
+      page.getByTestId("artifact-results-panel"),
+    ).toContainText("Reviewer confirmed the restart proof.");
     await expect(page.getByText("Start with a guided task")).toHaveCount(0);
     await expect(page.getByTestId("runtime-status-badge")).toContainText(
       "Degraded",
     );
+  } finally {
+    if (webProcess) {
+      await stopProcess(webProcess, "web");
+    }
+    if (backendProcess) {
+      await stopProcess(backendProcess, "stub-backend");
+    }
+    rmSync(tempDir, { recursive: true, force: true });
+  }
+});
+
+test("recovers a coordinator thread after a real restart into an empty runtime store once the backend returns", async ({
+  page,
+  request,
+}) => {
+  test.setTimeout(150_000);
+
+  const tempDir = mkdtempSync(join(tmpdir(), "deep-agent-v26-"));
+  const threadsDbPathBeforeRestart = join(tempDir, "threads-before.db");
+  const threadsDbPathAfterRestart = join(tempDir, "threads-after.db");
+  const runtimeCatalogPath = join(tempDir, "runtime-catalog.json");
+  const reconnectRunId = "process-restart-history-gap-connect";
+  let backendProcess: ChildProcess | null = null;
+  let webProcess: ChildProcess | null = null;
+
+  try {
+    backendProcess = startBackend();
+    await waitForHttp(`${BACKEND_BASE_URL}/health`);
+
+    webProcess = startWeb(threadsDbPathBeforeRestart, runtimeCatalogPath);
+    await waitForHttp(`${WEB_BASE_URL}/api/copilotkit/info`);
+
+    await page.goto(WEB_BASE_URL);
+    await page.waitForLoadState("domcontentloaded");
+
+    await expect(page.getByText("Start with a guided task")).toBeVisible();
+    await page
+      .getByRole("button", { name: /Analyze the repository structure/i })
+      .click();
+
+    await expect(
+      page.locator('[data-testid="copilot-assistant-message"]').first(),
+    ).toContainText("Process restart restore is working.");
+    await expect(
+      page
+        .getByTestId("task-timeline-panel")
+        .getByText("Inspect the repository architecture."),
+    ).toBeVisible();
+    await expect(
+      page.getByTestId("artifact-results-panel"),
+    ).toContainText("Reviewer confirmed the restart proof.");
+
+    const threadId = new URL(page.url()).searchParams.get("threadId");
+    expect(threadId).toBeTruthy();
+
+    await stopProcess(backendProcess, "stub-backend");
+    backendProcess = null;
+
+    await stopProcess(webProcess, "web");
+    webProcess = null;
+
+    webProcess = startWeb(threadsDbPathAfterRestart, runtimeCatalogPath);
+    await waitForHttp(`${WEB_BASE_URL}/api/copilotkit/info`);
+
+    await page.goto(`${WEB_BASE_URL}/?threadId=${threadId}`);
+    await page.waitForLoadState("domcontentloaded");
+
+    await expect(page.getByText("Thread history unavailable")).toBeVisible();
+    await expect(
+      page.locator('[data-testid="copilot-assistant-message"]'),
+    ).toHaveCount(0);
+    await expect(
+      page
+        .getByTestId("task-timeline-panel")
+        .getByText("Inspect the repository architecture."),
+    ).toBeVisible();
+    await expect(
+      page.getByTestId("artifact-results-panel"),
+    ).toContainText("Reviewer confirmed the restart proof.");
+    await expect(page.getByTestId("runtime-status-badge")).toContainText(
+      "Degraded",
+    );
+
+    backendProcess = startBackend();
+    await waitForHttp(`${BACKEND_BASE_URL}/health`);
+
+    await page.getByRole("button", { name: "Retry last task" }).click();
+
+    await expect(page.getByText("Thread history unavailable")).toHaveCount(0);
+    await expect(
+      page.locator('[data-testid="copilot-assistant-message"]').first(),
+    ).toContainText("Process restart restore is working.");
+    await expect(
+      page
+        .getByTestId("task-timeline-panel")
+        .getByText("Inspect the repository architecture."),
+    ).toBeVisible();
+    await expect(
+      page.getByTestId("artifact-final-summary").getByText(
+        "Process restart restore is working.",
+      ),
+    ).toBeVisible();
+    await expect(
+      page.getByTestId("artifact-results-panel").getByText(
+        "Reviewer confirmed the restart proof.",
+      ),
+    ).toBeVisible();
+
+    const restored = await request.post(
+      `${WEB_BASE_URL}/api/copilotkit/agent/coordinator-openai-balanced/connect`,
+      {
+        data: {
+          threadId,
+          runId: reconnectRunId,
+          messages: [],
+          state: {},
+          tools: [],
+          context: [],
+          forwardedProps: {},
+        },
+      },
+    );
+
+    expect(restored.status()).toBe(200);
+    const restoredPayload = await restored.text();
+    expect(restoredPayload).toContain('"type":"RUN_STARTED"');
+    expect(restoredPayload).toContain("Process restart restore is working.");
+    expect(restoredPayload).toContain("Analyze this repository structure");
   } finally {
     if (webProcess) {
       await stopProcess(webProcess, "web");

@@ -34,7 +34,7 @@
 | 前端 | Next.js 16 + React 19 + @copilotkit/react-core v2 |
 | 代理层 | @ag-ui/client HttpAgent + createCopilotRuntimeHandler |
 | UI | shadcn/ui + Tailwind v4 + lucide-react |
-| 测试 | pytest (59) + vitest (90) + playwright (24) |
+| 测试 | pytest (59) + vitest (90) + playwright (25) |
 
 ## 关键决策
 
@@ -56,6 +56,6 @@
 
 | 问题 | P级 | 说明 |
 |------|-----|------|
-| 更广覆盖的 runtime restart/resume 仍待扩展 | P1 | V25 已补齐 coordinator 的真实浏览器重启连续性证明，但跨更多入口与更深恢复交互场景的覆盖仍可继续增强 |
+| 更广覆盖的 runtime restart/resume 仍待扩展 | P1 | V26 已补齐 coordinator 在真实重启后切到空 runtime store 的 history-gap replay 证明，但跨更多入口与更多 agent 组合的恢复覆盖仍可继续增强 |
 | DataChart 组件 | P1 | V2 spec 可选组件，未实现 |
-| 更广对话恢复验证 | P1 | 已启用 `SqliteAgentRunner`，并覆盖 prompt 重放、历史缺失、部分历史漂移提示、主运行时跨实例恢复证明、主路由 catalog fallback 恢复、coordinator starter 主工作流回归、主 agent / coordinator 路由真实 Web 进程重启恢复，以及 coordinator 浏览器重启连续性；后续仍可扩展到更多入口与更复杂的浏览器恢复链路 |
+| 更广对话恢复验证 | P1 | 已启用 `SqliteAgentRunner`，并覆盖 prompt 重放、历史缺失、部分历史漂移提示、主运行时跨实例恢复证明、主路由 catalog fallback 恢复、coordinator starter 主工作流回归、主 agent / coordinator 路由真实 Web 进程重启恢复、coordinator 浏览器重启连续性，以及空 runtime store 后的同线程 replay；后续仍可扩展到更多入口与更复杂的浏览器恢复链路 |

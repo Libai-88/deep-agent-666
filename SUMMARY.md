@@ -29,6 +29,7 @@
 - `V23` 已补齐 true process restart persistence proof：真实 `next start` 进程在 backend 离线后重启，仍可通过 SQLite 线程存储和 cached preset catalog 恢复已完成线程。
 - `V24` 已补齐 coordinator true process restart proof：真实 `next start` 进程在 backend 离线后重启，仍可通过 SQLite 线程存储和 cached preset catalog 恢复已完成的 coordinator 线程。
 - `V25` 已补齐 coordinator browser restart continuity proof：真实 `next start` 进程在 backend 离线后重启，浏览器中的同一 coordinator 线程仍可恢复聊天、timeline、results 和 degraded 状态提示。
+- `V26` 已补齐 coordinator restart history-gap replay proof：真实 `next start` 进程在 backend 离线后重启且切换到空 SQLite thread store 时，产品会明确提示 `Thread history unavailable`，并能在 backend 恢复后于原线程内重放最后任务并重新写回 runtime 历史。
 
 ---
 
@@ -74,7 +75,7 @@ CopilotRuntime (Next.js route handler)
 | 后端 pytest | **59** | ✅ 全通过 |
 | 前端 vitest | **90** | ✅ 全通过 |
 | Next.js build | — | ✅ 无错误 |
-| E2E (playwright) | **24** | ✅ 全通过 |
+| E2E (playwright) | **25** | ✅ 全通过 |
 | Docker Compose 配置校验 | — | ⚠️ 当前机器未安装 `docker`，未执行命令级验证 |
 
 ---
@@ -210,15 +211,15 @@ Python FastAPI:
 
 | 问题 | 优先级 | 说明 | 必须修？ |
 |------|--------|------|---------|
-| 更广覆盖的 runtime restart/resume 验证仍待扩展 | 🟡 P1 | V25 已补齐 coordinator 的真实浏览器重启连续性证明，但跨更多入口与更深的恢复交互场景仍可继续增强 | 建议继续补强 |
+| 更广覆盖的 runtime restart/resume 验证仍待扩展 | 🟡 P1 | V26 已补齐真实重启后切到空 runtime store 的 history-gap replay 证明，但跨更多入口与更多 agent 组合的恢复场景仍可继续增强 | 建议继续补强 |
 | #4 同步 invoke 阻塞事件循环 | 🟡 P2 | LangGraph 工具同步设计，长命令影响性能 | 否 — LangGraph 设计特性 |
 | #6 预设双端维护 | 🟡 P3 | 新增预设需改 Python + TS 两处 | 否 — 有注释指引 |
 | A2UI 未与 Python 工具对接 | 🟡 P3 | 前端 catalog 就绪，coordinator 工具未调用 `a2ui.render()` | 否 — 阶段 B 未完成部分 |
-| Coordinator 更多恢复入口仍可继续扩展 | 🟡 P2 | V22 已覆盖 reconnect 后同线程 replay 主路径，V25 已补齐真实浏览器重启连续性证明，但 coordinator 在更深恢复交互场景下仍可继续扩展 | 建议继续补强 |
+| Coordinator 更多恢复入口仍可继续扩展 | 🟡 P2 | V22 已覆盖 reconnect 后同线程 replay 主路径，V25/V26 已补齐真实浏览器重启连续性与空 runtime store 后的同线程恢复，但 coordinator 在更多入口组合下仍可继续扩展 | 建议继续补强 |
 | interrupt_on 已禁用 | 🟡 P3 | 去掉后才无 Console Error | 建议修 — 需审批流程时恢复 |
 | Inspector `{}` 解析警告 | 🟢 P4 | `[CopilotKit Inspector] Failed to parse tool-call result content {}` | 否 — SDK 升级后解决 |
 | 运行时恢复回归覆盖不足 | 🟡 P2 | 已切到 SQLite，但还缺“重启后继续线程”的更深 E2E | 建议补 — 属于 V4 后续验证 |
-| 线程恢复与更深层入口回归覆盖仍可继续扩展 | 🟡 P1 | 当前已证明产品层可识别全空与部分历史漂移，并证明主运行时、主路由入口以及 coordinator 浏览器重启连续性都能在关键 fallback 场景下恢复消息；后续重点是扩展到更多入口与更复杂的恢复链路 | 建议继续补强 |
+| 线程恢复与更深层入口回归覆盖仍可继续扩展 | 🟡 P1 | 当前已证明产品层可识别全空与部分历史漂移，并证明主运行时、主路由入口、coordinator 浏览器重启连续性以及空 runtime store 后的同线程 replay 都能在关键 fallback 场景下恢复消息；后续重点是扩展到更多入口与更复杂的恢复链路 | 建议继续补强 |
 
 ---
 
