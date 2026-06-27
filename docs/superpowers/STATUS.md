@@ -1,6 +1,6 @@
 # Deep Agent 666 — 当前状态
 
-> 最后更新：2026-06-27 (V1 完成，V2 release hardening 完成，V3 首用引导完成，V4 本地持久化线程运行时完成，V5 live provider activation 完成，V6 first response roundtrip 完成，V7 provider alignment/runtime recovery 完成，V8 runtime failure normalization 完成，V9 retry replay recovery 完成，V10 thread history gap recovery 完成，V11 thread history drift recovery 完成，V12 runtime persistence proof 完成，V13 runtime catalog fallback 完成，V14 coordinator workbench regression 完成，V15 runtime-config workspace root 完成，V16 coordinator restored-thread continuity 完成，V17 thread management 完成)
+> 最后更新：2026-06-27 (V1 完成，V2 release hardening 完成，V3 首用引导完成，V4 本地持久化线程运行时完成，V5 live provider activation 完成，V6 first response roundtrip 完成，V7 provider alignment/runtime recovery 完成，V8 runtime failure normalization 完成，V9 retry replay recovery 完成，V10 thread history gap recovery 完成，V11 thread history drift recovery 完成，V12 runtime persistence proof 完成，V13 runtime catalog fallback 完成，V14 coordinator workbench regression 完成，V15 runtime-config workspace root 完成，V16 coordinator restored-thread continuity 完成，V17 thread management 完成，V18 runtime diagnostics 完成)
 
 ## 当前结论
 
@@ -8,15 +8,16 @@
 - V2 发布加固已在 `69d6d96` 完成，分支 `feat/deepagents-foundation` 已推送到 `origin`。
 - V3 首用引导已在 `380b84c` 完成并推送远端。
 - 当前产品基线是：一个本地工作区、一个 Web、一个 FastAPI/Deep Agents 服务，支持工程和研究混合场景，并已补齐“同页配置后即可启动首条任务并收到首条响应”的首用闭环。
+- 当前产品也已具备产品内运行时诊断面，用户可以直接看到 backend reachability、preset source、provider 配置数和 workspace root，而不是只看一条错误文案。
 
 ## 测试状态
 
 | 套件 | 数量 | 状态 |
 |------|------|------|
 | 后端 (pytest) | 61 | ✅ 全通过 |
-| 前端 (vitest) | 74 | ✅ 全通过 |
+| 前端 (vitest) | 83 | ✅ 全通过 |
 | Build (next build) | — | ✅ |
-| E2E (playwright) | 16 | ✅ 全通过 |
+| E2E (playwright) | 17 | ✅ 全通过 |
 | Docker Compose 配置校验 | — | ⚠️ 当前机器未安装 `docker`，未执行命令级验证 |
 
 ## 已完成
@@ -113,6 +114,11 @@
 - 删除线程时会同步清理本地 workbench 持久化，避免残留过期恢复状态
 - 如果删除的是当前线程，页面会自动回退到下一个最近线程；如果已经没有线程，则回到 starter gate
 
+### V18: Runtime Diagnostics ✅
+- Header 现在常驻 runtime status badge，可直接看出当前是 healthy / setup-required / degraded / offline
+- 新增同源 `/api/runtime-diagnostics` 聚合路由，把 backend `/health`、runtime config 和 preset catalog source 收口成一个对新手可读的状态快照
+- Onboarding gate 与运行时错误 notice 现在可以直接打开 diagnostics dialog，用户可在产品内刷新状态并确认恢复是否生效
+
 ## 关键提交
 
 | Commit | 说明 |
@@ -127,6 +133,6 @@
 
 ## 下一步
 
-- 下一阶段重点不再是“主路由在 catalog 掉线时能否恢复线程”的基础证明，而是把更多 runtime 入口与真实进程重启场景的覆盖继续扩展。
-- 完成标准是：真实模型失败与成功路径在所有主要入口都能稳定结束，并且新手能基于产品内提示完成恢复而不是靠猜。
+- 下一阶段重点不再是“产品内是否能看见运行时状态”，而是把更多 runtime 入口与真实进程重启场景的覆盖继续扩展。
+- 完成标准是：真实模型失败与成功路径在所有主要入口都能稳定结束，并且新手既能看懂状态，也能基于产品内提示完成恢复而不是靠猜。
 - 文档中若仍出现旧的 `openrouter/free`、或把 OpenAI 默认路径与 OpenRouter 混写的表述，应以本页和最新提交为准。

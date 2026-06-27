@@ -9,6 +9,7 @@ describe("runtime-errors", () => {
   it("maps backend_unreachable to retry and settings actions", () => {
     expect(resolveRecoverableActions("backend_unreachable")).toEqual([
       { label: "Retry connection", action: "retry_connection" },
+      { label: "View diagnostics", action: "view_diagnostics" },
       { label: "Open settings", action: "open_settings" },
     ]);
   });
@@ -35,6 +36,7 @@ describe("runtime-errors", () => {
 
   it("offers settings recovery for provider quota errors", () => {
     expect(resolveRecoverableActions("provider_rate_limited")).toEqual([
+      { label: "View diagnostics", action: "view_diagnostics" },
       { label: "Open settings", action: "open_settings" },
       { label: "Retry last task", action: "retry_last_task" },
     ]);

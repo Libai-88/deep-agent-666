@@ -72,6 +72,10 @@ import { FileViewDialog } from "@/components/FileViewDialog";
 import { TaskTimelinePanel } from "@/components/TaskTimelinePanel";
 import { ArtifactResultsPanel } from "@/components/ArtifactResultsPanel";
 import { HomePageShell } from "@/components/HomePageShell";
+import {
+  RuntimeDiagnosticsDialog,
+  RuntimeStatusBadge,
+} from "@/components/RuntimeDiagnosticsDialog";
 import { WorkbenchStatusNotice } from "@/components/WorkbenchStatusNotice";
 import {
   resolveFirstRunState,
@@ -108,6 +112,11 @@ import {
   normalizeRuntimeSettings,
   type RuntimeSettings,
 } from "@/lib/runtime-settings";
+import {
+  countConfiguredProviders,
+  normalizeRuntimeDiagnostics,
+  type RuntimeDiagnostics,
+} from "@/lib/runtime-diagnostics";
 
 export default function HomePage() {
   return (
@@ -153,6 +162,17 @@ async function fetchRuntimeSettings(): Promise<RuntimeSettings> {
   return normalizeRuntimeSettings((await response.json()) as unknown);
 }
 
+async function fetchRuntimeDiagnostics(): Promise<RuntimeDiagnostics> {
+  const response = await fetch("/api/runtime-diagnostics", {
+    cache: "no-store",
+  });
+  if (!response.ok) {
+    throw new Error(`Failed to load runtime diagnostics: ${response.status}`);
+  }
+
+  return normalizeRuntimeDiagnostics((await response.json()) as unknown);
+}
+
 function HomePageContent() {
   const [sidebar, setSidebar] = useQueryParamState("sidebar");
   const [threadId, setThreadId] = useQueryParamState("threadId");
@@ -170,10 +190,15 @@ function HomePageContent() {
   const [runtimeSettings, setRuntimeSettings] = useState<RuntimeSettings>(() =>
     normalizeRuntimeSettings(null),
   );
+  const [runtimeDiagnostics, setRuntimeDiagnostics] =
+    useState<RuntimeDiagnostics>(() => normalizeRuntimeDiagnostics(null));
+  const [runtimeDiagnosticsLoading, setRuntimeDiagnosticsLoading] =
+    useState(true);
   const [recoverableError, setRecoverableError] =
     useState<RecoverableErrorCode | null>(null);
   const [pendingThreadRun, setPendingThreadRun] =
     useState<PendingThreadRun | null>(null);
+  const [diagnosticsOpen, setDiagnosticsOpen] = useState(false);
 
   const handleOpenWorkspaceFile = useCallback(async (path: string) => {
     setPreviewFile(path);
@@ -209,6 +234,18 @@ function HomePageContent() {
       setRuntimeSettings(nextSettings);
     } catch {
       // Keep the last known runtime settings when the backend is unavailable.
+    }
+  }, []);
+
+  const reloadRuntimeDiagnostics = useCallback(async () => {
+    setRuntimeDiagnosticsLoading(true);
+    try {
+      const nextDiagnostics = await fetchRuntimeDiagnostics();
+      setRuntimeDiagnostics(nextDiagnostics);
+    } catch {
+      // Preserve the last diagnostics snapshot when refresh fails.
+    } finally {
+      setRuntimeDiagnosticsLoading(false);
     }
   }, []);
 
@@ -254,6 +291,10 @@ function HomePageContent() {
   useEffect(() => {
     void reloadRuntimeSettings();
   }, [reloadRuntimeSettings]);
+
+  useEffect(() => {
+    void reloadRuntimeDiagnostics();
+  }, [reloadRuntimeDiagnostics]);
 
   useEffect(() => {
     if (typeof window === "undefined") {
@@ -336,6 +377,47 @@ function HomePageContent() {
         : null,
     [effectiveRecoverableError],
   );
+
+  const effectiveRuntimeDiagnostics = useMemo<RuntimeDiagnostics>(() => {
+    if (runtimeDiagnostics.backendReachable) {
+      return runtimeDiagnostics;
+    }
+
+    return {
+      ...runtimeDiagnostics,
+      configuredProviderCount: Math.max(
+        runtimeDiagnostics.configuredProviderCount,
+        countConfiguredProviders(runtimeSettings),
+      ),
+      workspaceRoot:
+        runtimeDiagnostics.workspaceRoot ?? runtimeSettings.workspaceRoot,
+      providers: {
+        openai:
+          runtimeDiagnostics.providers.openai.configured ||
+          runtimeDiagnostics.providers.openai.baseUrl
+            ? runtimeDiagnostics.providers.openai
+            : runtimeSettings.providers.openai,
+        anthropic:
+          runtimeDiagnostics.providers.anthropic.configured ||
+          runtimeDiagnostics.providers.anthropic.baseUrl
+            ? runtimeDiagnostics.providers.anthropic
+            : runtimeSettings.providers.anthropic,
+        google:
+          runtimeDiagnostics.providers.google.configured ||
+          runtimeDiagnostics.providers.google.baseUrl
+            ? runtimeDiagnostics.providers.google
+            : runtimeSettings.providers.google,
+      },
+    };
+  }, [runtimeDiagnostics, runtimeSettings]);
+
+  const refreshRuntimeSurfaces = useCallback(async () => {
+    await Promise.all([
+      reloadCatalogState(),
+      reloadRuntimeSettings(),
+      reloadRuntimeDiagnostics(),
+    ]);
+  }, [reloadCatalogState, reloadRuntimeDiagnostics, reloadRuntimeSettings]);
 
   const handleNewThread = useCallback(() => {
     const defaultId = resolveDefaultPresetId(catalogState.catalog);
@@ -439,7 +521,11 @@ function HomePageContent() {
     (action: RecoverableAction["action"]) => {
       switch (action) {
         case "retry_connection":
-          void reloadCatalogState();
+          void refreshRuntimeSurfaces();
+          return;
+        case "view_diagnostics":
+          setDiagnosticsOpen(true);
+          void refreshRuntimeSurfaces();
           return;
         case "open_settings":
         case "configure_provider":
@@ -468,7 +554,7 @@ function HomePageContent() {
       activeAgentId,
       activeThread,
       handleNewThread,
-      reloadCatalogState,
+      refreshRuntimeSurfaces,
       workbenchState.lastUserPrompt,
     ],
   );
@@ -496,6 +582,11 @@ function HomePageContent() {
           </div>
           <div className="flex items-center gap-2">
             <WorkspaceRootLabel workspaceRoot={runtimeSettings.workspaceRoot} />
+            <RuntimeStatusBadge
+              status={effectiveRuntimeDiagnostics.status}
+              loading={runtimeDiagnosticsLoading}
+              onClick={() => setDiagnosticsOpen(true)}
+            />
             <ThemeToggle />
             <Button
               variant="outline"
@@ -528,9 +619,19 @@ function HomePageContent() {
           onSaved={async (nextSettings) => {
             setRecoverableError(null);
             setRuntimeSettings(nextSettings);
-            await reloadCatalogState();
+            await Promise.all([
+              reloadCatalogState(),
+              reloadRuntimeDiagnostics(),
+            ]);
           }}
           onSaveFailed={(code) => setRecoverableError(code)}
+        />
+        <RuntimeDiagnosticsDialog
+          open={diagnosticsOpen}
+          onOpenChange={setDiagnosticsOpen}
+          diagnostics={effectiveRuntimeDiagnostics}
+          refreshing={runtimeDiagnosticsLoading}
+          onRefresh={() => void refreshRuntimeSurfaces()}
         />
       </div>
     );
@@ -557,6 +658,11 @@ function HomePageContent() {
         </div>
         <div className="flex items-center gap-2">
           <WorkspaceRootLabel workspaceRoot={runtimeSettings.workspaceRoot} />
+          <RuntimeStatusBadge
+            status={effectiveRuntimeDiagnostics.status}
+            loading={runtimeDiagnosticsLoading}
+            onClick={() => setDiagnosticsOpen(true)}
+          />
           <ThemeToggle />
           <span className="text-xs text-muted-foreground">
             {currentPreset.label}
@@ -716,9 +822,19 @@ function HomePageContent() {
         onSaved={async (nextSettings) => {
           setRecoverableError(null);
           setRuntimeSettings(nextSettings);
-          await reloadCatalogState();
+          await Promise.all([
+            reloadCatalogState(),
+            reloadRuntimeDiagnostics(),
+          ]);
         }}
         onSaveFailed={(code) => setRecoverableError(code)}
+      />
+      <RuntimeDiagnosticsDialog
+        open={diagnosticsOpen}
+        onOpenChange={setDiagnosticsOpen}
+        diagnostics={effectiveRuntimeDiagnostics}
+        refreshing={runtimeDiagnosticsLoading}
+        onRefresh={() => void refreshRuntimeSurfaces()}
       />
       {previewOpen && previewFile && (
         <FileViewDialog

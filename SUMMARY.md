@@ -21,6 +21,7 @@
 - `V15` 已把 runtime 配置收口到同源 `/api/runtime-config`，并让新手可在 Settings 中直接查看和切换 workspace root。
 - `V16` 已补齐 coordinator 完成线程在页面刷新后的健康恢复浏览器回归，证明 restored chat 与本地 workbench 面板可以连续对齐。
 - `V17` 已把线程管理产品化：支持直接重命名/删除线程，并在删除当前线程后自动回退到下一个可用线程或 starter gate。
+- `V18` 已把 runtime diagnostics 产品化：支持显示运行时状态徽标，并在产品内直接查看 backend reachability、preset source、provider 配置和 workspace root。
 
 ---
 
@@ -64,9 +65,9 @@ CopilotRuntime (Next.js route handler)
 | 套件 | 数量 | 状态 |
 |------|------|------|
 | 后端 pytest | **61** | ✅ 全通过 |
-| 前端 vitest | **74** | ✅ 全通过 |
+| 前端 vitest | **83** | ✅ 全通过 |
 | Next.js build | — | ✅ 无错误 |
-| E2E (playwright) | **16** | ✅ 全通过 |
+| E2E (playwright) | **17** | ✅ 全通过 |
 | Docker Compose 配置校验 | — | ⚠️ 当前机器未安装 `docker`，未执行命令级验证 |
 
 ---
@@ -136,6 +137,8 @@ FileBrowser         — 工作区树浏览
 ThreadList          — 会话历史
 SettingsDialog      — 多 provider 密钥配置
                     — 支持同源 runtime-config 读写与 workspace root 热更新
+RuntimeStatusBadge  — 运行时状态徽标（healthy/setup-required/degraded/offline）
+RuntimeDiagnosticsDialog — 产品内运行时诊断弹窗，可刷新 backend/catalog/provider/workspace 状态
 ThreadList          — 支持线程重命名、删除与最近更新排序
 FileViewDialog      — 文件内容预览
 DiffViewer          — 内联 diff 查看器
@@ -167,6 +170,7 @@ Endpoints:
   GET  /health                — agent 列表 + 数量
   GET  /config                — 当前 runtime 配置快照（不暴露 API key）
   GET  /presets               — 预设定义（供前端动态获取）
+  GET  /api/runtime-diagnostics — 聚合 backend health/config + preset source 的产品内诊断快照
   POST /configure             — API 密钥 + workspace root 热更新（仅 runtime 内存态）
   GET  /workspace/files       — 目录浏览
   GET  /workspace/file        — 文件读取
@@ -197,7 +201,7 @@ Python FastAPI:
 
 | 问题 | 优先级 | 说明 | 必须修？ |
 |------|--------|------|---------|
-| 更广覆盖的 runtime restart/resume 验证仍待补齐 | 🟡 P1 | V13 已证明主路由在 preset catalog 掉线时仍可恢复已持久化线程，但跨更多入口与真实进程重启的覆盖仍可继续增强 | 建议继续补强 |
+| 更广覆盖的 runtime restart/resume 验证仍待补齐 | 🟡 P1 | V18 已把运行时状态诊断产品化，但跨更多入口与真实进程重启的覆盖仍可继续增强 | 建议继续补强 |
 | #4 同步 invoke 阻塞事件循环 | 🟡 P2 | LangGraph 工具同步设计，长命令影响性能 | 否 — LangGraph 设计特性 |
 | #6 预设双端维护 | 🟡 P3 | 新增预设需改 Python + TS 两处 | 否 — 有注释指引 |
 | A2UI 未与 Python 工具对接 | 🟡 P3 | 前端 catalog 就绪，coordinator 工具未调用 `a2ui.render()` | 否 — 阶段 B 未完成部分 |
@@ -217,7 +221,7 @@ Python FastAPI:
 |------|------|------|
 | 后端测试 ≥ 50 | 61 ✅ | 已达标 |
 | 前端测试 ≥ 20 | 74 ✅ | 已达标 |
-| E2E ≥ 5 条 | 16 ✅ | 已达标 |
+| E2E ≥ 5 条 | 17 ✅ | 已达标 |
 | 0 个 Console Error | 有 Inspector 警告 | SDK 升级 |
 | Docker 部署 | ❌ | Dockerfile + compose |
 | Windows 桌面壳 | ❌ | Electron wrapper |
@@ -256,6 +260,7 @@ V14 基线提交: `见最新提交` — coordinator workbench regression baselin
 V15 基线提交: `见最新提交` — runtime config workspace-root baseline
 V16 基线提交: `见最新提交` — coordinator restored-thread continuity baseline
 V17 基线提交: `见最新提交` — thread management baseline
+V18 基线提交: `见最新提交` — runtime diagnostics baseline
 
 日志：
 ```

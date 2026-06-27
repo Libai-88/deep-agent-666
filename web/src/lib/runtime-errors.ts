@@ -15,6 +15,7 @@ export type RecoverableAction = {
   label: string;
   action:
     | "retry_connection"
+    | "view_diagnostics"
     | "open_settings"
     | "configure_provider"
     | "retry_save"
@@ -30,6 +31,7 @@ export function resolveRecoverableActions(
     case "backend_unreachable":
       return [
         { label: "Retry connection", action: "retry_connection" },
+        { label: "View diagnostics", action: "view_diagnostics" },
         { label: "Open settings", action: "open_settings" },
       ];
     case "no_available_presets":
@@ -58,6 +60,7 @@ export function resolveRecoverableActions(
       ];
     case "provider_rate_limited":
       return [
+        { label: "View diagnostics", action: "view_diagnostics" },
         { label: "Open settings", action: "open_settings" },
         { label: "Retry last task", action: "retry_last_task" },
       ];
@@ -65,11 +68,15 @@ export function resolveRecoverableActions(
     case "provider_model_unavailable":
     case "provider_auth_failed":
       return [
+        { label: "View diagnostics", action: "view_diagnostics" },
         { label: "Open settings", action: "open_settings" },
         { label: "Retry last task", action: "retry_last_task" },
       ];
     case "runtime_request_failed":
-      return [{ label: "Retry last task", action: "retry_last_task" }];
+      return [
+        { label: "View diagnostics", action: "view_diagnostics" },
+        { label: "Retry last task", action: "retry_last_task" },
+      ];
   }
 }
 
