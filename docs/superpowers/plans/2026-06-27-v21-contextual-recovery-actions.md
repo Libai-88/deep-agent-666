@@ -65,7 +65,7 @@
 - [x] Run `npm --prefix web run e2e`
 - [x] Run `uv run --project agent pytest -v`
 - [x] Update docs and counts for V21
-- [ ] Commit and push
+- [x] Commit and push
 
 ## Self-Review
 

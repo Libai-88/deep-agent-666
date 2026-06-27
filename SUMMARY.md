@@ -268,7 +268,7 @@ V17 基线提交: `见最新提交` — thread management baseline
 V18 基线提交: `见最新提交` — runtime diagnostics baseline
 V19 基线提交: `见最新提交` — runtime bootstrap reconnect baseline
 V20 基线提交: `见最新提交` — active-thread recovery shell baseline
-V21 基线提交: `见最新提交` — contextual recovery actions baseline
+V21 基线提交: `a24adc8` — contextual recovery actions baseline
 
 日志：
 ```
