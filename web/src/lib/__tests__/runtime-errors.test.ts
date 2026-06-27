@@ -14,6 +14,20 @@ describe("runtime-errors", () => {
     ]);
   });
 
+  it("adds retry-last-task for backend_unreachable when the active thread has a queued task", () => {
+    expect(
+      resolveRecoverableActions("backend_unreachable", {
+        hasActiveThread: true,
+        hasRetryableTask: true,
+      }),
+    ).toEqual([
+      { label: "Retry connection", action: "retry_connection" },
+      { label: "Retry last task", action: "retry_last_task" },
+      { label: "View diagnostics", action: "view_diagnostics" },
+      { label: "Open settings", action: "open_settings" },
+    ]);
+  });
+
   it("classifies upstream rate limit failures as recoverable provider quota errors", () => {
     expect(
       resolveRecoverableErrorCode({

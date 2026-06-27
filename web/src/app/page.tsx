@@ -377,6 +377,16 @@ function HomePageContent() {
         : null,
     [effectiveRecoverableError],
   );
+  const noticeActions = useMemo(
+    () =>
+      effectiveRecoverableError
+        ? resolveRecoverableActions(effectiveRecoverableError, {
+            hasActiveThread: Boolean(activeThread),
+            hasRetryableTask: Boolean(workbenchState.lastUserPrompt),
+          })
+        : [],
+    [activeThread, effectiveRecoverableError, workbenchState.lastUserPrompt],
+  );
 
   const effectiveRuntimeDiagnostics = useMemo<RuntimeDiagnostics>(() => {
     if (runtimeDiagnostics.backendReachable) {
@@ -551,7 +561,9 @@ function HomePageContent() {
           if (!activeThread || !activeAgentId) {
             return;
           }
-          setRecoverableError(null);
+          if (runtimeAvailability === "ready") {
+            setRecoverableError(null);
+          }
           setPendingThreadRun({
             id: crypto.randomUUID(),
             threadId: activeThread.id,
@@ -566,6 +578,7 @@ function HomePageContent() {
       activeThread,
       handleNewThread,
       refreshRuntimeSurfaces,
+      runtimeAvailability,
       workbenchState.lastUserPrompt,
     ],
   );
@@ -738,7 +751,7 @@ function HomePageContent() {
                 <WorkbenchStatusNotice
                   title={noticePresentation.title}
                   description={noticePresentation.description}
-                  actions={resolveRecoverableActions(effectiveRecoverableError)}
+                  actions={noticeActions}
                   onAction={handleRecoveryAction}
                 />
               ) : null}

@@ -1,6 +1,6 @@
 # Deep Agent 666 — 当前状态
 
-> 最后更新：2026-06-27 (V1 完成，V2 release hardening 完成，V3 首用引导完成，V4 本地持久化线程运行时完成，V5 live provider activation 完成，V6 first response roundtrip 完成，V7 provider alignment/runtime recovery 完成，V8 runtime failure normalization 完成，V9 retry replay recovery 完成，V10 thread history gap recovery 完成，V11 thread history drift recovery 完成，V12 runtime persistence proof 完成，V13 runtime catalog fallback 完成，V14 coordinator workbench regression 完成，V15 runtime-config workspace root 完成，V16 coordinator restored-thread continuity 完成，V17 thread management 完成，V18 runtime diagnostics 完成，V19 runtime bootstrap reconnect 完成，V20 active-thread recovery shell 完成)
+> 最后更新：2026-06-27 (V1 完成，V2 release hardening 完成，V3 首用引导完成，V4 本地持久化线程运行时完成，V5 live provider activation 完成，V6 first response roundtrip 完成，V7 provider alignment/runtime recovery 完成，V8 runtime failure normalization 完成，V9 retry replay recovery 完成，V10 thread history gap recovery 完成，V11 thread history drift recovery 完成，V12 runtime persistence proof 完成，V13 runtime catalog fallback 完成，V14 coordinator workbench regression 完成，V15 runtime-config workspace root 完成，V16 coordinator restored-thread continuity 完成，V17 thread management 完成，V18 runtime diagnostics 完成，V19 runtime bootstrap reconnect 完成，V20 active-thread recovery shell 完成，V21 contextual recovery actions 完成)
 
 ## 当前结论
 
@@ -14,10 +14,10 @@
 
 | 套件 | 数量 | 状态 |
 |------|------|------|
-| 后端 (pytest) | 61 | ✅ 全通过 |
-| 前端 (vitest) | 85 | ✅ 全通过 |
+| 后端 (pytest) | 59 | ✅ 全通过 |
+| 前端 (vitest) | 86 | ✅ 全通过 |
 | Build (next build) | — | ✅ |
-| E2E (playwright) | 19 | ✅ 全通过 |
+| E2E (playwright) | 20 | ✅ 全通过 |
 | Docker Compose 配置校验 | — | ⚠️ 当前机器未安装 `docker`，未执行命令级验证 |
 
 ## 已完成
@@ -128,6 +128,11 @@
 - 当前线程遇到 recoverable backend/runtime 故障时，页面不再直接退回 gate，而是保留 workbench shell
 - timeline、results 和本地最后任务上下文在恢复期间继续可见，用户可以在原线程里完成恢复
 - 浏览器回归已证明：active thread 在 backend 离线时仍能保住本地面板，恢复连接后同一线程继续存在
+
+### V21: Contextual Recovery Actions ✅
+- `backend_unreachable` 的恢复动作不再只看错误码；当 active thread 本地存有 `lastUserPrompt` 时，会额外暴露 `Retry last task`
+- 用户在 backend 恢复后不必新建线程或手动重打上一条 prompt，而是可以在原线程 notice 中直接重试
+- 浏览器回归已证明：active thread 离线时可见 `Retry last task`，重连后仍能留在线程内并完成一次新的 in-thread replay
 
 ## 关键提交
 

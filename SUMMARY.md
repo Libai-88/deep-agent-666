@@ -24,6 +24,7 @@
 - `V18` 已把 runtime diagnostics 产品化：支持显示运行时状态徽标，并在产品内直接查看 backend reachability、preset source、provider 配置和 workspace root。
 - `V19` 已补齐 runtime bootstrap reconnect：backend 恢复后，同一标签页无需手动刷新也能重新挂载 CopilotKit 并启动首个任务。
 - `V20` 已补齐 active-thread recovery shell：可恢复故障下保留当前线程工作台，不再直接把用户踢回 gate。
+- `V21` 已补齐 contextual recovery actions：active-thread 在 backend 不可达且本地存有最后任务时，会直接给出 `Retry last task`，恢复后仍可在原线程内重试。
 
 ---
 
@@ -205,7 +206,7 @@ Python FastAPI:
 
 | 问题 | 优先级 | 说明 | 必须修？ |
 |------|--------|------|---------|
-| 更广覆盖的 runtime restart/resume 验证仍待补齐 | 🟡 P1 | V20 已补齐 active-thread recoverable shell preservation，但跨更多入口与真实进程重启的覆盖仍可继续增强 | 建议继续补强 |
+| 更广覆盖的 runtime restart/resume 验证仍待补齐 | 🟡 P1 | V21 已补齐 active-thread recoverable shell preservation + contextual retry action，但跨更多入口与真实进程重启的覆盖仍可继续增强 | 建议继续补强 |
 | #4 同步 invoke 阻塞事件循环 | 🟡 P2 | LangGraph 工具同步设计，长命令影响性能 | 否 — LangGraph 设计特性 |
 | #6 预设双端维护 | 🟡 P3 | 新增预设需改 Python + TS 两处 | 否 — 有注释指引 |
 | A2UI 未与 Python 工具对接 | 🟡 P3 | 前端 catalog 就绪，coordinator 工具未调用 `a2ui.render()` | 否 — 阶段 B 未完成部分 |
@@ -223,9 +224,9 @@ Python FastAPI:
 
 | 标准 | 当前 | 达标 |
 |------|------|------|
-| 后端测试 ≥ 50 | 61 ✅ | 已达标 |
-| 前端测试 ≥ 20 | 74 ✅ | 已达标 |
-| E2E ≥ 5 条 | 19 ✅ | 已达标 |
+| 后端测试 ≥ 50 | 59 ✅ | 已达标 |
+| 前端测试 ≥ 20 | 86 ✅ | 已达标 |
+| E2E ≥ 5 条 | 20 ✅ | 已达标 |
 | 0 个 Console Error | 有 Inspector 警告 | SDK 升级 |
 | Docker 部署 | ❌ | Dockerfile + compose |
 | Windows 桌面壳 | ❌ | Electron wrapper |
@@ -267,6 +268,7 @@ V17 基线提交: `见最新提交` — thread management baseline
 V18 基线提交: `见最新提交` — runtime diagnostics baseline
 V19 基线提交: `见最新提交` — runtime bootstrap reconnect baseline
 V20 基线提交: `见最新提交` — active-thread recovery shell baseline
+V21 基线提交: `见最新提交` — contextual recovery actions baseline
 
 日志：
 ```

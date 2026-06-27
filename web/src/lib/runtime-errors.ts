@@ -24,16 +24,29 @@ export type RecoverableAction = {
     | "retry_last_task";
 };
 
+type RecoverableActionContext = {
+  hasActiveThread?: boolean;
+  hasRetryableTask?: boolean;
+};
+
 export function resolveRecoverableActions(
   code: RecoverableErrorCode,
+  context: RecoverableActionContext = {},
 ): RecoverableAction[] {
   switch (code) {
-    case "backend_unreachable":
-      return [
+    case "backend_unreachable": {
+      const actions: RecoverableAction[] = [
         { label: "Retry connection", action: "retry_connection" },
+      ];
+      if (context.hasActiveThread && context.hasRetryableTask) {
+        actions.push({ label: "Retry last task", action: "retry_last_task" });
+      }
+      actions.push(
         { label: "View diagnostics", action: "view_diagnostics" },
         { label: "Open settings", action: "open_settings" },
-      ];
+      );
+      return actions;
+    }
     case "no_available_presets":
       return [{ label: "Configure provider", action: "configure_provider" }];
     case "configuration_failed":

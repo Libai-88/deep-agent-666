@@ -96,6 +96,7 @@ Open `http://127.0.0.1:3000`.
 - The shell now exposes runtime diagnostics in-product, with a status badge plus a diagnostics dialog that shows backend reachability, live-vs-fallback preset source, configured providers, and workspace-root context before a beginner has to guess what broke.
 - Backend recovery actions now also re-bootstrap the CopilotKit runtime in the current tab, so a beginner can retry connection and launch the next guided task without manually reloading the page first.
 - Recoverable runtime/backend failures no longer force active threads back into the onboarding gate; the current thread shell, timeline, and results stay visible while the user recovers in place.
+- Active-thread recovery is now context-aware: when a stored last task exists, backend-unreachable notices can surface `Retry last task` directly in the same thread, so the user can reconnect and replay without retyping the prompt.
 
 ## Test
 
