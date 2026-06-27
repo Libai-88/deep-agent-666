@@ -270,7 +270,7 @@ V18 基线提交: `见最新提交` — runtime diagnostics baseline
 V19 基线提交: `见最新提交` — runtime bootstrap reconnect baseline
 V20 基线提交: `见最新提交` — active-thread recovery shell baseline
 V21 基线提交: `a24adc8` — contextual recovery actions baseline
-V22 基线提交: `见最新提交` — coordinator recovery replay baseline
+V22 基线提交: `551e2e3` — coordinator recovery replay baseline
 
 日志：
 ```

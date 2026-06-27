@@ -52,7 +52,7 @@
 - [x] Run `npm --prefix web run e2e`.
 - [x] Run `uv run --project agent pytest -v`.
 - [x] Update docs with the V22 baseline and latest counts.
-- [ ] Commit and push.
+- [x] Commit and push.
 
 ## Self-Review
 
