@@ -75,6 +75,7 @@ import { FileViewDialog } from "@/components/FileViewDialog";
 import { TaskTimelinePanel } from "@/components/TaskTimelinePanel";
 import { ArtifactResultsPanel } from "@/components/ArtifactResultsPanel";
 import { HomePageShell } from "@/components/HomePageShell";
+import { ProviderRegistryEditor } from "@/components/ProviderRegistryEditor";
 import {
   RuntimeDiagnosticsDialog,
   RuntimeStatusBadge,
@@ -114,6 +115,8 @@ import {
 import {
   buildRuntimeConfigRequestBody,
   normalizeRuntimeSettings,
+  type RuntimeModelProfile,
+  type RuntimeProviderProfile,
   type RuntimeSettings,
 } from "@/lib/runtime-settings";
 import {
@@ -1718,6 +1721,8 @@ function SettingsDialog({
 }) {
   const [apiKeys, setApiKeys] = useState<Record<string, string>>({});
   const [baseUrls, setBaseUrls] = useState<Record<string, string>>({});
+  const [providerProfiles, setProviderProfiles] = useState<RuntimeProviderProfile[]>([]);
+  const [modelProfiles, setModelProfiles] = useState<RuntimeModelProfile[]>([]);
   const [workspaceRoot, setWorkspaceRoot] = useState("");
   const [loadingConfig, setLoadingConfig] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -1747,6 +1752,8 @@ function SettingsDialog({
           anthropic: settings.providers.anthropic.baseUrl ?? "",
           google: settings.providers.google.baseUrl ?? "",
         });
+        setProviderProfiles(settings.providerProfiles);
+        setModelProfiles(settings.modelProfiles);
         setApiKeys({});
       } catch {
         if (cancelled) {
@@ -1789,6 +1796,16 @@ function SettingsDialog({
           anthropic: baseUrls.anthropic ?? "",
           google: baseUrls.google ?? "",
         },
+        providerProfiles: providerProfiles.map((profile) => ({
+          id: profile.id,
+          label: profile.label,
+          protocol: profile.protocol,
+          baseUrl: profile.baseUrl,
+          apiKey: apiKeys[profile.id] ?? "",
+          enabled: profile.enabled,
+          headers: profile.headers,
+        })),
+        modelProfiles,
       });
       const res = await fetch("/api/runtime-config", {
         method: "POST",
@@ -1941,6 +1958,15 @@ function SettingsDialog({
               />
             </div>
           ))}
+        </div>
+
+        <div className="mt-5">
+          <ProviderRegistryEditor
+            providerProfiles={providerProfiles}
+            modelProfiles={modelProfiles}
+            onProviderChange={setProviderProfiles}
+            onModelChange={setModelProfiles}
+          />
         </div>
 
         {message && (

@@ -16,6 +16,30 @@ describe("runtime-config route", () => {
       new Response(
         JSON.stringify({
           workspaceRoot: "D:\\AgentBuild",
+          providerProfiles: [
+            {
+              id: "lab-gateway",
+              label: "Lab Gateway",
+              protocol: "openai-compatible",
+              baseUrl: "https://gateway.example.com/v1",
+              enabled: true,
+              api_key_present: true,
+              headers: {
+                "X-Team": "chem",
+              },
+            },
+          ],
+          modelProfiles: [
+            {
+              id: "lab-gpt5",
+              provider_id: "lab-gateway",
+              model_name: "gpt-5.4",
+              label: "GPT 5.4",
+              capabilities: ["chat", "tools"],
+              is_default: true,
+              enabled: true,
+            },
+          ],
           providers: {
             openai: {
               configured: true,
@@ -51,6 +75,30 @@ describe("runtime-config route", () => {
     );
     expect(await response.json()).toEqual({
       workspaceRoot: "D:\\AgentBuild",
+      providerProfiles: [
+        {
+          id: "lab-gateway",
+          label: "Lab Gateway",
+          protocol: "openai-compatible",
+          baseUrl: "https://gateway.example.com/v1",
+          enabled: true,
+          apiKeyPresent: true,
+          headers: {
+            "X-Team": "chem",
+          },
+        },
+      ],
+      modelProfiles: [
+        {
+          id: "lab-gpt5",
+          providerId: "lab-gateway",
+          modelName: "gpt-5.4",
+          label: "GPT 5.4",
+          capabilities: ["chat", "tools"],
+          isDefault: true,
+          enabled: true,
+        },
+      ],
       providers: {
         openai: {
           configured: true,
@@ -123,6 +171,8 @@ describe("runtime-config route", () => {
     expect(response.status).toBe(200);
     expect(await response.json()).toEqual({
       workspaceRoot: null,
+      providerProfiles: [],
+      modelProfiles: [],
       providers: {
         openai: {
           configured: false,

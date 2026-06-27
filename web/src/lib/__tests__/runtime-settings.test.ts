@@ -6,6 +6,55 @@ import {
 } from "../runtime-settings";
 
 describe("runtime-settings", () => {
+  it("normalizes provider and model profiles from runtime config", () => {
+    expect(
+      normalizeRuntimeSettings({
+        workspaceRoot: "D:\\AgentBuild",
+        providerProfiles: [
+          {
+            id: "lab-gateway",
+            label: "Lab Gateway",
+            protocol: "openai-compatible",
+            baseUrl: "https://gateway.example.com/v1",
+            enabled: true,
+            apiKeyPresent: true,
+            headers: {
+              "X-Team": "chem",
+            },
+          },
+        ],
+        modelProfiles: [
+          {
+            id: "lab-gpt5",
+            providerId: "lab-gateway",
+            modelName: "gpt-5.4",
+            label: "GPT 5.4",
+            capabilities: ["chat", "tools"],
+            isDefault: true,
+            enabled: true,
+          },
+        ],
+      }),
+    ).toMatchObject({
+      workspaceRoot: "D:\\AgentBuild",
+      providerProfiles: [
+        {
+          id: "lab-gateway",
+          protocol: "openai-compatible",
+          apiKeyPresent: true,
+        },
+      ],
+      modelProfiles: [
+        {
+          id: "lab-gpt5",
+          providerId: "lab-gateway",
+          modelName: "gpt-5.4",
+          isDefault: true,
+        },
+      ],
+    });
+  });
+
   it("normalizes runtime settings from camelCase payloads", () => {
     expect(
       normalizeRuntimeSettings({
@@ -27,6 +76,8 @@ describe("runtime-settings", () => {
       }),
     ).toEqual({
       workspaceRoot: "D:\\AgentBuild",
+      providerProfiles: [],
+      modelProfiles: [],
       providers: {
         openai: {
           configured: true,
@@ -65,6 +116,8 @@ describe("runtime-settings", () => {
       }),
     ).toEqual({
       workspaceRoot: "D:\\Repos",
+      providerProfiles: [],
+      modelProfiles: [],
       providers: {
         openai: {
           configured: false,
@@ -101,6 +154,64 @@ describe("runtime-settings", () => {
       agent_workspace_root: "D:\\AgentBuild",
       openai_api_key: "test-openai-key",
       openai_base_url: "https://api.openai.com/v1",
+    });
+  });
+
+  it("builds registry payloads for custom providers and models", () => {
+    expect(
+      buildRuntimeConfigRequestBody({
+        workspaceRoot: "D:\\AgentBuild",
+        apiKeys: {
+          openai: "",
+          anthropic: "",
+          google: "",
+        },
+        baseUrls: {
+          openai: "",
+          anthropic: "",
+          google: "",
+        },
+        providerProfiles: [
+          {
+            id: "lab-gateway",
+            label: "Lab Gateway",
+            protocol: "openai-compatible",
+            baseUrl: "https://gateway.example.com/v1",
+            apiKey: "secret",
+            enabled: true,
+            headers: {
+              "X-Team": "chem",
+            },
+          },
+        ],
+        modelProfiles: [
+          {
+            id: "lab-gpt5",
+            providerId: "lab-gateway",
+            modelName: "gpt-5.4",
+            label: "GPT 5.4",
+            capabilities: ["chat", "tools"],
+            isDefault: true,
+            enabled: true,
+          },
+        ],
+      }),
+    ).toMatchObject({
+      agent_workspace_root: "D:\\AgentBuild",
+      providerProfiles: [
+        {
+          id: "lab-gateway",
+          protocol: "openai-compatible",
+          apiKey: "secret",
+        },
+      ],
+      modelProfiles: [
+        {
+          id: "lab-gpt5",
+          providerId: "lab-gateway",
+          modelName: "gpt-5.4",
+        },
+      ],
     });
   });
 });
