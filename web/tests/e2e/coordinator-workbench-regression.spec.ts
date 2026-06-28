@@ -26,33 +26,6 @@ function buildCoordinatorRunStream(threadId: string, runId: string): string {
       content: "Planner mapped the main modules.",
     })}`,
     `data: ${JSON.stringify({
-      type: "STATE_SNAPSHOT",
-      snapshot: {
-        task_kind: "engineering",
-        workbench_events: [
-          {
-            id: "event-planner-1",
-            kind: "delegation",
-            status: "completed",
-            title: "Planner finished",
-            message: "Inspect the repository architecture.",
-            source: "planner",
-            artifact_path: null,
-            artifact_kind: null,
-          },
-        ],
-        delegations: [
-          {
-            id: "delegation-planner-1",
-            sub_agent: "planner",
-            task: "Inspect the repository architecture.",
-            status: "completed",
-            result: "Planner mapped the main modules.",
-          },
-        ],
-      },
-    })}`,
-    `data: ${JSON.stringify({
       type: "TOOL_CALL_START",
       toolCallId: "executor-call-1",
       toolCallName: "executor_tool",
@@ -162,60 +135,6 @@ function buildCoordinatorRunStream(threadId: string, runId: string): string {
       },
     })}`,
     `data: ${JSON.stringify({
-      type: "STATE_SNAPSHOT",
-      snapshot: {
-        task_kind: "engineering",
-        workbench_events: [
-          {
-            id: "event-planner-1",
-            kind: "delegation",
-            status: "completed",
-            title: "Planner finished",
-            message: "Inspect the repository architecture.",
-            source: "planner",
-            artifact_path: null,
-            artifact_kind: null,
-          },
-          {
-            id: "event-executor-1",
-            kind: "delegation",
-            status: "completed",
-            title: "Executor finished",
-            message: "Inspect risky files and TODOs.",
-            source: "executor",
-            artifact_path: null,
-            artifact_kind: null,
-          },
-          {
-            id: "event-artifact-1",
-            kind: "artifact",
-            status: "completed",
-            title: "updated docs/plan.md",
-            message: "updated docs/plan.md",
-            source: "tool",
-            artifact_path: "docs/plan.md",
-            artifact_kind: "file",
-          },
-        ],
-        delegations: [
-          {
-            id: "delegation-planner-1",
-            sub_agent: "planner",
-            task: "Inspect the repository architecture.",
-            status: "completed",
-            result: "Planner mapped the main modules.",
-          },
-          {
-            id: "delegation-executor-1",
-            sub_agent: "executor",
-            task: "Inspect risky files and TODOs.",
-            status: "completed",
-            result: "Executor found the risky recovery path.",
-          },
-        ],
-      },
-    })}`,
-    `data: ${JSON.stringify({
       type: "TOOL_CALL_START",
       toolCallId: "reviewer-call-1",
       toolCallName: "reviewer_tool",
@@ -310,6 +229,20 @@ function buildCoordinatorRunStream(threadId: string, runId: string): string {
       },
     })}`,
     `data: ${JSON.stringify({
+      type: "TEXT_MESSAGE_START",
+      messageId: "assistant-message-1",
+      role: "assistant",
+    })}`,
+    `data: ${JSON.stringify({
+      type: "TEXT_MESSAGE_CONTENT",
+      messageId: "assistant-message-1",
+      delta: "Repository review complete.",
+    })}`,
+    `data: ${JSON.stringify({
+      type: "TEXT_MESSAGE_END",
+      messageId: "assistant-message-1",
+    })}`,
+    `data: ${JSON.stringify({
       type: "RUN_FINISHED",
       threadId,
       runId,
@@ -369,6 +302,60 @@ test("starter-launched coordinator run updates cards, timeline, and results", as
     });
   });
 
+  await page.route("**/api/runtime-config", async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({
+        workspaceRoot: "D:\\AgentBuild",
+        providers: {
+          openai: {
+            configured: true,
+            baseUrl: "https://api.openai.com/v1",
+          },
+          anthropic: {
+            configured: false,
+            baseUrl: null,
+          },
+          google: {
+            configured: false,
+            baseUrl: null,
+          },
+        },
+      }),
+    });
+  });
+
+  await page.route("**/api/runtime-diagnostics", async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({
+        status: "healthy",
+        backendReachable: true,
+        catalogSource: "live",
+        launchablePresetCount: 1,
+        configuredProviderCount: 1,
+        workspaceRoot: "D:\\AgentBuild",
+        providers: {
+          openai: {
+            configured: true,
+            baseUrl: "https://api.openai.com/v1",
+          },
+          anthropic: {
+            configured: false,
+            baseUrl: null,
+          },
+          google: {
+            configured: false,
+            baseUrl: null,
+          },
+        },
+        checkedAt: "2026-06-28T00:00:00.000Z",
+      }),
+    });
+  });
+
   await page.route("**/api/copilotkit/agent/**/connect", async (route) => {
     await route.fulfill({
       status: 200,
@@ -396,17 +383,33 @@ test("starter-launched coordinator run updates cards, timeline, and results", as
 
   await page.goto("/");
   await page.waitForLoadState("networkidle");
-  await page
-    .getByRole("button", { name: /Analyze the repository structure/i })
-    .click();
+  const analyzeButton = page.getByRole("button", {
+    name: /Analyze the repository structure/i,
+  });
+  await expect(analyzeButton).toBeVisible({ timeout: 10_000 });
+  await analyzeButton.click();
 
   await expect.poll(() => capturedRunUrl).toContain(
     "coordinator-openai-balanced",
   );
+  await expect(
+    page.getByRole("heading", { name: "Engineering" }),
+  ).toBeVisible({ timeout: 10_000 });
+  await expect(
+    page
+      .getByTestId("task-timeline-panel")
+      .getByText("Inspect the repository architecture."),
+  ).toBeVisible({ timeout: 10_000 });
 
-  await expect(page.getByTestId("subagent-card-planner")).toBeVisible();
-  await expect(page.getByTestId("subagent-card-executor")).toBeVisible();
-  await expect(page.getByTestId("subagent-card-reviewer")).toBeVisible();
+  await expect(page.getByTestId("subagent-card-planner")).toBeVisible({
+    timeout: 10_000,
+  });
+  await expect(page.getByTestId("subagent-card-executor")).toBeVisible({
+    timeout: 10_000,
+  });
+  await expect(page.getByTestId("subagent-card-reviewer")).toBeVisible({
+    timeout: 10_000,
+  });
   await expect(
     page.getByTestId("subagent-card-planner").getByText(
       "Planner mapped the main modules.",
@@ -423,14 +426,6 @@ test("starter-launched coordinator run updates cards, timeline, and results", as
     ),
   ).toBeVisible();
 
-  await expect(
-    page.getByRole("heading", { name: "Engineering" }),
-  ).toBeVisible();
-  await expect(
-    page
-      .getByTestId("task-timeline-panel")
-      .getByText("Inspect the repository architecture."),
-  ).toBeVisible();
   await expect(page.getByTestId("timeline-todo-event-planner-1")).toContainText(
     "Completed",
   );

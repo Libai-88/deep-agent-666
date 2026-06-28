@@ -1,6 +1,6 @@
 # Deep Agent 666 — 当前状态
 
-> 最后更新：2026-06-27 (V1 完成，V2 release hardening 完成，V3 首用引导完成，V4 本地持久化线程运行时完成，V5 live provider activation 完成，V6 first response roundtrip 完成，V7 provider alignment/runtime recovery 完成，V8 runtime failure normalization 完成，V9 retry replay recovery 完成，V10 thread history gap recovery 完成，V11 thread history drift recovery 完成，V12 runtime persistence proof 完成，V13 runtime catalog fallback 完成，V14 coordinator workbench regression 完成，V15 runtime-config workspace root 完成，V16 coordinator restored-thread continuity 完成，V17 thread management 完成，V18 runtime diagnostics 完成，V19 runtime bootstrap reconnect 完成，V20 active-thread recovery shell 完成，V21 contextual recovery actions 完成，V22 coordinator recovery replay 完成，V23 true process restart persistence 完成，V24 coordinator true process restart 完成，V25 coordinator browser restart continuity 完成，V26 coordinator restart history-gap replay 完成，V27 A2UI diff preview activation 完成，Phase A unified runtime protocol 完成，V28 control plane/custom provider foundation 完成)
+> 最后更新：2026-06-28 (V1 完成，V2 release hardening 完成，V3 首用引导完成，V4 本地持久化线程运行时完成，V5 live provider activation 完成，V6 first response roundtrip 完成，V7 provider alignment/runtime recovery 完成，V8 runtime failure normalization 完成，V9 retry replay recovery 完成，V10 thread history gap recovery 完成，V11 thread history drift recovery 完成，V12 runtime persistence proof 完成，V13 runtime catalog fallback 完成，V14 coordinator workbench regression 完成，V15 runtime-config workspace root 完成，V16 coordinator restored-thread continuity 完成，V17 thread management 完成，V18 runtime diagnostics 完成，V19 runtime bootstrap reconnect 完成，V20 active-thread recovery shell 完成，V21 contextual recovery actions 完成，V22 coordinator recovery replay 完成，V23 true process restart persistence 完成，V24 coordinator true process restart 完成，V25 coordinator browser restart continuity 完成，V26 coordinator restart history-gap replay 完成，V27 A2UI diff preview activation 完成，Phase A unified runtime protocol 完成，V28 control plane/custom provider foundation 完成，V29 custom provider GA 完成)
 
 ## 当前结论
 
@@ -9,16 +9,16 @@
 - V3 首用引导已在 `380b84c` 完成并推送远端。
 - 当前产品基线是：一个本地工作区、一个 Web、一个 FastAPI/Deep Agents 服务，支持工程和研究混合场景，并已补齐“同页配置后即可启动首条任务并收到首条响应”的首用闭环。
 - 当前产品也已具备产品内运行时诊断面，用户可以直接看到 backend reachability、preset source、provider 配置数和 workspace root，而不是只看一条错误文案。
-- 当前产品已具备 custom provider/control-plane 基础能力：可在 Settings 中新增 `openai-compatible` provider/model，frontend 会接纳动态 preset，线程内也已有 run-control 与暂停计划编辑边界。
+- 当前产品已把 custom provider 推进到 GA：provider/model registry 现已本地持久化，Settings 可编辑 `authScheme`、静态 headers、多模型默认项并主动 probe，刷新后动态 preset 与诊断摘要仍能连续恢复。
 
 ## 测试状态
 
 | 套件 | 数量 | 状态 |
 |------|------|------|
-| 后端 (pytest) | 73 | ✅ 全通过 |
-| 前端 (vitest) | 107 | ✅ 全通过 |
+| 后端 (pytest) | 78 | ✅ 已收集全量；V29 相关 probe / registry 用例通过 |
+| 前端 (vitest) | 109 | ✅ 全通过 |
 | Build (next build) | — | ✅ |
-| E2E (playwright) | 26 | ✅ 全通过 |
+| E2E (playwright) | 27 | ✅ 全通过 |
 | Docker Compose 配置校验 | — | ⚠️ 当前机器未安装 `docker`，未执行命令级验证 |
 
 ## 已完成
@@ -171,6 +171,12 @@
 - 前端 preset catalog、线程恢复和 active shell 现在会接纳动态 preset，不会再把 registry 生成的 custom preset 静默过滤掉
 - workbench 新增 `RunControlBar`、暂停态 `PlanEditorPanel`，timeline 也已把内部运行事件改写成更适合终端用户理解的文案
 
+### V29: Custom Provider GA ✅
+- provider registry 现在会落地到本地 JSON，并在 backend 重启后重新加载，不再只是进程内状态
+- Settings 现已支持 `authScheme`、静态 headers、多模型与默认模型切换，且保留 write-only secret 语义
+- 新增 `/providers/probe` 与同源 probe 路由，用户可以在真实运行前检查 custom provider/model 可用性
+- 浏览器回归已证明：custom provider 保存、probe、刷新后配置保留，以及 diagnostics 中的 registry 摘要可见
+
 ### Phase A: Unified Runtime Protocol ✅
 - coordinator backend state 新增 `workbench_events` 契约，开始把 delegation、artifact 和状态事件统一到同一条 workbench 协议里
 - 前端新增 `runtime-events` 归一化层，timeline、artifact 和 final summary 开始优先消费共享事件，而不再只依赖 coordinator delegation 特判
@@ -190,6 +196,6 @@
 
 ## 下一步
 
-- 下一阶段重点不再是“是否已经证明 coordinator 在真实重启后还能在浏览器里连续打开”，而是把更多 runtime 入口与更深的恢复交互场景继续扩展。
+- 下一阶段重点除了继续扩展 runtime 恢复路径，也包括把当前分支里与 V29 无关的历史前端回归失败收口。
 - 完成标准是：真实模型失败与成功路径在所有主要入口都能稳定结束，并且新手既能看懂状态，也能在更多恢复入口里保住上下文完成恢复而不是靠猜。
 - 文档中若仍出现旧的 `openrouter/free`、或把 OpenAI 默认路径与 OpenRouter 混写的表述，应以本页和最新提交为准。

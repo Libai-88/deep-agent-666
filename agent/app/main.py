@@ -167,16 +167,37 @@ def probe_provider_model(
     provider_profile_payload: dict[str, object],
     model_profile_payload: dict[str, object],
 ) -> dict[str, object]:
+    current_profile = find_provider_profile(
+        store.provider_registry_snapshot,
+        str(provider_profile_payload.get("id", "")),
+    )
+    merged_provider_profile = dict(provider_profile_payload)
+    if current_profile is not None:
+        if not isinstance(merged_provider_profile.get("apiKey"), str) and current_profile.api_key:
+            merged_provider_profile["apiKey"] = current_profile.api_key
+        if not isinstance(merged_provider_profile.get("baseUrl"), str) and current_profile.base_url:
+            merged_provider_profile["baseUrl"] = current_profile.base_url
+        if not isinstance(merged_provider_profile.get("authScheme"), str):
+            merged_provider_profile["authScheme"] = current_profile.auth_scheme
+        if not isinstance(merged_provider_profile.get("label"), str):
+            merged_provider_profile["label"] = current_profile.label
+        if not isinstance(merged_provider_profile.get("protocol"), str):
+            merged_provider_profile["protocol"] = current_profile.protocol
+        if not isinstance(merged_provider_profile.get("headers"), dict):
+            merged_provider_profile["headers"] = current_profile.headers
+        if not isinstance(merged_provider_profile.get("enabled"), bool):
+            merged_provider_profile["enabled"] = current_profile.enabled
+
     snapshot = normalize_provider_registry_payload(
         {
             "workspaceRoot": str(store.snapshot().workspace_root),
-            "providerProfiles": [provider_profile_payload],
+            "providerProfiles": [merged_provider_profile],
             "modelProfiles": [model_profile_payload],
         }
     )
     provider_profile = find_provider_profile(
         snapshot,
-        str(provider_profile_payload.get("id", "")),
+        str(merged_provider_profile.get("id", "")),
     )
     if provider_profile is None:
         raise ValueError("provider probe payload did not include a valid provider")

@@ -1,4 +1,13 @@
 import type { WorkbenchArtifact } from "@/lib/workbench-state";
+import { DataChart } from "@/components/DataChart";
+
+function tryParseDataChart(content: string) {
+  try {
+    const d = JSON.parse(content);
+    if (Array.isArray(d?.columns) && Array.isArray(d?.rows)) return d;
+  } catch {}
+  return null;
+}
 
 export function ArtifactResultsPanel({
   artifacts,
@@ -50,9 +59,16 @@ export function ArtifactResultsPanel({
               ) : (
                 <div className="text-sm font-medium">{artifact.title}</div>
               )}
-              <pre className="mt-2 whitespace-pre-wrap text-xs text-muted-foreground">
-                {artifact.content}
-              </pre>
+              {(() => {
+                const d = tryParseDataChart(artifact.content);
+                return d ? (
+                  <DataChart columns={d.columns} rows={d.rows} />
+                ) : (
+                  <pre className="mt-2 whitespace-pre-wrap text-xs text-muted-foreground">
+                    {artifact.content}
+                  </pre>
+                );
+              })()}
             </div>
           ))
         )}

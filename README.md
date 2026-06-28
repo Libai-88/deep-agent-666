@@ -83,6 +83,7 @@ Open `http://127.0.0.1:3000`.
 
 ## Current limits
 
+- `V29` has now hardened custom providers into a local-first GA surface: the registry persists across restarts in `data/provider-registry.json`, Settings supports auth scheme/static headers/multi-model defaults, and users can probe provider readiness before a real run fails.
 - `Phase A` 已统一 workbench runtime protocol：coordinator state snapshot、tool 结果和 A2UI artifact 现在会收口为共享的 `workbench event` 语义，timeline、results 和 final summary 统一消费这一层协议。
 - `V27` 已激活 A2UI diff preview：`write_text_file` / `replace_text_in_file` 现在会返回结构化编辑结果，并在聊天流里内联渲染 `DiffPreview`。
 - The CopilotKit runtime now uses a local SQLite thread store by default (`COPILOTKIT_THREADS_DB_PATH`, default `./data/threads.db`), and `Retry last task` now persists the last runnable prompt so a restored thread can replay it after refresh/reload.
@@ -93,7 +94,7 @@ Open `http://127.0.0.1:3000`.
 - The web runtime now persists the last live preset catalog to `COPILOTKIT_RUNTIME_CATALOG_PATH` (default `./data/runtime-catalog.json`), so the main CopilotKit route can keep restoring persisted threads when `/presets` is temporarily unavailable.
 - The coordinator starter flow now has a browser regression that proves planner/executor/reviewer cards, timeline tasks, and results summary appear together in one thread, and timeline statuses are rendered with beginner-friendly labels instead of raw internal values.
 - Runtime settings now flow through the app-owned `/api/runtime-config` route, and beginners can inspect/change the active workspace root from `Settings` without editing `.env` or calling the backend directly from the browser.
-- Settings now includes a custom provider registry editor for `openai-compatible` gateways and custom models, and the frontend now accepts dynamic presets emitted from that registry instead of filtering them down to built-in providers only.
+- Settings now includes a persisted custom provider registry editor for `openai-compatible` gateways and custom models, with auth scheme, static header, multi-model default, and probe support, and the frontend accepts dynamic presets emitted from that registry instead of filtering them down to built-in providers only.
 - The workbench now exposes a control plane surface in-thread: `RunControlBar` stays visible during active work, timeline copy is normalized into user-facing language, and paused coordinator runs can open a constrained `Edit plan` panel before resuming.
 - `npm run e2e` now also proves that completed threads survive both mocked continuity flows and real production web-process restarts. The suite covers first-run launch, workspace-root settings saves, coordinator workbench rendering, healthy restored-thread continuity, restored-thread retry recovery, full history-gap detection, partial history-drift detection, dedicated true process-restart proofs for both the main agent route and the coordinator route, browser-visible coordinator continuity after a real restart using real `next start`, SQLite persistence, and cached preset-catalog fallback, plus coordinator in-thread replay after a real restart swaps the runtime to an empty SQLite store. The Vitest suite also includes runtime-level proofs for both fresh-instance SQLite restore and route-level restore during preset-catalog outages.
 - Local threads can now be renamed and deleted directly from the thread list, with deletion also cleaning persisted workbench state and automatically falling back to the next most recent thread or the starter gate.
@@ -123,7 +124,7 @@ npm --prefix web run test
 npm --prefix web run e2e
 ```
 
-This now covers 26 browser proofs total: 22 main Playwright specs plus 4 real process-restart specs.
+This now covers 27 browser proofs total: 23 main Playwright specs plus 4 real process-restart specs.
 
 ### Production build
 

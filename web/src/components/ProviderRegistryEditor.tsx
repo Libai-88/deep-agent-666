@@ -342,18 +342,35 @@ export function ProviderRegistryEditor({
                           id={`${profile.id}-provider-id`}
                           aria-label="Provider ID"
                           value={profile.id}
-                          onChange={(event) =>
+                          onChange={(event) => {
+                            const nextProviderId = event.target.value;
                             onProviderChange(
                               providerProfiles.map((currentProfile) =>
                                 currentProfile.id === profile.id
                                   ? {
                                       ...currentProfile,
-                                      id: event.target.value,
+                                      id: nextProviderId,
                                     }
                                   : currentProfile,
                               ),
-                            )
-                          }
+                            );
+                            onModelChange(
+                              modelProfiles.map((currentModel) =>
+                                currentModel.providerId === profile.id
+                                  ? {
+                                      ...currentModel,
+                                      providerId: nextProviderId,
+                                    }
+                                  : currentModel,
+                              ),
+                            );
+                            if (apiKeys[profile.id] !== undefined) {
+                              const nextApiKeys = { ...apiKeys };
+                              nextApiKeys[nextProviderId] = nextApiKeys[profile.id] ?? "";
+                              delete nextApiKeys[profile.id];
+                              onApiKeyChange(nextApiKeys);
+                            }
+                          }}
                         />
                       </div>
                     ) : null}

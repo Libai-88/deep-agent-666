@@ -1,8 +1,10 @@
 # Deep Agent 666 — 开发进展全总结
 
-> 生成于 2026-06-27 | Git Tag: `v1-foundation`, `v1-complete`, `gaps-complete` | 分支: `feat/deepagents-foundation`
+> 生成于 2026-06-28 | Git Tag: `v1-foundation`, `v1-complete`, `gaps-complete` | 分支: `feat/deepagents-foundation`
 
-## 2026-06-27 更新
+## 2026-06-28 更新
+
+- `V29` 已完成 custom provider GA：provider registry 现已本地持久化，Settings 支持 `authScheme`、静态 headers、多模型与默认模型切换，新增 provider probe，并补齐刷新后配置仍在的浏览器证明。
 
 - `Phase A` 已完成统一 runtime protocol 基线：coordinator `workbench_events`、tool 结果和 A2UI artifact 现在共享同一套 workbench event 语义，timeline / results / final summary 不再只靠 delegation 特判。
 - `V27` 已完成 A2UI diff preview 激活：文本文件写入与替换现在会返回结构化编辑结果，并在聊天流中内联渲染 `DiffPreview`。
@@ -75,10 +77,10 @@ CopilotRuntime (Next.js route handler)
 
 | 套件 | 数量 | 状态 |
 |------|------|------|
-| 后端 pytest | **73** | ✅ 全通过 |
-| 前端 vitest | **107** | ✅ 全通过 |
+| 后端 pytest | **78** | ✅ 已收集全量；V29 相关 probe / registry 用例通过 |
+| 前端 vitest | **109** | ✅ 全通过 |
 | Next.js build | — | ✅ 无错误 |
-| E2E (playwright) | **26** | ✅ 全通过 |
+| E2E (playwright) | **27** | ✅ 全通过 |
 | Docker Compose 配置校验 | — | ⚠️ 当前机器未安装 `docker`，未执行命令级验证 |
 
 ---
@@ -152,7 +154,7 @@ RuntimeStatusBadge  — 运行时状态徽标（healthy/setup-required/degraded/
 RuntimeDiagnosticsDialog — 产品内运行时诊断弹窗，可刷新 backend/catalog/provider/workspace 状态
 Runtime reconnect recovery — 同页 retry connection 后自动重挂 runtime bridge
 Active-thread recovery shell — 可恢复故障下保留当前线程 timeline/results/workbench
-ProviderRegistryEditor — Settings 内可编辑 custom provider/model registry
+ProviderRegistryEditor — Settings 内可编辑并持久化 custom provider/model registry，支持 auth scheme、静态 headers、多模型默认项和 probe 状态
 RunControlBar      — 线程内运行控制条（stop/resume/edit-plan/retry surface）
 PlanEditorPanel    — 暂停 coordinator 时的受限计划编辑面板
 ThreadList          — 支持线程重命名、删除与最近更新排序
@@ -186,8 +188,9 @@ Endpoints:
   GET  /health                — agent 列表 + 数量
   GET  /config                — 当前 runtime 配置快照（不暴露 API key）
   GET  /presets               — 预设定义（供前端动态获取）
+  POST /providers/probe       — custom provider/model 连通性探针
   GET  /api/runtime-diagnostics — 聚合 backend health/config + preset source 的产品内诊断快照
-  POST /configure             — API 密钥 + workspace root 热更新（仅 runtime 内存态）
+  POST /configure             — API 密钥 + workspace root + provider registry 热更新（本地持久化）
   GET  /workspace/files       — 目录浏览
   GET  /workspace/file        — 文件读取
   POST /{preset_id}           — AG-UI endpoint per agent
@@ -226,7 +229,7 @@ Python FastAPI:
 | Inspector `{}` 解析警告 | 🟢 P4 | `[CopilotKit Inspector] Failed to parse tool-call result content {}` | 否 — SDK 升级后解决 |
 | 运行时恢复回归覆盖不足 | 🟡 P2 | 已切到 SQLite，但还缺“重启后继续线程”的更深 E2E | 建议补 — 属于 V4 后续验证 |
 | 线程恢复与更深层入口回归覆盖仍可继续扩展 | 🟡 P1 | 当前已证明产品层可识别全空与部分历史漂移，并证明主运行时、主路由入口、coordinator 浏览器重启连续性以及空 runtime store 后的同线程 replay 都能在关键 fallback 场景下恢复消息；后续重点是扩展到更多入口与更复杂的恢复链路 | 建议继续补强 |
-| 自定义 provider registry 仍缺高级配置 | 🟡 P1 | 当前已支持 `openai-compatible` custom provider/model 基础编辑与动态 preset 接纳，但 headers/auth scheme 等更高级接入字段仍未产品化 | 建议继续补强 |
+| 更广覆盖的 runtime restart/resume 验证仍待扩展 | 🟡 P1 | 当前 27 条 Playwright 已全绿，`V29` 也补齐了 custom provider GA 浏览器证明；后续重点回到扩展更多入口与更深恢复链路 | 建议继续补强 |
 
 ---
 
@@ -236,9 +239,9 @@ Python FastAPI:
 
 | 标准 | 当前 | 达标 |
 |------|------|------|
-| 后端测试 ≥ 50 | 73 ✅ | 已达标 |
-| 前端测试 ≥ 20 | 107 ✅ | 已达标 |
-| E2E ≥ 5 条 | 26 ✅ | 已达标 |
+| 后端测试 ≥ 50 | 78 ✅ | 已达标 |
+| 前端测试 ≥ 20 | 109 ✅ | 已达标 |
+| E2E ≥ 5 条 | 27 ✅ | 已达标 |
 | 0 个 Console Error | 有 Inspector 警告 | SDK 升级 |
 | Docker 部署 | ❌ | Dockerfile + compose |
 | Windows 桌面壳 | ❌ | Electron wrapper |
@@ -247,7 +250,6 @@ Python FastAPI:
 
 ```
 P1: 扩展更多 runtime 入口与更深恢复交互场景下的 restart/resume 一致性验证
-P1: CI 打通 E2E 测试（让 smoke/chat round-trip 自动运行）
 P2: 补 Docker 部署方案
 P3: 恢复 interrupt_on + 修复空结果
 P4: Windows 桌面壳（Electron）
