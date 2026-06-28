@@ -54,6 +54,58 @@ test.describe("Page loads correctly", () => {
     await expect(page.getByText("Start with a guided task")).toBeVisible();
   });
 
+  test("three-region workbench layout renders with test IDs", async ({ page }) => {
+    const threadId = "e2e-layout-thread";
+
+    await page.addInitScript(([storedThreadId]) => {
+      window.localStorage.setItem(
+        "deep-agent-666.threads",
+        JSON.stringify([
+          {
+            id: storedThreadId,
+            title: "Layout thread",
+            presetId: "openai-balanced",
+            updatedAt: Date.now(),
+          },
+        ]),
+      );
+      window.localStorage.setItem(
+        `deep-agent-666.workbench.${storedThreadId}`,
+        JSON.stringify({
+          taskKind: "engineering",
+          todos: [],
+          artifacts: [],
+          finalSummary: null,
+          updatedAt: Date.now(),
+        }),
+      );
+    }, [threadId]);
+
+    await page.route("**/api/preset-state", async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({
+          source: "live",
+          defaultPresetId: "openai-balanced",
+          presets: [
+            {
+              id: "openai-balanced",
+              label: "OpenAI / Balanced",
+              provider: "openai",
+              permissionMode: "balanced",
+            },
+          ],
+        }),
+      });
+    });
+
+    await page.goto("/?threadId=e2e-layout-thread");
+
+    await expect(page.getByTestId("workbench-shell")).toBeVisible();
+    await expect(page.getByTestId("workbench-main-panel")).toBeVisible();
+  });
+
   test("home page shows no console errors", async ({ page }) => {
     const errors: string[] = [];
     page.on("console", (msg) => {

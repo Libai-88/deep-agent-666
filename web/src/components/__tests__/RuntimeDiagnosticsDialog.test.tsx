@@ -56,6 +56,7 @@ describe("RuntimeDiagnosticsDialog", () => {
     expect(html).toContain("Registry Providers");
     expect(html).toContain("Lab Gateway");
     expect(html).toContain("Default model: GPT 5.4");
+    expect(html).toContain('data-testid="runtime-diagnostics-dialog"');
   });
 
   it("renders a clickable status badge label", () => {

@@ -827,18 +827,18 @@ function HomePageContent() {
 
       {/* Content */}
       <div className="flex-1 overflow-hidden">
-        <ResizablePanelGroup direction="horizontal">
+        <ResizablePanelGroup direction="horizontal" data-testid="workbench-shell">
           <ResizablePanel
-            id="thread-history"
+            id="left-rail"
             order={1}
-            defaultSize={25}
-            minSize={18}
-            maxSize={40}
+            defaultSize={22}
+            minSize={16}
+            maxSize={35}
             className={`min-w-[280px] transition-all duration-300 ${sidebar ? "" : "!w-0 !min-w-0 !max-w-0 overflow-hidden"}`}
             collapsible
             collapsedSize={0}
           >
-            <div className={`h-full ${sidebar ? "" : "hidden"}`}>
+            <div className={`flex h-full flex-col ${sidebar ? "" : "hidden"}`}>
               <ThreadList
                 threads={threads}
                 activeThreadId={activeThread.id}
@@ -847,118 +847,120 @@ function HomePageContent() {
                 onDelete={handleDeleteThread}
                 onClose={() => setSidebar(null)}
               />
+              <TaskTimelinePanel
+                taskKind={workbenchState.taskKind}
+                events={workbenchState.events}
+                todos={workbenchState.todos}
+              />
             </div>
           </ResizablePanel>
           {sidebar && <ResizableHandle />}
 
-          <ResizablePanel id="timeline" order={2} defaultSize={22} minSize={18}>
-            <TaskTimelinePanel
-              taskKind={workbenchState.taskKind}
-              events={workbenchState.events}
-              todos={workbenchState.todos}
-            />
-          </ResizablePanel>
-
-          <ResizableHandle />
-
-          <ResizablePanel id="chat" order={3}>
+          <ResizablePanel id="main-panel" order={2}>
             <div className="flex h-full flex-col">
-              {noticePresentation && effectiveRecoverableError ? (
-                <WorkbenchStatusNotice
-                  title={noticePresentation.title}
-                  description={noticePresentation.description}
-                  actions={noticeActions}
-                  onAction={handleRecoveryAction}
-                />
-              ) : null}
-              <div className="border-b border-border px-4 py-2">
-                <RunControlBar
-                  state={runControlState}
-                  onAction={(action) => void handleRunControlAction(action)}
-                />
-              </div>
-              {/* Model / Permission bar */}
-              <div className="flex items-center gap-2 border-b border-border px-4 py-2">
-                <span className="text-xs text-muted-foreground">Model:</span>
-                <PresetSelector
-                  presets={catalogState.catalog.presets.filter(
-                    (p) => p.provider === currentPreset.provider,
-                  )}
-                  value={activeThread.presetId as AgentPresetId}
-                  onChange={handleSwitchPreset}
-                />
-                <span className="ml-4 text-xs text-muted-foreground">
-                  Permission:
-                </span>
-                <PresetSelector
-                  presets={catalogState.catalog.presets.filter(
-                    (p) => p.permissionMode === currentPreset.permissionMode,
-                  )}
-                  value={activeThread.presetId as AgentPresetId}
-                  onChange={handleSwitchPreset}
-                />
-              </div>
+              <section data-testid="workbench-status-header">
+                {noticePresentation && effectiveRecoverableError ? (
+                  <WorkbenchStatusNotice
+                    title={noticePresentation.title}
+                    description={noticePresentation.description}
+                    actions={noticeActions}
+                    onAction={handleRecoveryAction}
+                  />
+                ) : null}
+              </section>
+              <section
+                data-testid="workbench-main-panel"
+                className="flex min-h-0 flex-1 flex-col"
+              >
+                <div className="border-b border-border px-4 py-2">
+                  <RunControlBar
+                    state={runControlState}
+                    onAction={(action) => void handleRunControlAction(action)}
+                  />
+                </div>
+                {/* Model / Permission bar */}
+                <div className="flex items-center gap-2 border-b border-border px-4 py-2">
+                  <span className="text-xs text-muted-foreground">Model:</span>
+                  <PresetSelector
+                    presets={catalogState.catalog.presets.filter(
+                      (p) => p.provider === currentPreset.provider,
+                    )}
+                    value={activeThread.presetId as AgentPresetId}
+                    onChange={handleSwitchPreset}
+                  />
+                  <span className="ml-4 text-xs text-muted-foreground">
+                    Permission:
+                  </span>
+                  <PresetSelector
+                    presets={catalogState.catalog.presets.filter(
+                      (p) => p.permissionMode === currentPreset.permissionMode,
+                    )}
+                    value={activeThread.presetId as AgentPresetId}
+                    onChange={handleSwitchPreset}
+                  />
+                </div>
 
-              {/* Chat area */}
-              <div className="flex-1 min-h-0 flex flex-col">
-                {runtimeAvailability === "ready" ? (
-                  <CopilotChatConfigurationProvider
-                    agentId={activeAgentId}
-                    threadId={activeThread.id}
-                  >
-                    <WorkbenchRuntimeHooks
-                      activeAgentId={activeAgentId}
-                      setHasLiveThreadActivity={setHasLiveThreadActivity}
-                      setWorkbenchState={setWorkbenchState}
-                    />
-                    <ThreadHistoryGapMonitor
-                      activeAgentId={activeAgentId}
-                      hasLiveThreadActivity={hasLiveThreadActivity}
-                      runtimeAvailability={runtimeAvailability}
-                      workbenchState={workbenchState}
-                      pendingThreadRun={pendingThreadRun}
-                      recoverableError={recoverableError}
-                      setRecoverableError={setRecoverableError}
-                    />
-                    {pendingThreadRun && pendingThreadRun.threadId === activeThread.id ? (
-                      <PendingThreadRunController
-                        key={pendingThreadRun.id}
-                        run={pendingThreadRun}
-                        onComplete={() => setPendingThreadRun(null)}
-                        onError={(error) =>
-                          setRecoverableError(resolveRecoverableErrorCode(error))
-                        }
+                {/* Chat area */}
+                <div className="flex-1 min-h-0 flex flex-col">
+                  {runtimeAvailability === "ready" ? (
+                    <CopilotChatConfigurationProvider
+                      agentId={activeAgentId}
+                      threadId={activeThread.id}
+                    >
+                      <WorkbenchRuntimeHooks
+                        activeAgentId={activeAgentId}
+                        setHasLiveThreadActivity={setHasLiveThreadActivity}
+                        setWorkbenchState={setWorkbenchState}
                       />
-                    ) : null}
-                    <ActiveThreadChat
-                      activeAgentId={activeAgentId}
-                      activeThread={activeThread}
-                      setRuntimeControl={setRuntimeControl}
-                      currentPreset={currentPreset}
-                      setHasLiveThreadActivity={setHasLiveThreadActivity}
-                      threadId={threadId}
-                      workspaceRoot={runtimeSettings.workspaceRoot}
-                      pendingThreadRun={pendingThreadRun}
-                      setThreads={setThreads}
-                      setWorkbenchState={setWorkbenchState}
-                      planEditorDraft={planEditorDraft}
-                      setPlanEditorDraft={setPlanEditorDraft}
-                      onPlanEditorSubmit={handlePlanEditorSubmit}
-                    />
-                  </CopilotChatConfigurationProvider>
-                ) : (
-                  <ActiveThreadRuntimeFallback runtimeAvailability={runtimeAvailability} />
-                )}
-              </div>
+                      <ThreadHistoryGapMonitor
+                        activeAgentId={activeAgentId}
+                        hasLiveThreadActivity={hasLiveThreadActivity}
+                        runtimeAvailability={runtimeAvailability}
+                        workbenchState={workbenchState}
+                        pendingThreadRun={pendingThreadRun}
+                        recoverableError={recoverableError}
+                        setRecoverableError={setRecoverableError}
+                      />
+                      {pendingThreadRun && pendingThreadRun.threadId === activeThread.id ? (
+                        <PendingThreadRunController
+                          key={pendingThreadRun.id}
+                          run={pendingThreadRun}
+                          onComplete={() => setPendingThreadRun(null)}
+                          onError={(error) =>
+                            setRecoverableError(resolveRecoverableErrorCode(error))
+                          }
+                        />
+                      ) : null}
+                      <ActiveThreadChat
+                        activeAgentId={activeAgentId}
+                        activeThread={activeThread}
+                        setRuntimeControl={setRuntimeControl}
+                        currentPreset={currentPreset}
+                        setHasLiveThreadActivity={setHasLiveThreadActivity}
+                        threadId={threadId}
+                        workspaceRoot={runtimeSettings.workspaceRoot}
+                        pendingThreadRun={pendingThreadRun}
+                        setThreads={setThreads}
+                        setWorkbenchState={setWorkbenchState}
+                        planEditorDraft={planEditorDraft}
+                        setPlanEditorDraft={setPlanEditorDraft}
+                        onPlanEditorSubmit={handlePlanEditorSubmit}
+                      />
+                    </CopilotChatConfigurationProvider>
+                  ) : (
+                    <ActiveThreadRuntimeFallback runtimeAvailability={runtimeAvailability} />
+                  )}
+                </div>
+              </section>
             </div>
           </ResizablePanel>
 
           <ResizableHandle />
           <ResizablePanel
-            id="results"
-            order={4}
-            defaultSize={28}
-            minSize={20}
+            id="context-panel"
+            order={3}
+            defaultSize={25}
+            minSize={18}
             className="min-w-[280px]"
           >
             <ArtifactResultsPanel
@@ -2081,7 +2083,7 @@ function SettingsDialog({
           Configure the workspace root, provider API keys, and base URLs.
         </p>
 
-        <div className="mt-5 space-y-1.5">
+        <div data-testid="settings-section-environment" className="mt-5 space-y-1.5">
           <label
             htmlFor="workspace-root-input"
             className="block text-xs font-semibold uppercase tracking-wider text-muted-foreground"
@@ -2102,7 +2104,7 @@ function SettingsDialog({
         </div>
 
         {/* Provider / Permission selector */}
-        <div className="mt-4 flex gap-4">
+        <div data-testid="settings-section-models-presets" className="mt-4 flex gap-4">
           <fieldset className="flex-1">
             <legend className="mb-1 text-xs font-medium text-foreground">Provider</legend>
             <div className="flex flex-wrap gap-1.5">
@@ -2156,7 +2158,7 @@ function SettingsDialog({
         </div>
 
         {/* API Key inputs */}
-        <div className="mt-5 space-y-4">
+        <div data-testid="settings-section-providers" className="mt-5 space-y-4">
           <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
             Provider Credentials
           </h3>
@@ -2186,7 +2188,7 @@ function SettingsDialog({
           ))}
         </div>
 
-        <div className="mt-5">
+        <div data-testid="settings-section-diagnostics" className="mt-5">
           <ProviderRegistryEditor
             apiKeys={apiKeys}
             providerProfiles={providerProfiles}
