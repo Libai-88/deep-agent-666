@@ -1,14 +1,27 @@
-import type { RecoverableErrorCode } from "@/lib/runtime-errors";
-
-export type RunControlAction = "stop" | "retry" | "resume" | "edit_plan";
+export type RunControlAction = "approve_plan" | "edit_plan" | "retry_last" | "request_stop";
 
 export type RunControlStatus =
   | "idle"
   | "running"
-  | "waiting_approval"
-  | "stopped"
+  | "interrupted"
+  | "resuming"
+  | "completed"
   | "failed"
-  | "completed";
+  | "cancellation_requested"
+  | "cancelled";
+
+export type RunControlSnapshot = {
+  phase: RunControlStatus;
+  reason: "none" | "plan_approval" | "tool_approval" | "user_stop" | "error";
+  currentStep: string | null;
+  statusMessage: string;
+  availableActions: RunControlAction[];
+  interruptPayload: Record<string, unknown> | null;
+  threadId: string | null;
+  runId: string | null;
+  activeProviderId: string | null;
+  activeModelId: string | null;
+};
 
 export type RunControlState = {
   threadId: string | null;
@@ -17,7 +30,6 @@ export type RunControlState = {
   currentStep: string | null;
   availableActions: RunControlAction[];
   pendingApproval: boolean;
-  lastRecoverablePrompt: string | null;
   activeProviderId: string | null;
   activeModelId: string | null;
 };
@@ -25,40 +37,36 @@ export type RunControlState = {
 type ResolveRunControlStateInput = {
   threadId: string | null;
   runId?: string | null;
-  runStatus: RunControlStatus;
-  currentStep: string | null;
+  runtimeControl: RunControlSnapshot | null;
   activeProviderId: string | null;
   activeModelId: string | null;
-  recoverableError: RecoverableErrorCode | null;
-  lastRecoverablePrompt: string | null;
 };
 
 export function resolveRunControlState(
   input: ResolveRunControlStateInput,
 ): RunControlState {
-  const availableActions: RunControlAction[] = [];
-
-  if (input.runStatus === "running") {
-    availableActions.push("stop");
-  }
-
-  if (input.runStatus === "waiting_approval") {
-    availableActions.push("resume", "edit_plan");
-  }
-
-  if (input.lastRecoverablePrompt && input.recoverableError) {
-    availableActions.push("retry");
+  const snapshot = input.runtimeControl;
+  if (!snapshot) {
+    return {
+      threadId: input.threadId,
+      runId: input.runId ?? null,
+      status: "idle",
+      currentStep: null,
+      availableActions: [],
+      pendingApproval: false,
+      activeProviderId: input.activeProviderId,
+      activeModelId: input.activeModelId,
+    };
   }
 
   return {
     threadId: input.threadId,
-    runId: input.runId ?? null,
-    status: input.runStatus,
-    currentStep: input.currentStep,
-    availableActions,
-    pendingApproval: input.runStatus === "waiting_approval",
-    lastRecoverablePrompt: input.lastRecoverablePrompt,
-    activeProviderId: input.activeProviderId,
-    activeModelId: input.activeModelId,
+    runId: snapshot.runId ?? input.runId ?? null,
+    status: snapshot.phase,
+    currentStep: snapshot.currentStep,
+    availableActions: snapshot.availableActions,
+    pendingApproval: snapshot.phase === "interrupted" && snapshot.reason === "plan_approval",
+    activeProviderId: snapshot.activeProviderId ?? input.activeProviderId,
+    activeModelId: snapshot.activeModelId ?? input.activeModelId,
   };
 }

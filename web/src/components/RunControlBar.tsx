@@ -10,11 +10,24 @@ type RunControlBarProps = {
 };
 
 function actionLabel(action: RunControlAction): string {
-  if (action === "stop") return "Stop";
-  if (action === "resume") return "Resume";
-  if (action === "edit_plan") return "Edit plan";
-  return "Retry";
+  switch (action) {
+    case "request_stop": return "Stop";
+    case "approve_plan": return "Approve plan";
+    case "edit_plan": return "Edit plan";
+    case "retry_last": return "Retry";
+    default: {
+      const _exhaustive: never = action;
+      return _exhaustive;
+    }
+  }
 }
+
+const variantMap: Record<RunControlAction, "destructive" | "outline" | "default"> = {
+  request_stop: "destructive",
+  approve_plan: "default",
+  edit_plan: "outline",
+  retry_last: "outline",
+};
 
 export function RunControlBar({ state, onAction }: RunControlBarProps) {
   return (
@@ -35,7 +48,7 @@ export function RunControlBar({ state, onAction }: RunControlBarProps) {
         {state.availableActions.map((action) => (
           <Button
             key={action}
-            variant={action === "stop" ? "destructive" : "outline"}
+            variant={variantMap[action]}
             size="sm"
             onClick={() => onAction(action)}
           >

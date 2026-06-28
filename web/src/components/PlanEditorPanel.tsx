@@ -1,75 +1,39 @@
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
+import type {
+  RunControlAction,
+  RunControlSnapshot,
+} from "@/lib/run-control-state";
+
+const APPROVE_ACTION: RunControlAction = "approve_plan";
+const EDIT_ACTION: RunControlAction = "edit_plan";
 
 type PlanEditorPanelProps = {
-  open: boolean;
-  currentStep: string | null;
+  snapshot: RunControlSnapshot;
   draftPlan: string;
   onDraftPlanChange: (value: string) => void;
-  onOpenChange: (open: boolean) => void;
-  onSubmit: () => void;
+  onSubmit: (action: RunControlAction) => void;
 };
 
 export function PlanEditorPanel({
-  open,
-  currentStep,
+  snapshot,
   draftPlan,
   onDraftPlanChange,
-  onOpenChange,
   onSubmit,
 }: PlanEditorPanelProps) {
-  if (!open) {
+  if (snapshot.phase !== "interrupted" || snapshot.reason !== "plan_approval") {
     return null;
   }
 
   return (
-    <section
-      data-testid="plan-editor-panel"
-      className="border-b border-border bg-card/30 px-4 py-3"
-    >
-      <div className="flex items-start justify-between gap-3">
-        <div>
-          <h3 className="text-sm font-semibold text-foreground">Edit plan</h3>
-          <p className="mt-1 text-xs text-muted-foreground">
-            {currentStep ?? "Paused run"}
-          </p>
-        </div>
-        <Button
-          type="button"
-          variant="ghost"
-          size="sm"
-          onClick={() => onOpenChange(false)}
-        >
-          Close
-        </Button>
+    <section data-testid="plan-editor-panel" className="border-b border-border bg-card/40 px-4 py-4">
+      <h3 className="text-sm font-semibold text-foreground">Review and edit plan</h3>
+      <p className="mt-1 text-xs text-muted-foreground">{snapshot.statusMessage}</p>
+      <Textarea value={draftPlan} onChange={(event) => onDraftPlanChange(event.target.value)} rows={10} />
+      <div className="mt-3 flex justify-end gap-2">
+        <Button type="button" variant="outline" onClick={() => onSubmit(APPROVE_ACTION)}>Approve plan</Button>
+        <Button type="button" onClick={() => onSubmit(EDIT_ACTION)}>Apply edited plan</Button>
       </div>
-      <form
-        className="mt-3 space-y-3"
-        onSubmit={(event) => {
-          event.preventDefault();
-          onSubmit();
-        }}
-      >
-        <Textarea
-          value={draftPlan}
-          onChange={(event) => onDraftPlanChange(event.target.value)}
-          rows={8}
-          placeholder="1. Review the current plan&#10;2. Adjust the next step&#10;3. Resume the run"
-        />
-        <div className="flex items-center justify-end gap-2">
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            onClick={() => onOpenChange(false)}
-          >
-            Cancel
-          </Button>
-          <Button type="submit" size="sm">
-            Apply plan
-          </Button>
-        </div>
-      </form>
     </section>
   );
 }

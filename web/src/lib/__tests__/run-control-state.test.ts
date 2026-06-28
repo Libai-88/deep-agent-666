@@ -3,35 +3,64 @@ import { describe, expect, it } from "vitest";
 import { resolveRunControlState } from "../run-control-state";
 
 describe("run-control-state", () => {
-  it("exposes stop while a run is active", () => {
+  it("returns idle status when snapshot is null", () => {
     const state = resolveRunControlState({
       threadId: "thread-1",
-      runStatus: "running",
-      currentStep: "Writing code",
+      runtimeControl: null,
       activeProviderId: "lab-gateway",
       activeModelId: "lab-gpt5",
-      recoverableError: null,
-      lastRecoverablePrompt: "fix the bug",
     });
 
-    expect(state.availableActions).toContain("stop");
-    expect(state.status).toBe("running");
+    expect(state.status).toBe("idle");
+    expect(state.availableActions).toEqual([]);
+    expect(state.pendingApproval).toBe(false);
   });
 
-  it("exposes resume and edit_plan when paused for approval", () => {
+  it("returns pending approval and correct actions for interrupted plan_approval", () => {
     const state = resolveRunControlState({
       threadId: "thread-1",
-      runStatus: "waiting_approval",
-      currentStep: "Planner review",
-      activeProviderId: "openai",
-      activeModelId: "openai-default",
-      recoverableError: null,
-      lastRecoverablePrompt: "review the plan",
+      runtimeControl: {
+        phase: "interrupted",
+        reason: "plan_approval",
+        currentStep: "Reviewing plan",
+        statusMessage: "Approval needed",
+        availableActions: ["approve_plan", "edit_plan"],
+        interruptPayload: null,
+        threadId: "thread-1",
+        runId: "run-1",
+        activeProviderId: "lab-gateway",
+        activeModelId: "lab-gpt5",
+      },
+      activeProviderId: null,
+      activeModelId: null,
     });
 
-    expect(state.availableActions).toEqual(
-      expect.arrayContaining(["resume", "edit_plan"]),
-    );
     expect(state.pendingApproval).toBe(true);
+    expect(state.availableActions).toEqual(["approve_plan", "edit_plan"]);
+    expect(state.status).toBe("interrupted");
+  });
+
+  it("returns running status and stop action when snapshot indicates running", () => {
+    const state = resolveRunControlState({
+      threadId: "thread-1",
+      runtimeControl: {
+        phase: "running",
+        reason: "none",
+        currentStep: "Writing code",
+        statusMessage: "Running",
+        availableActions: ["request_stop"],
+        interruptPayload: null,
+        threadId: "thread-1",
+        runId: "run-1",
+        activeProviderId: "lab-gateway",
+        activeModelId: "lab-gpt5",
+      },
+      activeProviderId: null,
+      activeModelId: null,
+    });
+
+    expect(state.status).toBe("running");
+    expect(state.availableActions).toContain("request_stop");
+    expect(state.pendingApproval).toBe(false);
   });
 });
