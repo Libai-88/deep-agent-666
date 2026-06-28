@@ -51,6 +51,22 @@ describe("preset catalog", () => {
     });
   });
 
+  it("accepts snake_case default_preset_id from raw backend payload", () => {
+    const catalog = normalizePresetCatalog({
+      default_preset_id: "lab-gateway-balanced",
+      presets: [
+        {
+          id: "lab-gateway-balanced",
+          label: "Lab Gateway / Balanced",
+          permission_mode: "balanced",
+          provider_id: "lab-gateway",
+        },
+      ],
+    });
+
+    expect(catalog.defaultPresetId).toBe("lab-gateway-balanced");
+  });
+
   it("keeps custom provider presets from the backend registry", () => {
     expect(
       normalizePresetCatalog({

@@ -82,6 +82,16 @@ export function countConfiguredProviders(settings: RuntimeSettings): number {
   ).length;
 }
 
+export function countConfiguredProviderPaths(settings: RuntimeSettings): number {
+  const builtinCount = Object.values(settings.providers).filter(
+    (provider) => provider.configured,
+  ).length;
+  const registryCount = settings.providerProfiles.filter(
+    (profile) => profile.enabled && profile.apiKeyPresent,
+  ).length;
+  return builtinCount + registryCount;
+}
+
 export function resolveRuntimeDiagnosticsStatus(
   input: Omit<RuntimeDiagnosticsInput, "runtimeSettings" | "checkedAt"> & {
     configuredProviderCount: number;
@@ -105,7 +115,7 @@ export function resolveRuntimeDiagnosticsStatus(
 export function buildRuntimeDiagnostics(
   input: RuntimeDiagnosticsInput,
 ): RuntimeDiagnostics {
-  const configuredProviderCount = countConfiguredProviders(input.runtimeSettings);
+  const configuredProviderCount = countConfiguredProviderPaths(input.runtimeSettings);
   const registryProviders = input.runtimeSettings.providerProfiles.map((profile) => {
     const linkedModels = input.runtimeSettings.modelProfiles.filter(
       (model) => model.providerId === profile.id,

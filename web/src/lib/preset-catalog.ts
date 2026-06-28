@@ -104,7 +104,12 @@ export function normalizePresetCatalog(payload: unknown): AgentPresetCatalog {
     return result;
   }, []);
 
-  const rawDefaultPresetId = candidate.defaultPresetId;
+  const rawDefaultPresetId =
+    typeof candidate.defaultPresetId === "string"
+      ? candidate.defaultPresetId
+      : typeof candidate.default_preset_id === "string"
+        ? candidate.default_preset_id
+        : null;
   const defaultPresetId =
     typeof rawDefaultPresetId === "string" &&
     presets.some((preset) => preset.id === rawDefaultPresetId)

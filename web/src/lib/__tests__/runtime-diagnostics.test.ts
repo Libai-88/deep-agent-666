@@ -29,6 +29,70 @@ describe("runtime diagnostics", () => {
     ).toBe("setup-required");
   });
 
+  it("counts custom-provider-only settings as configured provider paths", () => {
+    const diagnostics = buildRuntimeDiagnostics({
+      backendReachable: true,
+      catalogSource: "live",
+      launchablePresetCount: 1,
+      runtimeSettings: {
+        workspaceRoot: "/tmp/workspace",
+        providers: {
+          openai: { configured: false, baseUrl: null },
+          anthropic: { configured: false, baseUrl: null },
+          google: { configured: false, baseUrl: null },
+        },
+        providerProfiles: [
+          {
+            id: "lab-gateway",
+            label: "Lab Gateway",
+            protocol: "openai-compatible",
+            authScheme: "bearer_token",
+            baseUrl: "https://gateway.example.com/v1",
+            headers: {},
+            enabled: true,
+            apiKeyPresent: true,
+          },
+        ],
+        modelProfiles: [],
+      },
+    });
+
+    expect(diagnostics.configuredProviderCount).toBe(1);
+    expect(diagnostics.status).toBe("healthy");
+  });
+
+  it("counts mixed builtin and custom providers as configured provider paths", () => {
+    const diagnostics = buildRuntimeDiagnostics({
+      backendReachable: true,
+      catalogSource: "live",
+      launchablePresetCount: 2,
+      runtimeSettings: {
+        workspaceRoot: "/tmp/workspace",
+        providers: {
+          openai: { configured: true, baseUrl: "https://api.openai.com/v1" },
+          anthropic: { configured: false, baseUrl: null },
+          google: { configured: false, baseUrl: null },
+        },
+        providerProfiles: [
+          {
+            id: "lab-gateway",
+            label: "Lab Gateway",
+            protocol: "openai-compatible",
+            authScheme: "bearer_token",
+            baseUrl: "https://gateway.example.com/v1",
+            headers: {},
+            enabled: true,
+            apiKeyPresent: true,
+          },
+        ],
+        modelProfiles: [],
+      },
+    });
+
+    expect(diagnostics.configuredProviderCount).toBe(2);
+    expect(diagnostics.status).toBe("healthy");
+  });
+
   it("classifies fallback-only catalog state as degraded", () => {
     expect(
       buildRuntimeDiagnostics({
