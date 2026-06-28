@@ -11,14 +11,19 @@ afterEach(() => {
 });
 
 describe("runtime-control route", () => {
-  it("proxies stop actions to the backend control endpoint", async () => {
+  it("proxies canonical run control actions to the backend and returns runtime_control", async () => {
     fetchMock.mockResolvedValue(
       new Response(
         JSON.stringify({
           status: "ok",
           threadId: "thread-1",
-          action: "stop",
-          runStatus: "stopped",
+          action: "request_stop",
+          runtime_control: {
+            phase: "cancellation_requested",
+            reason: "user_stop",
+            available_actions: [],
+            status_message: "Cancellation requested",
+          },
         }),
         {
           status: 200,
@@ -36,7 +41,7 @@ describe("runtime-control route", () => {
         headers: { "content-type": "application/json" },
         body: JSON.stringify({
           thread_id: "thread-1",
-          action: "stop",
+          action: "request_stop",
         }),
       }),
     );
@@ -48,15 +53,14 @@ describe("runtime-control route", () => {
         headers: { "content-type": "application/json" },
         body: JSON.stringify({
           thread_id: "thread-1",
-          action: "stop",
+          action: "request_stop",
         }),
       }),
     );
-    expect(await response.json()).toEqual({
-      status: "ok",
-      threadId: "thread-1",
-      action: "stop",
-      runStatus: "stopped",
+    const data = await response.json();
+    expect(response.status).toBe(200);
+    expect(data).toMatchObject({
+      runtime_control: { phase: "cancellation_requested" },
     });
   });
 });

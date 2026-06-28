@@ -1,3 +1,4 @@
+import type { RunControlAction, RunControlSnapshot } from "@/lib/run-control-state";
 import type { WorkbenchEvent } from "./runtime-events";
 
 export type WorkbenchTaskKind = "engineering" | "research" | "general";
@@ -124,4 +125,19 @@ export function resetWorkbenchStateForTaskKind(
     ...createEmptyWorkbenchState(),
     taskKind,
   };
+}
+
+export async function postRuntimeControlCommand(payload: {
+  thread_id: string;
+  action: RunControlAction;
+  plan_patch?: string;
+}): Promise<RunControlSnapshot | null> {
+  const response = await fetch("/api/runtime-control", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+  if (!response.ok) return null;
+  const data = (await response.json()) as Record<string, unknown>;
+  return (data.runtime_control ?? null) as RunControlSnapshot | null;
 }

@@ -43,6 +43,7 @@ import {
   createEmptyWorkbenchState,
   appendWorkbenchArtifacts,
   loadWorkbenchState,
+  postRuntimeControlCommand,
   removeWorkbenchState,
   replaceWorkbenchArtifacts,
   replaceWorkbenchTodos,
@@ -128,6 +129,7 @@ import {
 import {
   resolveRunControlState,
   type RunControlAction,
+  type RunControlSnapshot,
 } from "@/lib/run-control-state";
 import {
   countConfiguredProviders,
@@ -144,12 +146,6 @@ export default function HomePage() {
 }
 
 type RuntimeAvailability = "ready" | "empty" | "unreachable";
-type CoordinatorControlSnapshot = {
-  status: "idle" | "running" | "waiting_approval" | "stopped" | "failed" | "completed";
-  currentStep: string | null;
-  availableActions: RunControlAction[];
-  pendingApproval: boolean;
-};
 
 async function fetchRuntimeAvailability(): Promise<RuntimeAvailability> {
   try {
@@ -194,45 +190,6 @@ async function fetchRuntimeDiagnostics(): Promise<RuntimeDiagnostics> {
   }
 
   return normalizeRuntimeDiagnostics((await response.json()) as unknown);
-}
-
-function normalizeCoordinatorControlState(
-  input: unknown,
-): CoordinatorControlSnapshot | null {
-  if (!input || typeof input !== "object") {
-    return null;
-  }
-
-  const record = input as Record<string, unknown>;
-  const status = record.status;
-  if (
-    status !== "idle" &&
-    status !== "running" &&
-    status !== "waiting_approval" &&
-    status !== "stopped" &&
-    status !== "failed" &&
-    status !== "completed"
-  ) {
-    return null;
-  }
-
-  const availableActions = Array.isArray(record.available_actions)
-    ? record.available_actions.filter(
-        (action): action is RunControlAction =>
-          action === "stop" ||
-          action === "retry" ||
-          action === "resume" ||
-          action === "edit_plan",
-      )
-    : [];
-
-  return {
-    status,
-    currentStep:
-      typeof record.current_step === "string" ? record.current_step : null,
-    availableActions,
-    pendingApproval: Boolean(record.pending_approval),
-  };
 }
 
 function HomePageContent() {
@@ -287,8 +244,8 @@ function HomePageContent() {
   );
   const [loadedWorkbenchThreadId, setLoadedWorkbenchThreadId] = useState<string | null>(null);
   const [hasLiveThreadActivity, setHasLiveThreadActivity] = useState(false);
-  const [coordinatorControlState, setCoordinatorControlState] =
-    useState<CoordinatorControlSnapshot | null>(null);
+  const [runtimeControl, setRuntimeControl] =
+    useState<RunControlSnapshot | null>(null);
 
   // Persist threads to localStorage on change
   useEffect(() => {
@@ -409,7 +366,7 @@ function HomePageContent() {
       setLoadedWorkbenchThreadId(null);
       setWorkbenchState(createEmptyWorkbenchState());
       setHasLiveThreadActivity(false);
-      setCoordinatorControlState(null);
+      setRuntimeControl(null);
       setPlanEditorOpen(false);
       setPlanEditorDraft("");
       return;
@@ -418,7 +375,7 @@ function HomePageContent() {
     setWorkbenchState(loadWorkbenchState(activeThread.id));
     setLoadedWorkbenchThreadId(activeThread.id);
     setHasLiveThreadActivity(false);
-    setCoordinatorControlState(null);
+    setRuntimeControl(null);
     setPlanEditorOpen(false);
     setPlanEditorDraft("");
   }, [activeThread]);
@@ -468,40 +425,14 @@ function HomePageContent() {
     () =>
       resolveRunControlState({
         threadId: activeThread?.id ?? null,
-        runStatus:
-          coordinatorControlState?.status ??
-          (runtimeAvailability === "ready" &&
-          !effectiveRecoverableError &&
-          pendingThreadRun &&
-          activeThread &&
-          pendingThreadRun.threadId === activeThread.id
-            ? "running"
-            : effectiveRecoverableError === "thread_history_unavailable"
-              ? "waiting_approval"
-              : effectiveRecoverableError
-                ? "failed"
-                : "idle"),
-        currentStep:
-          coordinatorControlState?.currentStep ??
-          (pendingThreadRun && activeThread && pendingThreadRun.threadId === activeThread.id
-            ? "Running agent task"
-            : effectiveRecoverableError === "thread_history_unavailable"
-              ? "Thread recovery"
-              : workbenchState.events.at(-1)?.title ?? null),
+        runtimeControl,
         activeProviderId: currentPreset?.provider ?? null,
         activeModelId: currentPreset?.label ?? null,
-        recoverableError: effectiveRecoverableError,
-        lastRecoverablePrompt: workbenchState.lastUserPrompt,
       }),
     [
       activeThread,
-      coordinatorControlState,
+      runtimeControl,
       currentPreset,
-      effectiveRecoverableError,
-      pendingThreadRun,
-      runtimeAvailability,
-      workbenchState.events,
-      workbenchState.lastUserPrompt,
     ],
   );
 
@@ -706,7 +637,7 @@ function HomePageContent() {
 
   const handleRunControlAction = useCallback(
     async (action: RunControlAction) => {
-      if (action === "retry") {
+      if (action === "retry_last") {
         handleRecoveryAction("retry_last_task");
         return;
       }
@@ -724,58 +655,40 @@ function HomePageContent() {
       }
 
       try {
-        await fetch("/api/runtime-control", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            thread_id: activeThread.id,
-            action,
-          }),
+        const result = await postRuntimeControlCommand({
+          thread_id: activeThread.id,
+          action,
         });
+        if (result) {
+          setRuntimeControl(result);
+        }
       } catch {
         setRecoverableError("backend_unreachable");
-        return;
-      }
-
-      if (action === "stop") {
-        setPendingThreadRun(null);
-        setRecoverableError("runtime_request_failed");
       }
     },
     [activeThread, handleRecoveryAction, workbenchState.events, workbenchState.todos],
   );
 
-  const handlePlanEditorSubmit = useCallback(async () => {
-    if (!activeThread) {
-      return;
-    }
-
-    try {
-      const response = await fetch("/api/runtime-control", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
+  const handlePlanEditorSubmit = useCallback(
+    async (action: RunControlAction) => {
+      if (!activeThread) return;
+      try {
+        const result = await postRuntimeControlCommand({
           thread_id: activeThread.id,
-          action: "edit_plan",
-          plan_patch: planEditorDraft,
-        }),
-      });
-
-      if (!response.ok) {
-        setRecoverableError("runtime_request_failed");
-        return;
+          action,
+          plan_patch: action === "edit_plan" ? planEditorDraft : undefined,
+        });
+        if (result) {
+          setRuntimeControl(result);
+        } else {
+          setRecoverableError("runtime_request_failed");
+        }
+      } catch {
+        setRecoverableError("backend_unreachable");
       }
-
-      setPlanEditorOpen(false);
-      setRecoverableError(null);
-    } catch {
-      setRecoverableError("backend_unreachable");
-    }
-  }, [activeThread, planEditorDraft]);
+    },
+    [activeThread, planEditorDraft],
+  );
 
   const settingsPreset =
     currentPreset ??
@@ -961,12 +874,10 @@ function HomePageContent() {
                 />
               </div>
               <PlanEditorPanel
-                open={planEditorOpen}
-                currentStep={runControlState.currentStep}
+                snapshot={runtimeControl as unknown as RunControlSnapshot}
                 draftPlan={planEditorDraft}
                 onDraftPlanChange={setPlanEditorDraft}
-                onOpenChange={setPlanEditorOpen}
-                onSubmit={() => void handlePlanEditorSubmit()}
+                onSubmit={(action) => void handlePlanEditorSubmit(action)}
               />
               {/* Model / Permission bar */}
               <div className="flex items-center gap-2 border-b border-border px-4 py-2">
@@ -999,7 +910,6 @@ function HomePageContent() {
                   >
                     <WorkbenchRuntimeHooks
                       activeAgentId={activeAgentId}
-                      setCoordinatorControlState={setCoordinatorControlState}
                       setHasLiveThreadActivity={setHasLiveThreadActivity}
                       setWorkbenchState={setWorkbenchState}
                     />
@@ -1025,7 +935,7 @@ function HomePageContent() {
                     <ActiveThreadChat
                       activeAgentId={activeAgentId}
                       activeThread={activeThread}
-                      setCoordinatorControlState={setCoordinatorControlState}
+                      setRuntimeControl={setRuntimeControl}
                       currentPreset={currentPreset}
                       setHasLiveThreadActivity={setHasLiveThreadActivity}
                       threadId={threadId}
@@ -1204,14 +1114,10 @@ function PendingThreadRunController({
 
 function WorkbenchRuntimeHooks({
   activeAgentId,
-  setCoordinatorControlState,
   setHasLiveThreadActivity,
   setWorkbenchState,
 }: {
   activeAgentId: string;
-  setCoordinatorControlState: React.Dispatch<
-    React.SetStateAction<CoordinatorControlSnapshot | null>
-  >;
   setHasLiveThreadActivity: React.Dispatch<React.SetStateAction<boolean>>;
   setWorkbenchState: React.Dispatch<React.SetStateAction<ThreadWorkbenchState>>;
 }) {
@@ -1518,7 +1424,7 @@ function ThreadHistoryGapMonitor({
 function ActiveThreadChat({
   activeAgentId,
   activeThread,
-  setCoordinatorControlState,
+  setRuntimeControl,
   currentPreset,
   setHasLiveThreadActivity,
   threadId,
@@ -1529,8 +1435,8 @@ function ActiveThreadChat({
 }: {
   activeAgentId: string;
   activeThread: LocalThread;
-  setCoordinatorControlState: React.Dispatch<
-    React.SetStateAction<CoordinatorControlSnapshot | null>
+  setRuntimeControl: React.Dispatch<
+    React.SetStateAction<RunControlSnapshot | null>
   >;
   currentPreset: AgentPresetDefinition;
   setHasLiveThreadActivity: React.Dispatch<React.SetStateAction<boolean>>;
@@ -1561,6 +1467,18 @@ function ActiveThreadChat({
     value: workspaceContext,
   });
 
+  const rawRuntimeControl = (() => {
+    if (!agent?.state || typeof agent.state !== "object") return null;
+    const state = agent.state as Record<string, unknown>;
+    return (state.runtime_control ?? null) as RunControlSnapshot | null;
+  })();
+
+  useEffect(() => {
+    if (rawRuntimeControl) {
+      setRuntimeControl(rawRuntimeControl);
+    }
+  }, [rawRuntimeControl, setRuntimeControl]);
+
   const coordinatorWorkbenchSnapshot = (() => {
     if (!agent?.state || typeof agent.state !== "object") {
       return null;
@@ -1577,7 +1495,6 @@ function ActiveThreadChat({
       workbench_events?: unknown;
       task_kind?: "engineering" | "research" | "general";
       final_summary?: string;
-      control_state?: unknown;
     };
 
     const delegations = Array.isArray(state.delegations) ? state.delegations : [];
@@ -1586,14 +1503,12 @@ function ActiveThreadChat({
       typeof state.final_summary === "string" && state.final_summary.trim()
         ? state.final_summary
         : null;
-    const controlState = normalizeCoordinatorControlState(state.control_state);
 
     return {
       delegations,
       events,
       taskKind: state.task_kind,
       finalSummary,
-      controlState,
     };
   })();
 
@@ -1675,19 +1590,14 @@ function ActiveThreadChat({
   }, [latestCoordinatorAssistantText, setWorkbenchState]);
 
   useEffect(() => {
-    if (!coordinatorWorkbenchSnapshot) {
-      setCoordinatorControlState(null);
-      return;
-    }
+    if (!coordinatorWorkbenchSnapshot) return;
 
     const {
       delegations,
       events,
       taskKind,
       finalSummary,
-      controlState,
     } = coordinatorWorkbenchSnapshot;
-    setCoordinatorControlState(controlState ?? null);
 
     if (delegations.length === 0 && events.length === 0 && !taskKind && !finalSummary) {
       return;
@@ -1727,7 +1637,7 @@ function ActiveThreadChat({
         updatedAt: Date.now(),
       };
     });
-  }, [coordinatorWorkbenchSignature, setCoordinatorControlState, setWorkbenchState]);
+  }, [coordinatorWorkbenchSignature, setWorkbenchState]);
 
   return (
     <>
