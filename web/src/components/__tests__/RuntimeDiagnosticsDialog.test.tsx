@@ -95,7 +95,7 @@ describe("RuntimeDiagnosticsDialog", () => {
     expect(html).toContain('data-testid="settings-section-status"');
     expect(html).toContain('data-testid="settings-section-environment"');
     expect(html).toContain('data-testid="settings-section-providers"');
-    expect(html).toContain('data-testid="settings-section-diagnostics"');
+    expect(html).toContain('data-testid="settings-section-models-presets"');
   });
 
   it("renders a clickable status badge label", () => {

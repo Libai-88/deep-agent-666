@@ -101,14 +101,6 @@ def _current_registry() -> RuntimeAgentRegistry:
     return runtime_registry
 
 
-def build_runtime_control_snapshot(
-    snapshot: RuntimeControlSnapshot,
-) -> RuntimeControlSnapshot:
-    """返回当前运行时控制快照。"""
-
-    return snapshot
-
-
 def stamp_runtime_control(snapshot: RuntimeControlSnapshot) -> RuntimeControlSnapshot:
     """刷新运行时控制快照时间戳。"""
 
@@ -137,7 +129,7 @@ def record_thread_runtime_snapshot(
 ) -> None:
     THREAD_RUNTIME[thread_id] = {
         "thread_id": thread_id,
-        "runtime_control": stamp_runtime_control(build_runtime_control_snapshot(snapshot)),
+        "runtime_control": stamp_runtime_control(snapshot),
         "pending_command": None,
     }
 
@@ -593,7 +585,7 @@ async def run_control(body: RunControlRequest) -> JSONResponse:
             status_code=409,
         )
 
-    result_snapshot = build_runtime_control_snapshot(next_snapshot)
+    result_snapshot = stamp_runtime_control(next_snapshot)
     return JSONResponse(
         {
             "status": "ok",

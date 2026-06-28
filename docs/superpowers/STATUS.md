@@ -1,6 +1,6 @@
 # Deep Agent 666 — 当前状态
 
-> 最后更新：2026-06-28 (V1 完成，V2 release hardening 完成，V3 首用引导完成，V4 本地持久化线程运行时完成，V5 live provider activation 完成，V6 first response roundtrip 完成，V7 provider alignment/runtime recovery 完成，V8 runtime failure normalization 完成，V9 retry replay recovery 完成，V10 thread history gap recovery 完成，V11 thread history drift recovery 完成，V12 runtime persistence proof 完成，V13 runtime catalog fallback 完成，V14 coordinator workbench regression 完成，V15 runtime-config workspace root 完成，V16 coordinator restored-thread continuity 完成，V17 thread management 完成，V18 runtime diagnostics 完成，V19 runtime bootstrap reconnect 完成，V20 active-thread recovery shell 完成，V21 contextual recovery actions 完成，V22 coordinator recovery replay 完成，V23 true process restart persistence 完成，V24 coordinator true process restart 完成，V25 coordinator browser restart continuity 完成，V26 coordinator restart history-gap replay 完成，V27 A2UI diff preview activation 完成，Phase A unified runtime protocol 完成，V28 control plane/custom provider foundation 完成，V29 custom provider GA 完成)
+> 最后更新：2026-06-29 (V1 完成，V2 release hardening 完成，V3 首用引导完成，V4 本地持久化线程运行时完成，V5 live provider activation 完成，V6 first response roundtrip 完成，V7 provider alignment/runtime recovery 完成，V8 runtime failure normalization 完成，V9 retry replay recovery 完成，V10 thread history gap recovery 完成，V11 thread history drift recovery 完成，V12 runtime persistence proof 完成，V13 runtime catalog fallback 完成，V14 coordinator workbench regression 完成，V15 runtime-config workspace root 完成，V16 coordinator restored-thread continuity 完成，V17 thread management 完成，V18 runtime diagnostics 完成，V19 runtime bootstrap reconnect 完成，V20 active-thread recovery shell 完成，V21 contextual recovery actions 完成，V22 coordinator recovery replay 完成，V23 true process restart persistence 完成，V24 coordinator true process restart 完成，V25 coordinator browser restart continuity 完成，V26 coordinator restart history-gap replay 完成，V27 A2UI diff preview activation 完成，Phase A unified runtime protocol 完成，V28 control plane/custom provider foundation 完成，V29 custom provider GA 完成，Control Plane and Workbench Repair 完成)
 
 ## 当前结论
 
@@ -193,6 +193,18 @@
 | `6788bd5` | `feat(v4): add durable local thread runtime` |
 | `c1217ee` | `feat(v5): activate providers live without restart` |
 | `03171bc` | `feat(v6): prove first-run response roundtrip` |
+
+### Control Plane and Workbench Repair (2026-06-29)
+
+Replaced synthetic `/control` status mapping with snapshot-backed runtime control commands.
+- Added `RuntimeControlSnapshot`, `RuntimeControlPhase`, `RuntimeControlAction` types
+- Wired real `queue_thread_control_command` / `consume_thread_control_command` path
+- Moved plan approval/edit-plan UI onto real interrupted runtime state
+- Reworked workbench layout into left rail / main narrative / context rail
+- Corrected diagnostics for custom-provider-only configurations
+- Added `"cancelling"` phase to both Python and TypeScript runtime control types
+- Removed identity `build_runtime_control_snapshot` function
+- Fixed diagnostics `data-testid` for models-presets section
 
 ## 下一步
 

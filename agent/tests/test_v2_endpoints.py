@@ -5,6 +5,9 @@ import importlib
 import json
 import sys
 
+from ag_ui.core.events import RunStartedEvent
+from fastapi.testclient import TestClient
+
 from app.presets import ALL_PRESETS
 from app.state import build_default_runtime_control_snapshot
 
@@ -101,6 +104,7 @@ def test_run_control_endpoint_accepts_request_stop_action(monkeypatch, tmp_path)
 
     main_module = _reload_main(monkeypatch, tmp_path)
     snapshot = build_default_runtime_control_snapshot()
+    snapshot["phase"] = "running"
     snapshot["available_actions"] = ["request_stop"]
     snapshot["status_message"] = "Running"
     main_module.record_thread_runtime_snapshot("thread-1", snapshot)
@@ -116,12 +120,34 @@ def test_run_control_endpoint_accepts_request_stop_action(monkeypatch, tmp_path)
 
     assert response.status_code == 200
     payload = json.loads(response.body)
-    assert payload == {
-        "status": "ok",
-        "threadId": "thread-1",
-        "action": "request_stop",
-        "runtimeControl": snapshot,
-    }
+    assert payload["status"] == "ok"
+    assert payload["threadId"] == "thread-1"
+    assert payload["action"] == "request_stop"
+    rc = payload["runtime_control"]
+    assert rc["phase"] == "cancellation_requested"
+    assert rc["available_actions"] == []
+    assert rc["status_message"] == "Cancellation requested"
+    rc2 = payload["runtimeControl"]
+    assert rc2["phase"] == "cancellation_requested"
+
+
+def test_run_control_request_rejects_legacy_stop_action(monkeypatch, tmp_path) -> None:
+    monkeypatch.setenv("OPENAI_API_KEY", "test-key")
+
+    main_module = _reload_main(monkeypatch, tmp_path)
+
+    try:
+        main_module.RunControlRequest.model_validate(
+            {
+                "thread_id": "thread-legacy",
+                "action": "stop",
+            }
+        )
+    except Exception as exc:
+        assert "request_stop" in str(exc)
+        assert "stop" in str(exc)
+    else:
+        raise AssertionError("legacy stop action should be rejected")
 
 
 def test_run_control_rejects_unknown_thread_without_runtime_snapshot(monkeypatch, tmp_path) -> None:
@@ -141,3 +167,50 @@ def test_run_control_rejects_unknown_thread_without_runtime_snapshot(monkeypatch
     payload = json.loads(response.body)
     assert payload["status"] == "error"
     assert payload["code"] == "thread_runtime_not_found"
+
+
+class _SuccessfulAgent:
+    name = "openai-balanced"
+
+    def clone(self):
+        return _SuccessfulAgent()
+
+    async def run(self, input_data):
+        yield RunStartedEvent(
+            thread_id=input_data.thread_id,
+            run_id=input_data.run_id,
+        )
+
+
+def test_direct_agui_route_records_runtime_snapshot_for_real_thread(
+    monkeypatch,
+    tmp_path,
+) -> None:
+    main_module = _reload_main(monkeypatch, tmp_path)
+    monkeypatch.setattr(
+        main_module,
+        "_resolve_route_agent",
+        lambda _name: _SuccessfulAgent(),
+    )
+    client = TestClient(main_module.app)
+
+    response = client.post(
+        "/openai-balanced",
+        json={
+            "threadId": "thread-real-run",
+            "runId": "run-real-run",
+            "messages": [{"id": "m1", "role": "user", "content": "hello"}],
+            "state": {},
+            "tools": [],
+            "context": [],
+            "forwardedProps": {},
+        },
+        headers={"accept": "text/event-stream"},
+    )
+
+    assert response.status_code == 200
+    snapshot = main_module.get_thread_runtime_snapshot("thread-real-run")
+    assert snapshot is not None
+    assert snapshot["phase"] == "completed"
+    assert snapshot["status_message"] == "Completed"
+    assert snapshot["available_actions"] == []

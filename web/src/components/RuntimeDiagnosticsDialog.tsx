@@ -76,7 +76,7 @@ export function RuntimeDiagnosticsPanel({
       data-testid="runtime-diagnostics-dialog"
       className="space-y-4 text-sm"
     >
-      <div className="flex flex-wrap items-center gap-2">
+      <div data-testid="settings-section-status" className="flex flex-wrap items-center gap-2">
         <span
           className={`inline-flex items-center rounded-full border px-2.5 py-1 text-xs font-medium ${STATUS_BADGE_CLASSNAMES[diagnostics.status]}`}
         >
@@ -87,7 +87,7 @@ export function RuntimeDiagnosticsPanel({
         </span>
       </div>
 
-      <dl className="grid gap-3 sm:grid-cols-2">
+      <dl data-testid="settings-section-environment" className="grid gap-3 sm:grid-cols-2">
         <div>
           <dt className="text-xs uppercase tracking-wide text-muted-foreground">
             Backend
@@ -122,7 +122,7 @@ export function RuntimeDiagnosticsPanel({
         </div>
       </dl>
 
-      <div className="space-y-2">
+      <div data-testid="settings-section-providers" className="space-y-2">
         <p className="text-xs uppercase tracking-wide text-muted-foreground">
           Providers
         </p>
@@ -145,7 +145,7 @@ export function RuntimeDiagnosticsPanel({
       </div>
 
       {diagnostics.registryProviders.length > 0 ? (
-        <div className="space-y-2">
+        <div data-testid="settings-section-models-presets" className="space-y-2">
           <p className="text-xs uppercase tracking-wide text-muted-foreground">
             Registry Providers
           </p>

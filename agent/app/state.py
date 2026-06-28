@@ -62,6 +62,7 @@ RuntimeControlPhase = Literal[
     "failed",
     "cancellation_requested",
     "cancelled",
+    "cancelling",
 ]
 
 RuntimeControlAction = Literal[

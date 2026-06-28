@@ -46,3 +46,9 @@ docker compose config
 - V2 keeps the same one-web + one-agent topology as V1.
 - Coordinator remains the main path for balanced/full-access threads.
 - A2A research is now opt-in via `ENABLE_A2A_RESEARCH=true` so it does not destabilize the default beginner experience.
+
+## Post-V2 Hardening Changes
+
+- Added `"cancelling"` phase to `RuntimeControlPhase` (Python) and `RunControlStatus` (TypeScript) — `consume_thread_control_command` sets `phase="cancelling"` on `request_stop`.
+- Removed identity-function `build_runtime_control_snapshot` — replaced with direct `stamp_runtime_control()` calls at both call sites in `agent/app/main.py`.
+- Fixed `data-testid` for Registry Providers section in diagnostics dialog: renamed from `settings-section-diagnostics` to `settings-section-models-presets`.

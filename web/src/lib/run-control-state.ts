@@ -8,7 +8,8 @@ export type RunControlStatus =
   | "completed"
   | "failed"
   | "cancellation_requested"
-  | "cancelled";
+  | "cancelled"
+  | "cancelling";
 
 export type RunControlSnapshot = {
   phase: RunControlStatus;
