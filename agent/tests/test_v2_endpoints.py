@@ -6,6 +6,7 @@ import json
 import sys
 
 from app.presets import ALL_PRESETS
+from app.state import build_default_runtime_control_snapshot
 
 
 def _reload_main(monkeypatch, tmp_path):
@@ -99,6 +100,10 @@ def test_run_control_endpoint_accepts_stop_action(monkeypatch, tmp_path) -> None
     monkeypatch.setenv("OPENAI_API_KEY", "test-key")
 
     main_module = _reload_main(monkeypatch, tmp_path)
+    main_module.record_thread_runtime_snapshot(
+        "thread-1",
+        build_default_runtime_control_snapshot(),
+    )
 
     response = asyncio.run(
         main_module.run_control(
@@ -117,3 +122,22 @@ def test_run_control_endpoint_accepts_stop_action(monkeypatch, tmp_path) -> None
         "action": "stop",
         "runStatus": "stopped",
     }
+
+
+def test_run_control_rejects_unknown_thread_without_runtime_snapshot(monkeypatch, tmp_path) -> None:
+    monkeypatch.setenv("OPENAI_API_KEY", "test-key")
+    main_module = _reload_main(monkeypatch, tmp_path)
+
+    response = asyncio.run(
+        main_module.run_control(
+            main_module.RunControlRequest(
+                thread_id="missing-thread",
+                action="request_stop",
+            )
+        )
+    )
+
+    assert response.status_code == 404
+    payload = json.loads(response.body)
+    assert payload["status"] == "error"
+    assert payload["code"] == "thread_runtime_not_found"

@@ -1,6 +1,7 @@
 """Agent state schemas for V1 and V2 agents."""
 
 import typing
+from datetime import datetime, timezone
 from operator import add
 from typing import Annotated, Literal
 
@@ -50,6 +51,57 @@ class CoordinatorControlState(typing.TypedDict, total=False):
     current_step: str
     available_actions: list[Literal["stop", "retry", "resume", "edit_plan"]]
     pending_approval: bool
+
+
+RuntimeControlPhase = Literal[
+    "idle",
+    "running",
+    "interrupted",
+    "resuming",
+    "completed",
+    "failed",
+    "cancellation_requested",
+    "cancelled",
+]
+
+RuntimeControlAction = Literal[
+    "approve_plan",
+    "edit_plan",
+    "retry_last",
+    "request_stop",
+]
+
+
+class RuntimeControlSnapshot(typing.TypedDict):
+    """运行时控制快照，供后续 control plane 扩展复用。"""
+
+    phase: RuntimeControlPhase
+    reason: Literal["none", "plan_approval", "tool_approval", "user_stop", "error"]
+    available_actions: list[str]
+    status_message: str
+    current_step: str | None
+    interrupt_payload: dict[str, typing.Any] | None
+    checkpoint_id: str | None
+    active_delegation: str | None
+    last_error: str | None
+    updated_at: str
+
+
+def build_default_runtime_control_snapshot() -> RuntimeControlSnapshot:
+    """构建默认的 idle 运行时控制快照。"""
+
+    return {
+        "phase": "idle",
+        "reason": "none",
+        "available_actions": [],
+        "status_message": "Idle",
+        "current_step": None,
+        "interrupt_payload": None,
+        "checkpoint_id": None,
+        "active_delegation": None,
+        "last_error": None,
+        "updated_at": datetime.now(timezone.utc).isoformat(),
+    }
 
 
 class CoordinatorState(BaseAgentState):

@@ -1,5 +1,6 @@
 from pathlib import Path
 import logging
+import typing
 
 from fastapi import FastAPI, HTTPException, Query, Request
 from fastapi.responses import JSONResponse, StreamingResponse
@@ -36,6 +37,7 @@ from app.runtime_registry import (
     RuntimeAgentRegistry,
     build_runtime_registry,
 )
+from app.state import RuntimeControlSnapshot
 from app.tools.workspace import resolve_workspace_path
 
 
@@ -78,14 +80,47 @@ class ProviderProbeRequest(BaseModel):
     modelProfile: dict[str, object]
 
 
+class ThreadRuntimeEntry(typing.TypedDict):
+    """线程级运行时控制存储。"""
+
+    thread_id: str
+    runtime_control: RuntimeControlSnapshot
+    pending_command: str | None
+
+
 runtime_registry: RuntimeAgentRegistry = build_runtime_registry(
     settings,
     store.provider_registry_snapshot,
 )
+THREAD_RUNTIME: dict[str, ThreadRuntimeEntry] = {}
 
 
 def _current_registry() -> RuntimeAgentRegistry:
     return runtime_registry
+
+
+def build_runtime_control_snapshot(
+    snapshot: RuntimeControlSnapshot,
+) -> RuntimeControlSnapshot:
+    """返回当前运行时控制快照。"""
+
+    return snapshot
+
+
+def get_thread_runtime_snapshot(thread_id: str) -> RuntimeControlSnapshot | None:
+    entry = THREAD_RUNTIME.get(thread_id)
+    return None if entry is None else entry["runtime_control"]
+
+
+def record_thread_runtime_snapshot(
+    thread_id: str,
+    snapshot: RuntimeControlSnapshot,
+) -> None:
+    THREAD_RUNTIME[thread_id] = {
+        "thread_id": thread_id,
+        "runtime_control": build_runtime_control_snapshot(snapshot),
+        "pending_command": None,
+    }
 
 
 sdk = CopilotKitRemoteEndpoint(agents=LiveAgentAccessor(_current_registry))
@@ -394,6 +429,16 @@ async def provider_probe(body: ProviderProbeRequest) -> JSONResponse:
 
 @app.post("/control")
 async def run_control(body: RunControlRequest) -> JSONResponse:
+    if get_thread_runtime_snapshot(body.thread_id) is None:
+        return JSONResponse(
+            {
+                "status": "error",
+                "code": "thread_runtime_not_found",
+                "message": "runtime snapshot not found for thread",
+            },
+            status_code=404,
+        )
+
     status_map = {
         "stop": "stopped",
         "retry": "running",
