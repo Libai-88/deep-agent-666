@@ -37,6 +37,7 @@ from app.runtime_registry import (
     RuntimeAgentRegistry,
     build_runtime_registry,
 )
+from app.state import RuntimeControlAction
 from app.state import RuntimeControlSnapshot
 from app.tools.workspace import resolve_workspace_path
 
@@ -70,7 +71,7 @@ class ConfigureRequest(BaseModel):
 
 class RunControlRequest(BaseModel):
     thread_id: str
-    action: str
+    action: RuntimeControlAction
     run_id: str | None = None
     plan_patch: str | None = None
 
@@ -429,7 +430,8 @@ async def provider_probe(body: ProviderProbeRequest) -> JSONResponse:
 
 @app.post("/control")
 async def run_control(body: RunControlRequest) -> JSONResponse:
-    if get_thread_runtime_snapshot(body.thread_id) is None:
+    snapshot = get_thread_runtime_snapshot(body.thread_id)
+    if snapshot is None:
         return JSONResponse(
             {
                 "status": "error",
@@ -439,19 +441,12 @@ async def run_control(body: RunControlRequest) -> JSONResponse:
             status_code=404,
         )
 
-    status_map = {
-        "stop": "stopped",
-        "retry": "running",
-        "resume": "running",
-        "edit_plan": "waiting_approval",
-    }
-
     return JSONResponse(
         {
             "status": "ok",
             "threadId": body.thread_id,
             "action": body.action,
-            "runStatus": status_map.get(body.action, "idle"),
+            "runtimeControl": build_runtime_control_snapshot(snapshot),
         }
     )
 

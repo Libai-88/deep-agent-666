@@ -96,20 +96,20 @@ def test_agents_skip_unconfigured_providers(monkeypatch, tmp_path) -> None:
     assert "coordinator-google-balanced" not in agent_names
 
 
-def test_run_control_endpoint_accepts_stop_action(monkeypatch, tmp_path) -> None:
+def test_run_control_endpoint_accepts_request_stop_action(monkeypatch, tmp_path) -> None:
     monkeypatch.setenv("OPENAI_API_KEY", "test-key")
 
     main_module = _reload_main(monkeypatch, tmp_path)
-    main_module.record_thread_runtime_snapshot(
-        "thread-1",
-        build_default_runtime_control_snapshot(),
-    )
+    snapshot = build_default_runtime_control_snapshot()
+    snapshot["available_actions"] = ["request_stop"]
+    snapshot["status_message"] = "Running"
+    main_module.record_thread_runtime_snapshot("thread-1", snapshot)
 
     response = asyncio.run(
         main_module.run_control(
             main_module.RunControlRequest(
                 thread_id="thread-1",
-                action="stop",
+                action="request_stop",
             )
         )
     )
@@ -119,8 +119,8 @@ def test_run_control_endpoint_accepts_stop_action(monkeypatch, tmp_path) -> None
     assert payload == {
         "status": "ok",
         "threadId": "thread-1",
-        "action": "stop",
-        "runStatus": "stopped",
+        "action": "request_stop",
+        "runtimeControl": snapshot,
     }
 
 
