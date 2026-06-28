@@ -1,3 +1,4 @@
+import { cn } from "@/lib/utils";
 import type { RecoverableAction } from "@/lib/runtime-errors";
 
 export function WorkbenchStatusNotice({
@@ -5,14 +6,24 @@ export function WorkbenchStatusNotice({
   description,
   actions,
   onAction,
+  tone = "info",
 }: {
   title: string;
   description: string;
   actions: RecoverableAction[];
   onAction: (action: RecoverableAction["action"]) => void;
+  tone?: "info" | "approval" | "danger";
 }) {
   return (
-    <div className="border-b border-border bg-amber-50 px-4 py-3">
+    <div
+      data-testid="workbench-status-notice"
+      className={cn(
+        "border-b px-4 py-3",
+        tone === "approval" && "border-[rgb(var(--accent-soft))] bg-[rgb(var(--surface-approval))]",
+        tone === "danger" && "border-red-200 bg-[rgb(var(--surface-danger))]",
+        tone === "info" && "border-border bg-amber-50",
+      )}
+    >
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="space-y-1">
           <p className="text-sm font-semibold">{title}</p>

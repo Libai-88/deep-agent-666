@@ -17,4 +17,19 @@ describe("WorkbenchStatusNotice", () => {
     expect(html).toContain("Backend unavailable");
     expect(html).toContain("Retry connection");
   });
+
+  it("applies approval tone styling", () => {
+    const html = renderToStaticMarkup(
+      <WorkbenchStatusNotice
+        title="Plan approved"
+        description="The supervisor has approved your plan."
+        actions={[]}
+        onAction={() => {}}
+        tone="approval"
+      />,
+    );
+
+    expect(html).toContain("Plan approved");
+    expect(html).toContain("--surface-approval");
+  });
 });
