@@ -104,6 +104,8 @@ test.describe("Page loads correctly", () => {
 
     await expect(page.getByTestId("workbench-shell")).toBeVisible();
     await expect(page.getByTestId("workbench-main-panel")).toBeVisible();
+    await expect(page.getByTestId("workbench-context-panel")).toBeVisible();
+    await expect(page.getByTestId("workbench-status-header")).toBeVisible();
   });
 
   test("home page shows no console errors", async ({ page }) => {

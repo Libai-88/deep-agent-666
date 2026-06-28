@@ -958,6 +958,7 @@ function HomePageContent() {
           <ResizableHandle />
           <ResizablePanel
             id="context-panel"
+            data-testid="workbench-context-panel"
             order={3}
             defaultSize={25}
             minSize={18}
