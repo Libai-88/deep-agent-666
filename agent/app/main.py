@@ -200,7 +200,7 @@ def queue_thread_control_command(
 
 
 def consume_thread_control_command(thread_id: str) -> dict[str, object] | None:
-    """消费线程上的待处理控制命令。"""
+    """消费线程上的待处理控制命令并更新快照。"""
 
     entry = THREAD_RUNTIME.get(thread_id)
     if entry is None:
@@ -208,6 +208,32 @@ def consume_thread_control_command(thread_id: str) -> dict[str, object] | None:
 
     command = entry["pending_command"]
     entry["pending_command"] = None
+    if command is not None:
+        action = command.get("action")
+        snapshot = entry["runtime_control"]
+        if action == "request_stop":
+            snapshot.update(
+                phase="cancelling",
+                status_message="Cancelling",
+            )
+        elif action == "approve_plan":
+            snapshot.update(
+                phase="resuming",
+                status_message="Approved, resuming",
+            )
+        elif action == "edit_plan":
+            snapshot.update(
+                phase="resuming",
+                status_message="Edit applied, resuming",
+            )
+        elif action == "retry_last":
+            snapshot.update(
+                phase="running",
+                status_message="Retrying",
+            )
+        entry["runtime_control"] = stamp_runtime_control(
+            typing.cast(RuntimeControlSnapshot, snapshot)
+        )
     return command
 
 
@@ -567,12 +593,14 @@ async def run_control(body: RunControlRequest) -> JSONResponse:
             status_code=409,
         )
 
+    result_snapshot = build_runtime_control_snapshot(next_snapshot)
     return JSONResponse(
         {
             "status": "ok",
             "threadId": body.thread_id,
             "action": body.action,
-            "runtime_control": build_runtime_control_snapshot(next_snapshot),
+            "runtime_control": result_snapshot,
+            "runtimeControl": result_snapshot,
         }
     )
 
@@ -647,6 +675,12 @@ async def run_agent(agent_name: str, input_data: RunAgentInput, request: Request
             phase="running",
             status_message="Running",
         )
+
+        pending = consume_thread_control_command(input_data.thread_id)
+        cancel_requested = False
+        if pending is not None and pending.get("action") == "request_stop":
+            cancel_requested = True
+
         saw_run_started = False
         open_text_messages: list[str] = []
         open_reasoning_messages: list[str] = []
@@ -662,6 +696,8 @@ async def run_agent(agent_name: str, input_data: RunAgentInput, request: Request
 
         try:
             async for event in agent.run(input_data):
+                if cancel_requested:
+                    break
                 if event.type == EventType.RUN_STARTED:
                     saw_run_started = True
                 elif event.type == EventType.TEXT_MESSAGE_START:
@@ -685,6 +721,17 @@ async def run_agent(agent_name: str, input_data: RunAgentInput, request: Request
                 status_message="Completed",
             )
         except Exception as exc:  # noqa: BLE001
+            if isinstance(exc, (KeyError, ValueError)):
+                entry = THREAD_RUNTIME.get(input_data.thread_id)
+                if entry is not None and entry["runtime_control"]["phase"] == "cancelling":
+                    _record_runtime_phase(
+                        input_data.thread_id,
+                        phase="cancelled",
+                        status_message="Cancelled",
+                        reason="user_stop",
+                    )
+                    return
+
             logger.exception("Direct AG-UI route '%s' failed", agent_name)
 
             if not saw_run_started:

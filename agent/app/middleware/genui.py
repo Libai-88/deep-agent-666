@@ -39,13 +39,13 @@ async def genui_middleware(state: dict[str, Any], config: RunnableConfig) -> Non
     if delegations:
         await _emit("delegations", delegations)
 
-    control_state = _get_state_field(state, "control_state")
-    if control_state:
-        await _emit("control_state", control_state)
-
     runtime_control = _get_state_field(state, "runtime_control")
     if runtime_control:
         await _emit("runtime_control", runtime_control)
+    else:
+        control_state = _get_state_field(state, "control_state")
+        if control_state:
+            await _emit("control_state", control_state)
 
     # Also check for legacy V2 fields (backward compat)
     phase = _get_state_field(state, "phase")

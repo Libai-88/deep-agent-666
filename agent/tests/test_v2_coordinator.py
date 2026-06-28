@@ -100,3 +100,4 @@ def test_planner_completion_emits_interrupted_runtime_control() -> None:
     assert runtime_control["reason"] == "plan_approval"
     assert runtime_control["available_actions"] == ["approve_plan", "edit_plan"]
     assert runtime_control["interrupt_payload"]["plan"] == "1. Inspect\n2. Update"
+    assert "control_state" not in update, "Fix 2: control_state removed when runtime_control present"

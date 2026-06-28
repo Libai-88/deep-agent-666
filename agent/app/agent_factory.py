@@ -435,18 +435,34 @@ def _build_delegation_completed_command(
     status_title = "completed" if status == "completed" else "failed"
     runtime_control = None
     if sub_agent == "planner" and status == "completed":
-        control_state: CoordinatorControlState = {
-            "status": "waiting_approval",
-            "current_step": "Planner review",
-            "available_actions": ["resume", "edit_plan"],
-            "pending_approval": True,
-        }
         runtime_control = build_plan_approval_interrupt(
             plan=result,
             task=task,
             sub_agent=sub_agent,
         )
-    elif status == "failed":
+        return Command(
+            update={
+                "delegations": [entry],
+                "workbench_events": [
+                    _build_workbench_event(
+                        kind="delegation",
+                        status=status,
+                        title=f"{sub_agent.title()} {status_title}",
+                        message=result if result else task,
+                        source=sub_agent,
+                        artifact_kind="summary" if sub_agent == "reviewer" and status == "completed" else None,
+                    )
+                ],
+                "runtime_control": runtime_control,
+                "task_kind": task_kind,
+                "final_summary": result if status == "completed" else "",
+                "messages": [
+                    ToolMessage(content=result, tool_call_id=tool_call_id)
+                ],
+            }
+        )
+
+    if status == "failed":
         control_state = {
             "status": "failed",
             "current_step": f"{sub_agent.title()} failed",
@@ -481,7 +497,6 @@ def _build_delegation_completed_command(
                 )
             ],
             "control_state": control_state,
-            "runtime_control": runtime_control,
             "task_kind": task_kind,
             "final_summary": result if status == "completed" else "",
             "messages": [
