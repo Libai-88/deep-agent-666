@@ -237,7 +237,6 @@ function HomePageContent() {
 
   const [threads, setThreads] = useState<LocalThread[]>(() => loadThreads());
   const [settingsOpen, setSettingsOpen] = useState(false);
-  const [planEditorOpen, setPlanEditorOpen] = useState(false);
   const [planEditorDraft, setPlanEditorDraft] = useState("");
   const [workbenchState, setWorkbenchState] = useState<ThreadWorkbenchState>(
     () => createEmptyWorkbenchState(),
@@ -367,7 +366,6 @@ function HomePageContent() {
       setWorkbenchState(createEmptyWorkbenchState());
       setHasLiveThreadActivity(false);
       setRuntimeControl(null);
-      setPlanEditorOpen(false);
       setPlanEditorDraft("");
       return;
     }
@@ -376,7 +374,6 @@ function HomePageContent() {
     setLoadedWorkbenchThreadId(activeThread.id);
     setHasLiveThreadActivity(false);
     setRuntimeControl(null);
-    setPlanEditorOpen(false);
     setPlanEditorDraft("");
   }, [activeThread]);
 
@@ -635,6 +632,13 @@ function HomePageContent() {
     ],
   );
 
+  const ACTION_LABELS: Record<RunControlAction, string> = {
+    approve_plan: "Approve Plan",
+    edit_plan: "Edit Plan",
+    retry_last: "Retry Last",
+    request_stop: "Stop",
+  };
+
   const handleRunControlAction = useCallback(
     async (action: RunControlAction) => {
       if (action === "retry_last") {
@@ -650,7 +654,6 @@ function HomePageContent() {
         setPlanEditorDraft(
           buildEditablePlanDraft(workbenchState.todos, workbenchState.events),
         );
-        setPlanEditorOpen(true);
         return;
       }
 
@@ -680,6 +683,7 @@ function HomePageContent() {
         });
         if (result) {
           setRuntimeControl(result);
+          setRecoverableError(null);
         } else {
           setRecoverableError("runtime_request_failed");
         }
@@ -873,12 +877,6 @@ function HomePageContent() {
                   onAction={(action) => void handleRunControlAction(action)}
                 />
               </div>
-              <PlanEditorPanel
-                snapshot={runtimeControl as unknown as RunControlSnapshot}
-                draftPlan={planEditorDraft}
-                onDraftPlanChange={setPlanEditorDraft}
-                onSubmit={(action) => void handlePlanEditorSubmit(action)}
-              />
               {/* Model / Permission bar */}
               <div className="flex items-center gap-2 border-b border-border px-4 py-2">
                 <span className="text-xs text-muted-foreground">Model:</span>
@@ -943,6 +941,9 @@ function HomePageContent() {
                       pendingThreadRun={pendingThreadRun}
                       setThreads={setThreads}
                       setWorkbenchState={setWorkbenchState}
+                      planEditorDraft={planEditorDraft}
+                      setPlanEditorDraft={setPlanEditorDraft}
+                      onPlanEditorSubmit={handlePlanEditorSubmit}
                     />
                   </CopilotChatConfigurationProvider>
                 ) : (
@@ -1432,6 +1433,9 @@ function ActiveThreadChat({
   pendingThreadRun,
   setThreads,
   setWorkbenchState,
+  planEditorDraft,
+  setPlanEditorDraft,
+  onPlanEditorSubmit,
 }: {
   activeAgentId: string;
   activeThread: LocalThread;
@@ -1445,6 +1449,9 @@ function ActiveThreadChat({
   pendingThreadRun: PendingThreadRun | null;
   setThreads: React.Dispatch<React.SetStateAction<LocalThread[]>>;
   setWorkbenchState: React.Dispatch<React.SetStateAction<ThreadWorkbenchState>>;
+  planEditorDraft: string;
+  setPlanEditorDraft: React.Dispatch<React.SetStateAction<string>>;
+  onPlanEditorSubmit: (action: RunControlAction) => void;
 }) {
   const { agent } = useAgent({
     agentId: activeAgentId,
@@ -1474,9 +1481,7 @@ function ActiveThreadChat({
   })();
 
   useEffect(() => {
-    if (rawRuntimeControl) {
-      setRuntimeControl(rawRuntimeControl);
-    }
+    setRuntimeControl(rawRuntimeControl ?? null);
   }, [rawRuntimeControl, setRuntimeControl]);
 
   const coordinatorWorkbenchSnapshot = (() => {
@@ -1641,16 +1646,25 @@ function ActiveThreadChat({
 
   return (
     <>
-      <CopilotChat
-        className="h-full"
-        agentId={activeAgentId}
-        threadId={activeThread.id}
-        labels={{
-          welcomeMessageText: "Hi! I'm your local AI agent. I can help you with code, files, and tasks.",
-          chatInputPlaceholder: "Ask me to research, write files, or manage tasks...",
-          chatDisclaimerText: "AI responses may be inaccurate. Verify important information.",
-        }}
-      />
+      {rawRuntimeControl?.phase === "interrupted" && rawRuntimeControl?.reason === "plan_approval" ? (
+        <PlanEditorPanel
+          snapshot={rawRuntimeControl}
+          draftPlan={planEditorDraft}
+          onDraftPlanChange={setPlanEditorDraft}
+          onSubmit={onPlanEditorSubmit}
+        />
+      ) : (
+        <CopilotChat
+          className="h-full"
+          agentId={activeAgentId}
+          threadId={activeThread.id}
+          labels={{
+            welcomeMessageText: "Hi! I'm your local AI agent. I can help you with code, files, and tasks.",
+            chatInputPlaceholder: "Ask me to research, write files, or manage tasks...",
+            chatDisclaimerText: "AI responses may be inaccurate. Verify important information.",
+          }}
+        />
+      )}
     </>
   );
 }
