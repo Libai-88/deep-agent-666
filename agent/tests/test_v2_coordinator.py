@@ -82,3 +82,21 @@ def test_completed_delegation_command_includes_workbench_event() -> None:
     assert update["workbench_events"][0]["title"] == "Reviewer completed"
     assert update["workbench_events"][0]["message"] == "Reviewer confirmed the next engineering steps."
     assert update["workbench_events"][0]["source"] == "reviewer"
+
+
+def test_planner_completion_emits_interrupted_runtime_control() -> None:
+    command = _build_delegation_completed_command(
+        sub_agent="planner",
+        task="Plan the fix",
+        status="completed",
+        result="1. Inspect\n2. Update",
+        tool_call_id="tool-1",
+        task_kind="engineering",
+    )
+
+    update = command.update or {}
+    runtime_control = update["runtime_control"]
+    assert runtime_control["phase"] == "interrupted"
+    assert runtime_control["reason"] == "plan_approval"
+    assert runtime_control["available_actions"] == ["approve_plan", "edit_plan"]
+    assert runtime_control["interrupt_payload"]["plan"] == "1. Inspect\n2. Update"

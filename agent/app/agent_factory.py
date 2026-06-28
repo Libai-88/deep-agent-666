@@ -26,7 +26,9 @@ from app.state import (
     CoordinatorControlState,
     CoordinatorState,
     Delegation,
+    RuntimeControlSnapshot,
     WorkbenchEvent,
+    build_default_runtime_control_snapshot,
 )
 from app.task_profile import infer_task_kind, task_prompt_fragment
 from app.tools.documents import inspect_document, read_document
@@ -393,6 +395,27 @@ def _build_delegation_running_command(
     )
 
 
+def build_plan_approval_interrupt(
+    *,
+    plan: str,
+    task: str,
+    sub_agent: str,
+) -> RuntimeControlSnapshot:
+    """构建 planner 完成后的中断控制快照。"""
+
+    snapshot = build_default_runtime_control_snapshot()
+    snapshot.update(
+        phase="interrupted",
+        reason="plan_approval",
+        available_actions=["approve_plan", "edit_plan"],
+        status_message="Planner review required",
+        current_step="Planner review",
+        interrupt_payload={"plan": plan, "task": task},
+        active_delegation=sub_agent,
+    )
+    return snapshot
+
+
 def _build_delegation_completed_command(
     *,
     sub_agent: Literal["planner", "executor", "reviewer"],
@@ -410,6 +433,7 @@ def _build_delegation_completed_command(
         "result": result,
     }
     status_title = "completed" if status == "completed" else "failed"
+    runtime_control = None
     if sub_agent == "planner" and status == "completed":
         control_state: CoordinatorControlState = {
             "status": "waiting_approval",
@@ -417,6 +441,11 @@ def _build_delegation_completed_command(
             "available_actions": ["resume", "edit_plan"],
             "pending_approval": True,
         }
+        runtime_control = build_plan_approval_interrupt(
+            plan=result,
+            task=task,
+            sub_agent=sub_agent,
+        )
     elif status == "failed":
         control_state = {
             "status": "failed",
@@ -452,6 +481,7 @@ def _build_delegation_completed_command(
                 )
             ],
             "control_state": control_state,
+            "runtime_control": runtime_control,
             "task_kind": task_kind,
             "final_summary": result if status == "completed" else "",
             "messages": [

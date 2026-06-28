@@ -43,6 +43,10 @@ async def genui_middleware(state: dict[str, Any], config: RunnableConfig) -> Non
     if control_state:
         await _emit("control_state", control_state)
 
+    runtime_control = _get_state_field(state, "runtime_control")
+    if runtime_control:
+        await _emit("runtime_control", runtime_control)
+
     # Also check for legacy V2 fields (backward compat)
     phase = _get_state_field(state, "phase")
     if phase and phase != "idle":

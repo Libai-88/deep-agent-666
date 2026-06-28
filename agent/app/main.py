@@ -37,6 +37,7 @@ from app.runtime_registry import (
     RuntimeAgentRegistry,
     build_runtime_registry,
 )
+from app.state import build_default_runtime_control_snapshot
 from app.state import RuntimeControlAction
 from app.state import RuntimeControlSnapshot
 from app.tools.workspace import resolve_workspace_path
@@ -86,7 +87,7 @@ class ThreadRuntimeEntry(typing.TypedDict):
 
     thread_id: str
     runtime_control: RuntimeControlSnapshot
-    pending_command: str | None
+    pending_command: dict[str, object] | None
 
 
 runtime_registry: RuntimeAgentRegistry = build_runtime_registry(
@@ -108,6 +109,23 @@ def build_runtime_control_snapshot(
     return snapshot
 
 
+def stamp_runtime_control(snapshot: RuntimeControlSnapshot) -> RuntimeControlSnapshot:
+    """刷新运行时控制快照时间戳。"""
+
+    stamped = dict(snapshot)
+    stamped["updated_at"] = build_default_runtime_control_snapshot()["updated_at"]
+    return typing.cast(RuntimeControlSnapshot, stamped)
+
+
+class ControlActionNotAllowed(Exception):
+    """控制动作不允许时抛出。"""
+
+    def __init__(self, action: str, phase: str) -> None:
+        self.action = action
+        self.phase = phase
+        super().__init__(f"action '{action}' is not allowed while phase is '{phase}'")
+
+
 def get_thread_runtime_snapshot(thread_id: str) -> RuntimeControlSnapshot | None:
     entry = THREAD_RUNTIME.get(thread_id)
     return None if entry is None else entry["runtime_control"]
@@ -119,9 +137,99 @@ def record_thread_runtime_snapshot(
 ) -> None:
     THREAD_RUNTIME[thread_id] = {
         "thread_id": thread_id,
-        "runtime_control": build_runtime_control_snapshot(snapshot),
+        "runtime_control": stamp_runtime_control(build_runtime_control_snapshot(snapshot)),
         "pending_command": None,
     }
+
+
+def queue_thread_control_command(
+    thread_id: str,
+    command: dict[str, object],
+) -> RuntimeControlSnapshot:
+    """入队线程控制命令，并同步更新 canonical runtime_control。"""
+
+    entry = THREAD_RUNTIME.get(thread_id)
+    if entry is None:
+        raise KeyError(thread_id)
+
+    snapshot = entry["runtime_control"]
+    action = command.get("action")
+    if not isinstance(action, str):
+        raise ValueError("control command action must be a string")
+
+    allowed = set(snapshot["available_actions"])
+    if action not in allowed:
+        raise ControlActionNotAllowed(action, snapshot["phase"])
+
+    next_snapshot = dict(snapshot)
+    if action == "request_stop":
+        next_snapshot.update(
+            phase="cancellation_requested",
+            reason="user_stop",
+            available_actions=[],
+            status_message="Cancellation requested",
+        )
+    elif action == "approve_plan":
+        next_snapshot.update(
+            phase="resuming",
+            reason="none",
+            available_actions=["request_stop"],
+            status_message="Resuming after plan approval",
+        )
+    elif action == "edit_plan":
+        next_snapshot.update(
+            phase="resuming",
+            reason="none",
+            available_actions=["request_stop"],
+            status_message="Resuming after plan edit",
+        )
+    elif action == "retry_last":
+        next_snapshot.update(
+            phase="resuming",
+            reason="none",
+            available_actions=["request_stop"],
+            status_message="Retry requested",
+            last_error=None,
+        )
+
+    entry["pending_command"] = dict(command)
+    entry["runtime_control"] = stamp_runtime_control(
+        typing.cast(RuntimeControlSnapshot, next_snapshot)
+    )
+    return entry["runtime_control"]
+
+
+def consume_thread_control_command(thread_id: str) -> dict[str, object] | None:
+    """消费线程上的待处理控制命令。"""
+
+    entry = THREAD_RUNTIME.get(thread_id)
+    if entry is None:
+        return None
+
+    command = entry["pending_command"]
+    entry["pending_command"] = None
+    return command
+
+
+def _record_runtime_phase(
+    thread_id: str,
+    *,
+    phase: typing.Literal["running", "completed", "failed"],
+    status_message: str,
+    reason: typing.Literal["none", "error"] = "none",
+    last_error: str | None = None,
+) -> None:
+    snapshot = build_default_runtime_control_snapshot()
+    existing_snapshot = get_thread_runtime_snapshot(thread_id)
+    if existing_snapshot is not None:
+        snapshot.update(existing_snapshot)
+
+    snapshot["phase"] = phase
+    snapshot["status_message"] = status_message
+    snapshot["reason"] = reason
+    snapshot["last_error"] = last_error
+    snapshot["available_actions"] = ["request_stop"] if phase == "running" else []
+    record_thread_runtime_snapshot(thread_id, snapshot)
 
 
 sdk = CopilotKitRemoteEndpoint(agents=LiveAgentAccessor(_current_registry))
@@ -441,12 +549,30 @@ async def run_control(body: RunControlRequest) -> JSONResponse:
             status_code=404,
         )
 
+    command: dict[str, object] = {"action": body.action}
+    if body.run_id is not None:
+        command["run_id"] = body.run_id
+    if body.plan_patch is not None:
+        command["plan_patch"] = body.plan_patch
+
+    try:
+        next_snapshot = queue_thread_control_command(body.thread_id, command)
+    except ControlActionNotAllowed:
+        return JSONResponse(
+            {
+                "status": "error",
+                "code": "control_action_not_allowed",
+                "message": "control action is not allowed for the current runtime state",
+            },
+            status_code=409,
+        )
+
     return JSONResponse(
         {
             "status": "ok",
             "threadId": body.thread_id,
             "action": body.action,
-            "runtimeControl": build_runtime_control_snapshot(snapshot),
+            "runtime_control": build_runtime_control_snapshot(next_snapshot),
         }
     )
 
@@ -516,6 +642,11 @@ async def run_agent(agent_name: str, input_data: RunAgentInput, request: Request
     encoder = EventEncoder(accept=request.headers.get("accept"))
 
     async def event_generator():
+        _record_runtime_phase(
+            input_data.thread_id,
+            phase="running",
+            status_message="Running",
+        )
         saw_run_started = False
         open_text_messages: list[str] = []
         open_reasoning_messages: list[str] = []
@@ -547,6 +678,12 @@ async def run_agent(agent_name: str, input_data: RunAgentInput, request: Request
                     _forget(open_tool_calls, event.tool_call_id)
 
                 yield encoder.encode(event)
+
+            _record_runtime_phase(
+                input_data.thread_id,
+                phase="completed",
+                status_message="Completed",
+            )
         except Exception as exc:  # noqa: BLE001
             logger.exception("Direct AG-UI route '%s' failed", agent_name)
 
@@ -568,6 +705,13 @@ async def run_agent(agent_name: str, input_data: RunAgentInput, request: Request
                 yield encoder.encode(ToolCallEndEvent(tool_call_id=tool_call_id))
 
             code, message = _classify_route_exception(exc)
+            _record_runtime_phase(
+                input_data.thread_id,
+                phase="failed",
+                status_message="Failed",
+                reason="error",
+                last_error=message,
+            )
             yield encoder.encode(
                 RunErrorEvent(
                     message=message,
